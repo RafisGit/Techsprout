@@ -1,0 +1,2168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TechSprout School LMS - Product Research & Development Guideline</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Hind+Siliguri:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  @page {
+    size: A4;
+    margin: 20mm 16mm 20mm 16mm;
+    @bottom-right {
+      content: counter(page);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 8pt;
+      color: #64748B;
+    }
+    @bottom-left {
+      content: "TechSprout School LMS — Product Research & Engineering Guideline";
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 8pt;
+      color: #64748B;
+    }
+  }
+
+  * {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 10pt;
+    line-height: 1.55;
+    color: #1E293B;
+    background: #FFFFFF;
+    margin: 0;
+    padding: 0;
+  }
+
+  .bangla-text {
+    font-family: 'Hind Siliguri', 'Plus Jakarta Sans', sans-serif;
+  }
+
+  .page-break {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .avoid-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Cover Page */
+  .cover-page {
+    height: 100vh;
+    min-height: 270mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 30mm 10mm 15mm 10mm;
+    background: linear-gradient(135deg, #091E3A 0%, #102A45 50%, #0F3B4C 100%);
+    color: #FFFFFF;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cover-badge {
+    display: inline-block;
+    background: rgba(16, 185, 129, 0.2);
+    color: #34D399;
+    border: 1px solid rgba(52, 211, 153, 0.4);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 9pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 20px;
+  }
+
+  .cover-title {
+    font-size: 32pt;
+    font-weight: 800;
+    line-height: 1.15;
+    margin: 0 0 16px 0;
+    letter-spacing: -0.5px;
+    color: #FFFFFF;
+  }
+
+  .cover-subtitle {
+    font-size: 13pt;
+    font-weight: 400;
+    line-height: 1.6;
+    color: #94A3B8;
+    max-width: 90%;
+    margin-bottom: 40px;
+  }
+
+  .cover-divider {
+    width: 80px;
+    height: 4px;
+    background: #10B981;
+    border-radius: 2px;
+    margin-bottom: 30px;
+  }
+
+  .cover-roles {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 40px;
+  }
+
+  .cover-role-item {
+    font-size: 8.5pt;
+    color: #CBD5E1;
+  }
+
+  .cover-role-item strong {
+    color: #38BDF8;
+  }
+
+  .cover-meta {
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    padding-top: 20px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 9pt;
+    color: #94A3B8;
+  }
+
+  /* Typography */
+  h1 {
+    font-size: 20pt;
+    font-weight: 800;
+    color: #0F172A;
+    margin-top: 28pt;
+    margin-bottom: 12pt;
+    border-bottom: 2px solid #E2E8F0;
+    padding-bottom: 6pt;
+    letter-spacing: -0.3px;
+  }
+
+  h1.section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  h1 .num {
+    background: #0284C7;
+    color: #FFFFFF;
+    font-size: 11pt;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 6px;
+    display: inline-block;
+  }
+
+  h2 {
+    font-size: 13.5pt;
+    font-weight: 700;
+    color: #1E293B;
+    margin-top: 18pt;
+    margin-bottom: 8pt;
+    border-left: 3.5px solid #0284C7;
+    padding-left: 8px;
+  }
+
+  h3 {
+    font-size: 11pt;
+    font-weight: 600;
+    color: #334155;
+    margin-top: 14pt;
+    margin-bottom: 6pt;
+  }
+
+  p {
+    margin: 0 0 8pt 0;
+    text-align: justify;
+  }
+
+  /* Executive Decision Summary Box */
+  .eds-container {
+    background: #F8FAFC;
+    border: 2px solid #0284C7;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+  }
+
+  .eds-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #CBD5E1;
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+  }
+
+  .eds-title {
+    font-size: 14pt;
+    font-weight: 800;
+    color: #0369A1;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0;
+  }
+
+  .eds-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 18px;
+  }
+
+  .eds-item {
+    font-size: 8.8pt;
+    line-height: 1.45;
+  }
+
+  .eds-item strong {
+    color: #0F172A;
+    display: block;
+    margin-bottom: 2px;
+    font-size: 9pt;
+  }
+
+  /* Callout Boxes */
+  .callout {
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin: 12pt 0;
+    font-size: 9.2pt;
+    line-height: 1.5;
+  }
+
+  .callout-critical {
+    background: #FEF2F2;
+    border-left: 4px solid #EF4444;
+    color: #991B1B;
+  }
+
+  .callout-warning {
+    background: #FFFBEB;
+    border-left: 4px solid #F59E0B;
+    color: #92400E;
+  }
+
+  .callout-info {
+    background: #F0F9FF;
+    border-left: 4px solid #0284C7;
+    color: #075985;
+  }
+
+  .callout-success {
+    background: #ECFDF5;
+    border-left: 4px solid #10B981;
+    color: #065F46;
+  }
+
+  .callout-title {
+    font-weight: 700;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10pt 0;
+    font-size: 8.5pt;
+  }
+
+  th, td {
+    padding: 6pt 8pt;
+    text-align: left;
+    vertical-align: top;
+    border: 1px solid #CBD5E1;
+  }
+
+  th {
+    background: #F1F5F9;
+    color: #0F172A;
+    font-weight: 700;
+    font-size: 8.5pt;
+  }
+
+  tr:nth-child(even) td {
+    background: #F8FAFC;
+  }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 7.2pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+  }
+
+  .badge-critical { background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
+  .badge-high { background: #FFEDD5; color: #9A3412; border: 1px solid #FDBA74; }
+  .badge-medium { background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; }
+  .badge-low { background: #E0E7FF; color: #3730A3; border: 1px solid #A5B4FC; }
+  .badge-mvp { background: #DCFCE7; color: #166534; border: 1px solid #86EFAC; }
+  .badge-postmvp { background: #E0F2FE; color: #075985; border: 1px solid #7DD3FC; }
+  .badge-future { background: #F3E8FF; color: #6B21A8; border: 1px solid #D8B4FE; }
+
+  .status-tag {
+    font-weight: 700;
+    font-size: 7.5pt;
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+  .status-complete { background: #D1FAE5; color: #065F46; }
+  .status-mock { background: #FEF3C7; color: #92400E; }
+  .status-broken { background: #FEE2E2; color: #991B1B; }
+  .status-missing { background: #F1F5F9; color: #475569; }
+  .status-partial { background: #E0E7FF; color: #3730A3; }
+
+  /* Code & Pre */
+  code {
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 8pt;
+    background: #F1F5F9;
+    padding: 1.5px 4px;
+    border-radius: 3px;
+    color: #0F172A;
+  }
+
+  pre {
+    background: #0F172A;
+    color: #F8FAFC;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 7.8pt;
+    line-height: 1.45;
+    overflow-x: auto;
+    margin: 8pt 0;
+  }
+
+  pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+  }
+
+  /* TOC */
+  .toc-container {
+    padding: 10px 0;
+  }
+  .toc-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px dotted #CBD5E1;
+    font-size: 8.8pt;
+  }
+  .toc-item a {
+    color: #1E293B;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .toc-item span.page-num {
+    color: #64748B;
+    font-weight: 600;
+  }
+
+  /* Diagram Blocks */
+  .diagram-box {
+    background: #F8FAFC;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    padding: 12px;
+    margin: 10pt 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8pt;
+    line-height: 1.4;
+    color: #334155;
+  }
+
+  /* Checklists */
+  .check-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 4px;
+    font-size: 8.8pt;
+  }
+  .check-box {
+    font-family: monospace;
+    font-weight: bold;
+    color: #0284C7;
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= COVER PAGE ================= -->
+<div class="cover-page page-break">
+  <div>
+    <div class="cover-badge">Confidential &bull; Strategic Product Architecture</div>
+    <div class="cover-title">TECHSPROUT SCHOOL LMS</div>
+    <div class="cover-subtitle">Product Research, Comprehensive Codebase Audit, REST API & Database Architecture, and Production Launch Guideline</div>
+    <div class="cover-divider"></div>
+  </div>
+
+  <div>
+    <div class="cover-roles">
+      <div class="cover-role-item"><strong>Senior Product Manager:</strong> Product Strategy, MVP Scope, EdTech Benchmarks</div>
+      <div class="cover-role-item"><strong>Software Architect:</strong> Modular Monolith, Data Pipelines, Media CDN</div>
+      <div class="cover-role-item"><strong>REST API Architect:</strong> Versioned API Envelopes, RBAC & Endpoints</div>
+      <div class="cover-role-item"><strong>Security & SQA Engineer:</strong> OWASP Top 10, Auth Hygiene, Test Coverage</div>
+      <div class="cover-role-item"><strong>UX / Product Analyst:</strong> Learner Portals, Evaluation UX, Mobile Readiness</div>
+      <div class="cover-role-item"><strong>Technical Project Manager:</strong> Phased WBS, Gantt Roadmaps, Cost Scenarios</div>
+    </div>
+
+    <div class="cover-meta">
+      <div><strong>Target Platform:</strong> Web (Desktop/Mobile) &bull; Future iOS/Android Native</div>
+      <div><strong>Document Version:</strong> 1.0.0-RC &bull; Date: September 2026</div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ONE-PAGE EXECUTIVE DECISION SUMMARY ================= -->
+<div class="page-break">
+  <div class="eds-container">
+    <div class="eds-header">
+      <div class="eds-title">One-Page Executive Decision Summary</div>
+      <span class="badge badge-critical">Read First &bull; Executive Mandate</span>
+    </div>
+    
+    <div class="eds-grid">
+      <div class="eds-item">
+        <strong>1. What is TechSprout currently?</strong>
+        A polished Next.js 16 frontend marketing prototype. Course browsing, blogs, and landing pages render strictly from in-memory mock data (<code>src/lib/mockData/mockData.ts</code>). No real course learning, enrollment, or examination backend exists.
+      </div>
+
+      <div class="eds-item">
+        <strong>2. What is missing?</strong>
+        Functional session authentication, student course player/viewer, teacher course builder, admin moderation tools, online examination/quiz engine, certificate generation, real payment gateway (bKash/Nagad/Cards), and internationalization (Bangla support).
+      </div>
+
+      <div class="eds-item">
+        <strong>3. What should the MVP contain?</strong>
+        Student/Teacher/Admin accounts, email/phone OTP login, course publishing, modular video player with progress tracking, timed MCQ exams with automatic grading, student dashboard with enrollment history, and single-gateway checkout (bKash/Nagad).
+      </div>
+
+      <div class="eds-item">
+        <strong>4. What should NOT be built yet?</strong>
+        Live Zoom/WebRTC classes, real-time peer chat, AI recommendation engines, gamification token economies, complex proctoring (webcam AI), and native iOS/Android apps prior to stabilizing the core REST API.
+      </div>
+
+      <div class="eds-item">
+        <strong>5. What backend architecture is recommended?</strong>
+        A Clean Modular Architecture built inside the Next.js 16 App Router using isolated Domain Services, Repository pattern with Mongoose/MongoDB, and strict DTO validation via Zod schemas. This leverages existing infrastructure while enabling future extraction.
+      </div>
+
+      <div class="eds-item">
+        <strong>6. What REST API architecture is recommended?</strong>
+        A versioned <code>/api/v1/...</code> RESTful structure with standardized JSON response envelopes (<code>{ success, message, data, meta }</code>), HTTP status codes, bearer JWT sessions, cursor/offset pagination, and centralized error logging.
+      </div>
+
+      <div class="eds-item">
+        <strong>7. What authentication options should be considered?</strong>
+        <strong>MVP:</strong> Email/Password + Phone Number with 6-digit SMS OTP + Google OAuth. <br>
+        <strong>Post-MVP:</strong> Facebook Login, passwordless magic links, and session termination across all active devices.
+      </div>
+
+      <div class="eds-item">
+        <strong>8. How should Bangla + English work?</strong>
+        Routing via <code>next-intl</code> (<code>/bn/...</code>, <code>/en/...</code>) with cookie fallback; static UI translated via JSON catalogs; course/lesson content stored in bilingual database fields; typography powered by Google Fonts <code>Hind Siliguri</code> and <code>Plus Jakarta Sans</code>.
+      </div>
+
+      <div class="eds-item">
+        <strong>9. What are the biggest risks?</strong>
+        <strong>Security:</strong> Plaintext password storage in <code>/api/register</code> and open role assignment. <br>
+        <strong>Operational:</strong> Uncontrolled video streaming egress costs without CDN tokens. <br>
+        <strong>Business:</strong> MFS payment dropouts without automated webhook reconciliation.
+      </div>
+
+      <div class="eds-item">
+        <strong>10. What is the estimated MVP development timeline?</strong>
+        <strong>Solo Developer:</strong> 22–26 calendar weeks (approx. 110–130 working days). <br>
+        <strong>Small Team (3 Devs + 1 QA):</strong> 10–13 calendar weeks (approx. 50–65 working days).
+      </div>
+
+      <div class="eds-item">
+        <strong>11. What is the recommended order of development?</strong>
+        1. Security & Auth Stabilization &rarr; 2. Role-Based Access Control (RBAC) &rarr; 3. Course Hierarchy & Media Hosting &rarr; 4. Learning Portal & Progress &rarr; 5. Exam/Quiz Engine &rarr; 6. Payments & Enrollments &rarr; 7. Multilingual &rarr; 8. QA Launch Gate.
+      </div>
+
+      <div class="eds-item">
+        <strong>12. What should I do immediately after this research?</strong>
+        Immediately close the plaintext password vulnerability in <code>/api/register</code>, fix the form input binding bug in <code>Register.tsx</code>, standardize MongoDB schemas, and implement the formal <code>/api/v1/auth</code> service.
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-info avoid-break">
+    <div class="callout-title">Architectural Mandate</div>
+    <p>Do not write production feature code until the domain models, database schema indexes, and API response contracts detailed in this document are approved. Transitioning an LMS from prototype to production requires absolute data integrity around student enrollments, exam answers, and financial transactions.</p>
+  </div>
+</div>
+
+<!-- ================= TABLE OF CONTENTS ================= -->
+<div class="page-break">
+  <h1>Table of Contents</h1>
+  <div class="toc-container">
+    <div class="toc-item"><span><strong>One-Page Executive Decision Summary</strong></span><span class="page-num">Page 2</span></div>
+    <div class="toc-item"><span><strong>1. Executive Summary</strong></span><span class="page-num">Section 1</span></div>
+    <div class="toc-item"><span><strong>2. Existing Project Audit & Codebase Inspection</strong></span><span class="page-num">Section 2</span></div>
+    <div class="toc-item"><span><strong>3. Market & Competitor Research (Bangladesh & Global EdTech)</strong></span><span class="page-num">Section 3</span></div>
+    <div class="toc-item"><span><strong>4. Product Vision & Pedagogical Architecture</strong></span><span class="page-num">Section 4</span></div>
+    <div class="toc-item"><span><strong>5. MVP Scope Definition (Must Have vs. Should Have vs. Future)</strong></span><span class="page-num">Section 5</span></div>
+    <div class="toc-item"><span><strong>6. Launch-Readiness Feature Gap Analysis</strong></span><span class="page-num">Section 6</span></div>
+    <div class="toc-item"><span><strong>7. Authentication & Identity Management Strategy</strong></span><span class="page-num">Section 7</span></div>
+    <div class="toc-item"><span><strong>8. Language & Internationalization (i18n) Architecture</strong></span><span class="page-num">Section 8</span></div>
+    <div class="toc-item"><span><strong>9. Backend Engineering & Services Plan</strong></span><span class="page-num">Section 9</span></div>
+    <div class="toc-item"><span><strong>10. REST API Architecture & Formal Specification</strong></span><span class="page-num">Section 10</span></div>
+    <div class="toc-item"><span><strong>11. Database Architecture & Data Modeling (MongoDB/Mongoose)</strong></span><span class="page-num">Section 11</span></div>
+    <div class="toc-item"><span><strong>12. Online Examination & Assessment Engine</strong></span><span class="page-num">Section 12</span></div>
+    <div class="toc-item"><span><strong>13. Evaluation, Grading & Academic Results System</strong></span><span class="page-num">Section 13</span></div>
+    <div class="toc-item"><span><strong>14. Student, Teacher & Admin Role Responsibility Matrix</strong></span><span class="page-num">Section 14</span></div>
+    <div class="toc-item"><span><strong>15. Security Requirements & Threat Mitigation (OWASP Top 10)</strong></span><span class="page-num">Section 15</span></div>
+    <div class="toc-item"><span><strong>16. QA / SQA Launch Audit & Defect Catalog</strong></span><span class="page-num">Section 16</span></div>
+    <div class="toc-item"><span><strong>17. Mobile Application Strategy & API Convergence</strong></span><span class="page-num">Section 17</span></div>
+    <div class="toc-item"><span><strong>18. Sequential Product Development Roadmap (Phases 1–14)</strong></span><span class="page-num">Section 18</span></div>
+    <div class="toc-item"><span><strong>19. MVP Research & Estimated Time Frame to Launch</strong></span><span class="page-num">Section 19</span></div>
+    <div class="toc-item"><span><strong>20. Full Product Development Timeline (Solo vs. Small Team)</strong></span><span class="page-num">Section 20</span></div>
+    <div class="toc-item"><span><strong>21. Infrastructure, Cloud Resources & Operational Cost Model</strong></span><span class="page-num">Section 21</span></div>
+    <div class="toc-item"><span><strong>22. Master Launch Readiness Checklist</strong></span><span class="page-num">Section 22</span></div>
+    <div class="toc-item"><span><strong>23. Critical Gap Report (Severity-Ranked Findings)</strong></span><span class="page-num">Section 23</span></div>
+    <div class="toc-item"><span><strong>24. Recommended Immediate Next Steps (30-Day Engineering Plan)</strong></span><span class="page-num">Section 24</span></div>
+    <div class="toc-item"><span><strong>25. Technical References & Industry Standards</strong></span><span class="page-num">Section 25</span></div>
+  </div>
+</div>
+
+<!-- ================= SECTION 1: EXECUTIVE SUMMARY ================= -->
+<div class="avoid-break">
+  <h1 class="section-title"><span class="num">01</span> Executive Summary</h1>
+  <p>TechSprout School is poised to become a premiere online learning management system (LMS) purpose-built for the Bangladeshi ecosystem and regional international learners. The platform aims to bridge the critical gap between academic instruction, practical technical skills, and structured career readiness. To achieve market leadership, TechSprout must deliver a flawless, high-retention digital learning experience characterized by robust video delivery, interactive online examinations, instant academic evaluation, and frictionless localized payments.</p>
+
+  <p>This document presents the findings of an exhaustive architectural, codebase, security, and product audit of the current TechSprout repository. While the codebase exhibits modern visual aesthetics using Next.js 16, Tailwind CSS v4, and Radix UI primitives, it is currently in a <strong>pre-alpha prototype state</strong>. The existing implementation lacks core functional backends, exposes serious security vulnerabilities, and utilizes static mock data across all public catalogs.</p>
+
+  <div class="callout callout-warning avoid-break">
+    <div class="callout-title">Strategic Assessment</div>
+    <p>TechSprout School currently possesses a polished storefront, but <strong>zero operational LMS engines</strong>. Launching the platform requires transitioning from static marketing mockups into an enterprise-grade modular monolith with true data persistence, secure multi-role authentication, automated grading, and compliant MFS billing.</p>
+  </div>
+</div>
+
+<!-- ================= SECTION 2: EXISTING PROJECT AUDIT ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">02</span> Existing Project Audit & Codebase Inspection</h1>
+  <p>Every file, route handler, UI component, database schema, and configuration in <code>techsprout-main</code> was inspected. To provide absolute transparency, each core component has been categorized into one of six mutually exclusive technical states:</p>
+  
+  <p><strong>Status Definitions:</strong></p>
+  <ul>
+    <li><span class="status-tag status-complete">Fully Implemented</span>: Complete UI, working business logic, database persistence, and validation.</li>
+    <li><span class="status-tag status-partial">Partially Implemented</span>: Partially working logic or UI; missing error states or edge case handling.</li>
+    <li><span class="status-tag status-mock">UI Only / Mock</span>: Visual interface present, but reads hardcoded data or performs no real actions.</li>
+    <li><span class="status-tag status-broken">Broken</span>: Code exists but causes runtime errors, infinite loops, or severe logic failures.</li>
+    <li><span class="status-tag status-missing">Missing</span>: Feature is required for LMS operations but does not exist anywhere in the codebase.</li>
+  </ul>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">System Component</th>
+        <th style="width: 18%;">Current File / Location</th>
+        <th style="width: 15%;">Audit Status</th>
+        <th style="width: 42%;">Technical Findings & Code Evidence</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Authentication Engine</strong></td>
+        <td><code>src/auth.ts</code><br><code>src/app/api/[...nextauth]/route.ts</code></td>
+        <td><span class="status-tag status-broken">Broken</span></td>
+        <td>NextAuth v5 beta is configured, but <code>authorize</code> unconditionally returns <code>null</code>. Logging in is mathematically impossible through NextAuth.</td>
+      </tr>
+      <tr>
+        <td><strong>User Registration API</strong></td>
+        <td><code>src/app/api/(user)/register/route.ts</code></td>
+        <td><span class="status-tag status-broken">Broken / Critical</span></td>
+        <td>Directly persists <code>req.json()</code> to <code>User.create()</code> without password hashing (Argon2/bcrypt) or schema validation. Allows arbitrary role escalation. Returns empty 200 on error.</td>
+      </tr>
+      <tr>
+        <td><strong>User Registration Form</strong></td>
+        <td><code>src/components/forms/Register.tsx</code></td>
+        <td><span class="status-tag status-broken">Broken / Bug</span></td>
+        <td>Posts data to scratch endpoint <code>/test</code> instead of <code>/api/register</code>. Confirm Password field is erroneously bound to form key <code>name</code>, overwriting the user's name on typing.</td>
+      </tr>
+      <tr>
+        <td><strong>Login Component</strong></td>
+        <td><code>src/components/forms/Login.tsx</code></td>
+        <td><span class="status-tag status-mock">UI Only / Mock</span></td>
+        <td>Submit handler executes <code>console.log(userData)</code>. No session initiation, no cookie creation, no redirection to dashboard.</td>
+      </tr>
+      <tr>
+        <td><strong>OTP Verification Modal</strong></td>
+        <td><code>src/components/OtpModal.tsx</code><br><code>src/store/Otpstore.ts</code></td>
+        <td><span class="status-tag status-mock">UI Only / Mock</span></td>
+        <td>InputOTP slots render, but clicking Submit immediately triggers <code>setModalStatus('close')</code> with no backend verification endpoint, SMS gateway, or email trigger.</td>
+      </tr>
+      <tr>
+        <td><strong>Course Catalog & Filtering</strong></td>
+        <td><code>src/app/courses/page.tsx</code></td>
+        <td><span class="status-tag status-mock">UI Only / Mock</span></td>
+        <td>Renders static array <code>courses.slice(0, 6)</code> from <code>mockData.ts</code>. Category checkboxes, price toggles, search input, and pagination buttons have no event handlers.</td>
+      </tr>
+      <tr>
+        <td><strong>Course Details & Enrollment</strong></td>
+        <td><code>src/app/courses/[course]/page.tsx</code></td>
+        <td><span class="status-tag status-mock">UI Only / Mock</span></td>
+        <td>Reads synchronous mock data via <code>getSingleCourse()</code>. The "Enroll Now" button is a pure HTML button with no <code>onClick</code> handler or cart integration.</td>
+      </tr>
+      <tr>
+        <td><strong>Learning Player & Lessons</strong></td>
+        <td><code>src/app/courses/...</code></td>
+        <td><span class="status-tag status-missing">Missing</span></td>
+        <td>No classroom, video player with curriculum sidebar, lesson completion checklist, or resource download system exists for enrolled learners.</td>
+      </tr>
+      <tr>
+        <td><strong>Online Exam / Quiz System</strong></td>
+        <td><code>N/A</code></td>
+        <td><span class="status-tag status-missing">Missing</span></td>
+        <td>Zero schemas, API endpoints, or UI views exist for creating quizzes, taking timed exams, evaluating questions, or displaying test scores.</td>
+      </tr>
+      <tr>
+        <td><strong>Admin Dashboard</strong></td>
+        <td><code>src/app/dashboard/admin/courses/page.tsx</code><br><code>src/app/dashboard/admin/overview/page.tsx</code></td>
+        <td><span class="status-tag status-mock">UI Only / Stub</span></td>
+        <td>Consists solely of placeholder headers (e.g., <code>&lt;h2&gt;Admin Overview&lt;/h2&gt;</code>). No course approval tables, analytics, user lists, or financial reports.</td>
+      </tr>
+      <tr>
+        <td><strong>Student Dashboard</strong></td>
+        <td><code>N/A</code></td>
+        <td><span class="status-tag status-missing">Missing</span></td>
+        <td>No student portal for enrolled courses, completion certificates, payment receipts, or personal progress tracking.</td>
+      </tr>
+      <tr>
+        <td><strong>Instructor Dashboard</strong></td>
+        <td><code>N/A</code></td>
+        <td><span class="status-tag status-missing">Missing</span></td>
+        <td>No instructor tools for managing course curriculums, uploading lecture videos, setting exam questions, or reviewing student grades.</td>
+      </tr>
+      <tr>
+        <td><strong>Database Schemas</strong></td>
+        <td><code>src/models/*.ts</code> (9 models)</td>
+        <td><span class="status-tag status-partial">Partially Implemented</span></td>
+        <td>Mongoose schemas exist for User, Course, Cart, Enrolment, etc., but are loosely typed (e.g., <code>lessons: [String]</code> instead of subdocuments/references). Lacks indexes and timestamps.</td>
+      </tr>
+      <tr>
+        <td><strong>Middleware & Route Guarding</strong></td>
+        <td><code>src/middleware.ts</code></td>
+        <td><span class="status-tag status-broken">Broken / No-Op</span></td>
+        <td>Contains an empty function returning <code>undefined</code>. Protected routes (like <code>/dashboard/*</code>) are completely unprotected and publicly accessible.</td>
+      </tr>
+      <tr>
+        <td><strong>Internationalization (i18n)</strong></td>
+        <td><code>src/app/layout.tsx</code></td>
+        <td><span class="status-tag status-missing">Missing</span></td>
+        <td>Root HTML hardcoded to <code>lang="en"</code> with Latin font subsets. No language switcher, translation files, or Bangla font support.</td>
+      </tr>
+      <tr>
+        <td><strong>Footer Navigation</strong></td>
+        <td><code>src/components/Footer.tsx</code></td>
+        <td><span class="status-tag status-broken">Broken Links</span></td>
+        <td>Links point to non-existent routes: <code>/about</code> (instead of <code>/about-us</code>), <code>/blog</code> (instead of <code>/blogs</code>), <code>/terms-conditions</code> (instead of <code>/terms-and-condition</code>). Social links lack protocols.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ================= SECTION 3: COMPETITOR RESEARCH ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">03</span> Market & Competitor Research</h1>
+  <p>To position TechSprout School competitively, we benchmarked leading platforms in Bangladesh (10 Minute School, Bohubrihi, WebcoachBD) and internationally (Udemy, Coursera). Every finding is strictly classified by evidentiary standard:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Platform</th>
+        <th>Category / Focus</th>
+        <th>Core Architecture Findings</th>
+        <th>Key Lessons for TechSprout</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>10 Minute School</strong><br><em>(Bangladesh)</em></td>
+        <td>K-12, Admission, Skills</td>
+        <td>
+          <strong>FACT:</strong> Mobile-first architecture with OTP phone authentication as the primary sign-in mechanism.<br>
+          <strong>FACT:</strong> Seamless bKash and Nagad direct merchant API checkout.<br>
+          <strong>OBSERVATION:</strong> Uses multi-bitrate HLS/DASH video delivery optimized for low-bandwidth cellular networks in rural Bangladesh.<br>
+          <strong>RECOMMENDATION:</strong> TechSprout must provide phone number OTP sign-in and bKash direct payment for local viability.
+        </td>
+        <td>Frictionless enrollment via phone numbers is mandatory in Bangladesh. Email-only auth causes up to 60% checkout abandonment.</td>
+      </tr>
+      <tr>
+        <td><strong>Bohubrihi</strong><br><em>(Bangladesh)</em></td>
+        <td>Tech & Professional Career Tracks</td>
+        <td>
+          <strong>FACT:</strong> Employs structured multi-week project submissions with manual human mentor grading.<br>
+          <strong>FACT:</strong> Issues verifiable PDF certificates with unique alphanumeric codes and public verification URLs.<br>
+          <strong>OBSERVATION:</strong> Offers lecture-specific discussion forums where students tag timestamps.<br>
+          <strong>RECOMMENDATION:</strong> TechSprout should implement automated MCQ grading first, then add mentor project submission post-MVP.
+        </td>
+        <td>Professional career learners value accredited, verifiable certificates with high academic rigor.</td>
+      </tr>
+      <tr>
+        <td><strong>Udemy</strong><br><em>(Global)</em></td>
+        <td>Massive Open Marketplace</td>
+        <td>
+          <strong>FACT:</strong> Strict modular hierarchy: Course &rarr; Section &rarr; Lecture &rarr; Resource.<br>
+          <strong>OBSERVATION:</strong> Video player includes speed adjustments (0.5x–2.0x), timestamped personal notes, and automatic next-lesson triggers.<br>
+          <strong>RECOMMENDATION:</strong> Adopt Udemy's battle-tested lesson completion model (auto-marking completion upon 90% video watch).
+        </td>
+        <td>Intuitive, distraction-free video playback with curriculum drawer is the gold standard for student retention.</td>
+      </tr>
+      <tr>
+        <td><strong>Coursera</strong><br><em>(Global)</em></td>
+        <td>University & Enterprise Degrees</td>
+        <td>
+          <strong>FACT:</strong> Timed summative assessments with strict attempt cooldown periods and randomized question pools.<br>
+          <strong>OBSERVATION:</strong> Heavy emphasis on peer review evaluation and honor code enforcement.<br>
+          <strong>OPTIONAL FEATURE:</strong> Web-based code playgrounds or remote lab containers.
+        </td>
+        <td>Question bank randomization prevents exam answer sharing among student cohorts.</td>
+      </tr>
+      <tr>
+        <td><strong>WebcoachBD</strong><br><em>(Bangladesh)</em></td>
+        <td>Early Tech Tutorials</td>
+        <td>
+          <strong>FACT:</strong> Early pioneer of Bengali web development tutorials.<br>
+          <strong>OBSERVATION:</strong> Suffered from lack of structured evaluation, progress tracking, and monetized interactive exams.<br>
+          <strong>RECOMMENDATION:</strong> TechSprout must not rely on passive video watching alone; interactive evaluations create sticky engagement.
+        </td>
+        <td>Pure video repositories face commoditization; interactive LMS platforms provide defensible value.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-success avoid-break">
+    <div class="callout-title">Synthesized Competitive Strategy</div>
+    <p>TechSprout School will combine <strong>Udemy's intuitive self-paced learning player</strong> with <strong>10 Minute School's frictionless mobile/bKash onboarding</strong>, backed by <strong>Coursera's rigorous randomized examination engine</strong>, presented in a clean bilingual (Bangla & English) interface.</p>
+  </div>
+</div>
+
+<!-- ================= SECTION 4: PRODUCT VISION ================= -->
+<div class="avoid-break">
+  <h1 class="section-title"><span class="num">04</span> Product Vision & Pedagogical Architecture</h1>
+  <p>The core vision of TechSprout School is to democratize high-caliber technical, vocational, and digital education across Bangladesh. The platform is designed around a three-tier learner progression model:</p>
+
+  <div class="diagram-box">
+    [ 1. Conceptual Knowledge ] &rarr; [ 2. Hands-on Practice & Quizzes ] &rarr; [ 3. Evaluated Assessment & Certification ]
+    &bull; High-definition video lectures   &bull; In-video knowledge checks        &bull; Timed final examinations
+    &bull; Downloadable cheat-sheets       &bull; Modular assignments              &bull; Cryptographically signed certificates
+    &bull; Bilingual transcripts (BN/EN)   &bull; Discussion Q&A with instructor   &bull; Public resume verification links
+  </div>
+
+  <h2>Target User Personas</h2>
+  <ul>
+    <li><strong>The University Student (Tanvir, 21, Dhaka):</strong> Needs practical programming skills in Bengali. Studies primarily from a smartphone and laptop. Prefers paying via personal bKash wallet.</li>
+    <li><strong>The District Learner (Fatima, 19, Bogura):</strong> Constrained by intermittent broadband. Needs video quality selector (360p–1080p), downloadable lecture notes, and offline quiz caching.</li>
+    <li><strong>The Industry Instructor (Rahim, 32, Senior Software Engineer):</strong> Wants an intuitive course creation suite to upload videos, organize curriculum modules, and generate automated question pools without technical overhead.</li>
+    <li><strong>The Platform Administrator:</strong> Requires comprehensive controls over course moderation, payouts, student disputes, coupon codes, and platform analytics.</li>
+  </ul>
+</div>
+
+<!-- ================= SECTION 5: MVP DEFINITION ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">05</span> Minimum Viable Product (MVP) Definition</h1>
+  <p>To avoid scope creep and deliver a stable, revenue-generating product to market, features are strictly partitioned into three tiers:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 22%;">Feature Category</th>
+        <th style="width: 14%;">MVP Tier</th>
+        <th style="width: 32%;">Detailed Scope Description</th>
+        <th style="width: 18%;">Dependencies</th>
+        <th style="width: 14%;">Dev Effort</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Dual Authentication</strong></td>
+        <td><span class="badge badge-mvp">Must Have (MVP)</span></td>
+        <td>Email/Password with Argon2id + Bangladeshi Phone Number with 6-digit SMS OTP + Google OAuth.</td>
+        <td>SMS Gateway (Greenweb/SSL Wireless), NextAuth v5</td>
+        <td>10 Days</td>
+      </tr>
+      <tr>
+        <td><strong>Role-Based Access (RBAC)</strong></td>
+        <td><span class="badge badge-mvp">Must Have (MVP)</span></td>
+        <td>Strict separation between Student, Instructor, and Admin roles via JWT claims and server route guards.</td>
+        <td>Auth Service</td>
+        <td>5 Days</td>
+      </tr>
+      <tr>
+        <td><strong>Course Curriculum Engine</strong></td>
+        <td><span class="badge badge-mvp">Must Have (MVP)</span></td>
+        <td>Multi-tier hierarchy: Course &rarr; Module &rarr; Lesson. Support for video streaming, rich text, and PDF attachments.</td>
+        <td>Mongoose Schemas, S3/Bunny Storage</td>
+        <td>12 Days</td>
+      </tr>
+      <tr>
+        <td><strong>Student Learning Player</strong></td>
+        <td><span class="badge badge-mvp">Must Have (MVP)</span></td>
+        <td>Distraction-free video player with speed control, curriculum progress sidebar, and completion tracking.</td>
+        <td>Video Hosting CDN, Progress API</td>
+        <td>10 Days</td>
+      </tr>
+      <tr>
+        <td><strong>Automated Quiz Engine</strong></td>
+        <td><span class="badge badge-mvp">Must Have (MVP)</span></td>
+        <td>Single-choice and multi-choice MCQs, randomized question orders, time limits, and instant automated grading.</td>
+        <td>Exam Service</td>
+        <td>12 Days</td>
+      </tr>
+      <tr>
+        <td><strong>Student Dashboard</strong></td>
+        <td><span class="badge badge-mvp">Must Have (MVP)</span></td>
+        <td>Enrolled courses overview, progress percentages, past quiz scores, and account profile management.</td>
+        <td>Enrollment & Progress API</td>
+        <td>8 Days</td>
+      </tr>
+      <tr>
+        <td><strong>MFS Payment Integration</strong></td>
+        <td><span class="badge badge-mvp">Must Have (MVP)</span></td>
+        <td>Single payment gateway checkout supporting bKash, Nagad, Rocket, and local debit cards with IPN webhooks.</td>
+        <td>SSLCommerz / Shurjopay API</td>
+        <td>9 Days</td>
+      </tr>
+      <tr>
+        <td><strong>Automated Certificates</strong></td>
+        <td><span class="badge badge-mvp">Must Have (MVP)</span></td>
+        <td>Dynamic PDF certificate generation upon 100% course + exam completion with unique verification QR/URL.</td>
+        <td>PDFKit / Puppeteer, Certificate Model</td>
+        <td>6 Days</td>
+      </tr>
+      <tr>
+        <td><strong>Bilingual Support (BN/EN)</strong></td>
+        <td><span class="badge badge-mvp">Must Have (MVP)</span></td>
+        <td>Header language toggle, <code>next-intl</code> dictionary routing, and dual-language titles/descriptions.</td>
+        <td>next-intl, Translation Files</td>
+        <td>7 Days</td>
+      </tr>
+      <tr>
+        <td><strong>Instructor Portal</strong></td>
+        <td><span class="badge badge-postmvp">Should Have (Post-MVP)</span></td>
+        <td>Self-service course curriculum editor, video uploader, quiz creator, and enrollment analytics.</td>
+        <td>Course Engine, File Upload</td>
+        <td>14 Days</td>
+      </tr>
+      <tr>
+        <td><strong>Descriptive Exam Grading</strong></td>
+        <td><span class="badge badge-postmvp">Should Have (Post-MVP)</span></td>
+        <td>Short-answer and file-submission questions requiring manual instructor review and qualitative feedback.</td>
+        <td>Exam Engine</td>
+        <td>8 Days</td>
+      </tr>
+      <tr>
+        <td><strong>Discussion Q&A Forum</strong></td>
+        <td><span class="badge badge-postmvp">Should Have (Post-MVP)</span></td>
+        <td>Lesson-specific threaded discussion board for student-instructor questions.</td>
+        <td>Forum Schemas</td>
+        <td>7 Days</td>
+      </tr>
+      <tr>
+        <td><strong>Live Video Classes</strong></td>
+        <td><span class="badge badge-future">Future (v2+)</span></td>
+        <td>Integrated Zoom / WebRTC live video sessions with calendar reminders.</td>
+        <td>Livekit / Agora API</td>
+        <td>18 Days</td>
+      </tr>
+      <tr>
+        <td><strong>Native Mobile Apps</strong></td>
+        <td><span class="badge badge-future">Future (v2+)</span></td>
+        <td>Cross-platform Flutter or React Native mobile apps with offline encrypted video caching.</td>
+        <td>Stable REST API v1</td>
+        <td>45 Days</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ================= SECTION 6: FEATURE GAP ANALYSIS ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">06</span> Launch-Readiness Feature Gap Analysis</h1>
+  <p>To establish production readiness, we conducted a granular capability gap analysis comparing expected LMS functionalities against current repository implementations:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Functional Domain</th>
+        <th style="width: 25%;">Target LMS Production Requirement</th>
+        <th style="width: 25%;">Current TechSprout Implementation</th>
+        <th style="width: 15%;">Launch Blockage</th>
+        <th style="width: 10%;">Priority</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Credential Security</strong></td>
+        <td>Password hashing via Argon2id or Bcrypt (cost factor 12) + salt.</td>
+        <td>Plain text JSON stored in <code>User.create()</code> at <code>/api/register</code>.</td>
+        <td><span class="badge badge-critical">Immediate Blocker</span></td>
+        <td>P0</td>
+      </tr>
+      <tr>
+        <td><strong>Form Data Integrity</strong></td>
+        <td>Password confirmation equality check; strict regex for BD numbers.</td>
+        <td><code>Register.tsx</code> binds Confirm Password to <code>name</code>; posts to <code>/test</code>.</td>
+        <td><span class="badge badge-critical">Immediate Blocker</span></td>
+        <td>P0</td>
+      </tr>
+      <tr>
+        <td><strong>Course Delivery</strong></td>
+        <td>Protected video streaming (HLS) with signed playback tokens.</td>
+        <td>Static mock HTML5 <code>&lt;video src=demoVideo&gt;</code> without token protection.</td>
+        <td><span class="badge badge-high">High Blocker</span></td>
+        <td>P0</td>
+      </tr>
+      <tr>
+        <td><strong>Enrollment Engine</strong></td>
+        <td>Atomic transaction enrolling user upon verified payment IPN webhook.</td>
+        <td>"Enroll Now" button has no click handler; no purchase pipeline.</td>
+        <td><span class="badge badge-critical">Immediate Blocker</span></td>
+        <td>P0</td>
+      </tr>
+      <tr>
+        <td><strong>Progress Tracking</strong></td>
+        <td>Event-driven lesson completion and course percentage calculations.</td>
+        <td>Zero progress tracking models or endpoints exist.</td>
+        <td><span class="badge badge-high">High Blocker</span></td>
+        <td>P1</td>
+      </tr>
+      <tr>
+        <td><strong>Assessment / Exams</strong></td>
+        <td>Timed MCQ engine with server-side validation and question randomization.</td>
+        <td>No exam schemas, questions, or result tables exist.</td>
+        <td><span class="badge badge-high">High Blocker</span></td>
+        <td>P1</td>
+      </tr>
+      <tr>
+        <td><strong>Admin Oversight</strong></td>
+        <td>Admin portal to approve courses, audit revenues, and manage roles.</td>
+        <td>Two static pages displaying placeholder <code>&lt;h2&gt;</code> text.</td>
+        <td><span class="badge badge-medium">Moderate Blocker</span></td>
+        <td>P1</td>
+      </tr>
+      <tr>
+        <td><strong>Bilingual Localization</strong></td>
+        <td>Full Bengali and English UI with localized number & currency strings.</td>
+        <td>English-only hardcoded strings; no font support for complex Bangla script.</td>
+        <td><span class="badge badge-high">High Blocker</span></td>
+        <td>P1</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ================= SECTION 7: AUTHENTICATION STRATEGY ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">07</span> Authentication & Identity Management Strategy</h1>
+  <p>A critical comparative benchmark between modern e-commerce/LMS authentication (phone OTP + social login) and TechSprout's current state reveals vital strategic requirements for the Bangladeshi market:</p>
+
+  <div class="diagram-box">
+                    [ User Registration / Sign-In Request ]
+                                   |
+           +-----------------------+-----------------------+
+           |                                               |
+     [ Phone Number ]                              [ Email / Social ]
+           |                                               |
+     Validate BD Regex (+8801...)                 Check User Table
+           |                                               |
+     Generate 6-Digit OTP                         Verify Argon2id Hash / OAuth Token
+     Store in Redis (TTL: 180s)                            |
+     Send via SMS Gateway                                  |
+           |                                               |
+     Verify OTP Code                                       |
+           +-----------------------+-----------------------+
+                                   |
+                        [ Issue Secure Session ]
+                     - HttpOnly Cookie (NextAuth JWT)
+                     - Refresh Token & Device Fingerprint
+                     - Role Claims: Student | Teacher | Admin
+  </div>
+
+  <h2>Authentication Feature Classification</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Authentication Method</th>
+        <th style="width: 15%;">Classification</th>
+        <th style="width: 40%;">Architectural & Market Rationale</th>
+        <th style="width: 20%;">Security Controls</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Email + Strong Password</strong></td>
+        <td><span class="badge badge-mvp">Required (MVP)</span></td>
+        <td>Essential for instructors, corporate learners, and administrative personnel who manage formal credentials.</td>
+        <td>Argon2id hashing, min 8 chars, 1 uppercase, 1 symbol. Zod validation.</td>
+      </tr>
+      <tr>
+        <td><strong>Phone Number + 6-Digit OTP</strong></td>
+        <td><span class="badge badge-mvp">Required (MVP)</span></td>
+        <td>The primary login standard in Bangladesh. Most students use smartphones and lack active email habits.</td>
+        <td>Redis rate limiting (max 3 OTP requests / 15 mins), 3-minute TTL, constant-time compare.</td>
+      </tr>
+      <tr>
+        <td><strong>Google OAuth 2.0</strong></td>
+        <td><span class="badge badge-mvp">Required (MVP)</span></td>
+        <td>One-tap sign-in reduces friction on desktop browsers and Android smartphones dramatically.</td>
+        <td>PKCE verification, strict redirect URI validation, automatic email linking.</td>
+      </tr>
+      <tr>
+        <td><strong>Facebook Login</strong></td>
+        <td><span class="badge badge-postmvp">Recommended</span></td>
+        <td>Widely utilized in Bangladesh, but frequent API policy shifts and Meta developer review delays make it risky for initial MVP launch.</td>
+        <td>Strict state token validation to prevent CSRF authentication hijack.</td>
+      </tr>
+      <tr>
+        <td><strong>Password Reset via SMS/Email</strong></td>
+        <td><span class="badge badge-mvp">Required (MVP)</span></td>
+        <td>Without automated password resets, support teams will be overwhelmed with locked account tickets.</td>
+        <td>Signed, single-use, cryptographically random token with 15-minute expiration.</td>
+      </tr>
+      <tr>
+        <td><strong>Session Management & Invalidation</strong></td>
+        <td><span class="badge badge-mvp">Required (MVP)</span></td>
+        <td>NextAuth JWT with HttpOnly cookies. Support revoking tokens upon role change or password reset.</td>
+        <td>HttpOnly, Secure, SameSite=Lax cookie flags; token rotation.</td>
+      </tr>
+      <tr>
+        <td><strong>Logout from All Devices</strong></td>
+        <td><span class="badge badge-postmvp">Recommended</span></td>
+        <td>Prevents credential sharing where multiple students pool money to access a single paid account.</td>
+        <td>User <code>tokenVersion</code> integer incremented on global logout.</td>
+      </tr>
+      <tr>
+        <td><strong>Brute-Force & Abuse Protection</strong></td>
+        <td><span class="badge badge-mvp">Required (MVP)</span></td>
+        <td>Prevents SMS gateway drainage (financial loss) and credential stuffing attacks.</td>
+        <td>Upstash Redis sliding-window rate limiting per IP and per phone number.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ================= SECTION 8: INTERNATIONALIZATION (i18n) ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">08</span> Language & Internationalization Strategy</h1>
+  <p>To serve Bangladeshi students while maintaining institutional rigor, TechSprout School must support both <strong>বাংলা (Bangla)</strong> and <strong>English</strong> as first-class languages. The architecture must avoid hardcoded string conditionals and establish an extensible i18n foundation:</p>
+
+  <h2>1. Routing & Locale Persistence Architecture</h2>
+  <ul>
+    <li><strong>Subpath Routing:</strong> Utilize Next.js 16 with <code>next-intl</code> to support canonical localized paths:
+      <br><code>techsprout.edu/bn/courses</code> (Bangla) and <code>techsprout.edu/en/courses</code> (English).
+    </li>
+    <li><strong>Default Locale:</strong> Default to <code>bn</code> for visitors originating from Bangladesh IP addresses (detected via Cloudflare <code>CF-IPCountry</code> header), with cookie fallback (<code>NEXT_LOCALE=bn</code>).</li>
+    <li><strong>Language Switcher:</strong> An accessible language toggle in the primary navigation header and mobile drawer, persisting user choice across sessions.</li>
+  </ul>
+
+  <h2>2. Content Translation Strategy</h2>
+  <div class="diagram-box">
+                          [ Content Layer Separation ]
+                                       |
+           +---------------------------+---------------------------+
+           |                                                       |
+  [ Static UI Chrome ]                                    [ Dynamic Dynamic LMS Content ]
+  &bull; Navigation, buttons, labels                        &bull; Course titles, descriptions
+  &bull; Validation & error messages                        &bull; Lessons, syllabus, exam questions
+  &bull; Handled via JSON Dictionaries                     &bull; Stored as localized database subdocuments
+    <code>messages/bn.json</code>, <code>messages/en.json</code>           <code>{ title: { bn: "...", en: "..." } }</code>
+  </div>
+
+  <h2>3. Typography, Number & Currency Formatting</h2>
+  <ul>
+    <li><strong>Bangla Typography:</strong> Google Font <strong>Hind Siliguri</strong> or <strong>Noto Sans Bengali</strong> loaded via <code>next/font/google</code> with appropriate font-display swap to eliminate FOIT (Flash of Invisible Text).</li>
+    <li><strong>Numeral Localization:</strong> A centralized utility function converting western digits to Bengali numerals in Bangla mode (e.g., <code>15</code> &rarr; <code>১৫</code>).</li>
+    <li><strong>Currency Standards:</strong> Display course pricing in Bangladeshi Taka (<code>৳ ১,৫০০</code>) for local currency and USD (<code>$ 20.00</code>) for international visitors.</li>
+    <li><strong>Date & Time:</strong> Formatting dates using native <code>Intl.DateTimeFormat('bn-BD', { ... })</code> for natural Bengali calendar displays.</li>
+  </ul>
+</div>
+
+<!-- ================= SECTION 9: BACKEND ENGINEERING PLAN ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">09</span> Backend Engineering & Services Plan</h1>
+  <p>The backend of TechSprout School will be structured as a <strong>Clean Modular Monolith</strong> built directly on Next.js 16 App Router Route Handlers. This provides serverless scalability, low latency, and zero deployment friction while strictly isolating business domains:</p>
+
+  <div class="diagram-box">
+  [ Client Application / Web UI ] &lt;---( HTTPS JSON )---&gt; [ REST API Route Handlers (/api/v1/...) ]
+                                                                      |
+                                                          +-----------+-----------+
+                                                          |                       |
+                                                  [ Zod DTO Validation ]  [ JWT Auth & RBAC Guard ]
+                                                          |                       |
+                                                          +-----------+-----------+
+                                                                      |
+                                                          [ Domain Service Layer ]
+                                                  (Auth, Course, Progress, Exam, Payment)
+                                                                      |
+                                                          +-----------+-----------+
+                                                          |                       |
+                                                  [ Mongoose Repository ]  [ External Cloud Integrations ]
+                                                          |                 &bull; Cloudflare Stream / Bunny.net
+                                                  [ MongoDB Atlas Cluster ] &bull; SSLCommerz / bKash Gateway
+                                                  (Replica Sets, Indexes)   &bull; SMS Gateway (SSL Wireless)
+                                                                            &bull; Email Dispatch (Resend/SES)
+  </div>
+
+  <h2>Core Backend Architectural Pillars</h2>
+  <ul>
+    <li><strong>Standardized API Response Envelopes:</strong>
+      All endpoints return a uniform envelope ensuring client predictability:
+      <pre><code>// Success Response (HTTP 200/201)
+{
+  "success": true,
+  "message": "Operation completed successfully",
+  "data": { ... },
+  "meta": { "page": 1, "limit": 20, "total": 142, "totalPages": 8 }
+}
+
+// Error Response (HTTP 400/401/403/404/422/500)
+{
+  "success": false,
+  "message": "Validation failed for one or more fields",
+  "errorCode": "VALIDATION_ERROR",
+  "errors": [{ "field": "email", "message": "Invalid email address format" }]
+}</code></pre>
+    </li>
+    <li><strong>Database Transactions:</strong> Atomic multi-document transactions (via <code>mongoose.startSession()</code>) for checkout, enrollment, and exam submission to prevent data corruption during network drops.</li>
+    <li><strong>Media Storage Pipeline:</strong> Direct client-to-cloud uploads using presigned S3/Cloudflare R2 URLs for avatars, lecture PDFs, and assignment files. Video lectures ingested through Bunny.net Stream or Cloudflare Stream with automatic HLS transcode.</li>
+    <li><strong>Background Jobs:</strong> Lightweight asynchronous processing using Upstash QStash or BullMQ for sending enrollment emails, SMS OTP alerts, and certificate PDF generation.</li>
+  </ul>
+</div>
+
+<!-- ================= SECTION 10: REST API ARCHITECTURE ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">10</span> REST API Architecture & Specification</h1>
+  <p>The REST API is strictly versioned under the <code>/api/v1</code> prefix. Below is the proposed endpoint map covering all core domains:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 10%;">Method</th>
+        <th style="width: 25%;">Endpoint Path</th>
+        <th style="width: 15%;">Auth / Role</th>
+        <th style="width: 25%;">Request Payload</th>
+        <th style="width: 25%;">Purpose & Security Rules</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/api/v1/auth/register</code></td>
+        <td>Public</td>
+        <td><code>{ name, phone, password, role? }</code></td>
+        <td>Registers student; hashes password with Argon2id; dispatches OTP.</td>
+      </tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/api/v1/auth/verify-otp</code></td>
+        <td>Public</td>
+        <td><code>{ phone, otp }</code></td>
+        <td>Verifies 6-digit OTP against Redis; marks account verified.</td>
+      </tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/api/v1/auth/login</code></td>
+        <td>Public</td>
+        <td><code>{ identifier, password }</code></td>
+        <td>Authenticates via phone/email; issues secure HttpOnly JWT.</td>
+      </tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/api/v1/users/me</code></td>
+        <td>Bearer (All)</td>
+        <td>None</td>
+        <td>Fetches authenticated user profile, roles, and preferences.</td>
+      </tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/api/v1/courses</code></td>
+        <td>Public</td>
+        <td>Query: <code>page, limit, category, sort</code></td>
+        <td>Returns paginated published courses with price and ratings.</td>
+      </tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/api/v1/courses</code></td>
+        <td>Instructor / Admin</td>
+        <td><code>{ title, category, price, ... }</code></td>
+        <td>Creates course draft; validates instructor ownership.</td>
+      </tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/api/v1/courses/:id</code></td>
+        <td>Public</td>
+        <td>None</td>
+        <td>Returns full course syllabus, instructor bio, and reviews.</td>
+      </tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/api/v1/courses/:id/learn</code></td>
+        <td>Enrolled Student</td>
+        <td>None</td>
+        <td>Returns full video stream URLs, lecture notes, and quiz links.</td>
+      </tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/api/v1/progress/complete</code></td>
+        <td>Enrolled Student</td>
+        <td><code>{ lessonId, timeWatched }</code></td>
+        <td>Records lesson completion; updates overall course progress.</td>
+      </tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/api/v1/exams/:id/start</code></td>
+        <td>Enrolled Student</td>
+        <td>None</td>
+        <td>Initiates exam attempt; starts server timer; locks questions.</td>
+      </tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/api/v1/exams/:id/submit</code></td>
+        <td>Enrolled Student</td>
+        <td><code>{ attemptId, answers: [...] }</code></td>
+        <td>Evaluates answers; computes grade; creates Result record.</td>
+      </tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/api/v1/payments/initiate</code></td>
+        <td>Student</td>
+        <td><code>{ courseId, gateway }</code></td>
+        <td>Creates pending Order; returns bKash/SSLCommerz redirect URL.</td>
+      </tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td><code>/api/v1/payments/webhook</code></td>
+        <td>Gateway IPN</td>
+        <td>Gateway signature & payload</td>
+        <td>Verifies HMAC signature; creates Enrollment; grants access.</td>
+      </tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td><code>/api/v1/certificates/:id</code></td>
+        <td>Public</td>
+        <td>None</td>
+        <td>Validates authenticity of student completion certificate.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ================= SECTION 11: DATABASE ARCHITECTURE ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">11</span> Database Architecture & Data Modeling</h1>
+  <p>The persistence layer will utilize <strong>MongoDB with Mongoose</strong> on a high-availability MongoDB Atlas replica set. The data model transitions TechSprout away from loose string arrays to strongly normalized documents with compound indexes, referential integrity, and soft deletion:</p>
+
+  <div class="diagram-box">
+  +-------------------+       1:N       +-------------------+       1:N       +-------------------+
+  |       User        | --------------> |      Course       | --------------> |      Module       |
+  |-------------------|                 |-------------------|                 |-------------------|
+  | _id: ObjectId     |                 | _id: ObjectId     |                 | _id: ObjectId     |
+  | name, email, phone|                 | instructor: Ref   |                 | courseId: Ref     |
+  | passwordHash      |                 | title, category   |                 | title, sortOrder  |
+  | role: enum        |                 | price, status     |                 +-------------------+
+  +-------------------+                 +-------------------+                           | 1:N
+            |                                     |                                     v
+            | 1:N                                 | 1:N                       +-------------------+
+            v                                     v                           |      Lesson       |
+  +-------------------+                 +-------------------+                 |-------------------|
+  |    Enrollment     | <-------------- |      Order        |                 | _id: ObjectId     |
+  |-------------------|      M:1        |-------------------|                 | moduleId: Ref     |
+  | userId, courseId  |                 | userId, courseId  |                 | title, type, video|
+  | status, enrolledAt|                 | amount, trxId, bK |                 | duration, sort    |
+  +-------------------+                 +-------------------+                 +-------------------+
+            |                                                                           |
+            v                                                                           v
+  +-------------------+                                                       +-------------------+
+  | CourseProgress    |                                                       |    Exam / Quiz    |
+  |-------------------|                                                       |-------------------|
+  | completedLessons[]|                                                       | courseId/lessonId |
+  | percentComplete   |                                                       | title, duration   |
+  +-------------------+                                                       | passingMarks      |
+                                                                              +-------------------+
+  </div>
+
+  <h2>Key Entity Specifications</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 20%;">Entity Name</th>
+        <th style="width: 30%;">Key Fields & Types</th>
+        <th style="width: 25%;">Indexes & Constraints</th>
+        <th style="width: 25%;">Integrity & Lifecycle Rules</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>User</strong></td>
+        <td><code>_id, name, email, phone, passwordHash, role, isVerified, authProvider</code></td>
+        <td><code>{ email: 1 } (unique, sparse)</code><br><code>{ phone: 1 } (unique, sparse)</code></td>
+        <td>Soft delete with <code>isDeleted: Boolean</code>. Role strictly restricted to <code>['student', 'instructor', 'admin']</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>Course</strong></td>
+        <td><code>_id, title, slug, instructorId, category, price, isPublished, thumbnail, duration</code></td>
+        <td><code>{ slug: 1 } (unique)</code><br><code>{ instructorId: 1, isPublished: 1 }</code></td>
+        <td>Cascade prevents deletion if active enrollments exist. Draft/Published workflow.</td>
+      </tr>
+      <tr>
+        <td><strong>Module</strong></td>
+        <td><code>_id, courseId, title, sortOrder, isFreePreview</code></td>
+        <td><code>{ courseId: 1, sortOrder: 1 }</code></td>
+        <td>Ordered sub-unit. Modules contain one or more sequential Lessons.</td>
+      </tr>
+      <tr>
+        <td><strong>Lesson</strong></td>
+        <td><code>_id, moduleId, title, type (video/quiz/text), videoStreamId, duration, resources[]</code></td>
+        <td><code>{ moduleId: 1, sortOrder: 1 }</code></td>
+        <td>Stores video streaming identifier (e.g. Bunny video ID) rather than raw public MP4 URLs.</td>
+      </tr>
+      <tr>
+        <td><strong>Enrollment</strong></td>
+        <td><code>_id, userId, courseId, orderId, enrolledAt, expiresAt, status (active/expired)</code></td>
+        <td><code>{ userId: 1, courseId: 1 } (unique)</code></td>
+        <td>Atomic creation during payment webhook. Idempotency guarantees access is granted exactly once.</td>
+      </tr>
+      <tr>
+        <td><strong>CourseProgress</strong></td>
+        <td><code>_id, userId, courseId, completedLessons: [ObjectId], percentComplete, lastAccessedLesson</code></td>
+        <td><code>{ userId: 1, courseId: 1 } (unique)</code></td>
+        <td>Updated whenever student completes a lesson. Triggers certificate generation at 100%.</td>
+      </tr>
+      <tr>
+        <td><strong>Exam & Question</strong></td>
+        <td><code>_id, title, courseId, durationMinutes, totalMarks, passingScore, questions[]</code></td>
+        <td><code>{ courseId: 1 }</code></td>
+        <td>Embedded questions array for high-performance retrieval during student test sessions.</td>
+      </tr>
+      <tr>
+        <td><strong>ExamAttempt</strong></td>
+        <td><code>_id, examId, userId, startedAt, submittedAt, answers[], score, isPassed</code></td>
+        <td><code>{ userId: 1, examId: 1, startedAt: -1 }</code></td>
+        <td>Server calculates score on submission. Immutable audit record of student examination performance.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ================= SECTION 12: ONLINE EXAM SYSTEM ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">12</span> Online Examination & Assessment Engine</h1>
+  <p>The online examination engine delivers rigorous, tamper-resistant academic testing. It supports formative quizzes (end-of-lesson knowledge checks) and summative final exams (required for course certificates):</p>
+
+  <h2>1. Question Formats & Randomization</h2>
+  <ul>
+    <li><strong>Single-Choice MCQ:</strong> Traditional question with 4 options and exactly one correct answer.</li>
+    <li><strong>Multiple-Answer MCQ:</strong> Questions with multiple correct options (partial credit logic applied).</li>
+    <li><strong>True / False:</strong> Rapid conceptual verification questions.</li>
+    <li><strong>Question Pool Randomization:</strong> If an exam requires 20 questions, the server draws randomly from an instructor-curated pool of 50 questions, ensuring adjacent students receive different tests.</li>
+    <li><strong>Option Shuffling:</strong> The order of options (A, B, C, D) is cryptographically shuffled for each attempt.</li>
+  </ul>
+
+  <h2>2. Examination Lifecycle & Integrity Controls</h2>
+  <div class="diagram-box">
+  [ Student Clicks Start Exam ]
+                |
+                v
+  [ Server Generates Attempt Record ] &rarr; Records <code>startedAt</code> timestamp; Computes <code>hardDeadline = startedAt + duration</code>
+                |
+                v
+  [ Client Displays Questions ] &rarr; Client timer countdown (synced with server via Heartbeat)
+                |
+  +-------------+-------------+
+  |                           |
+  v                           v
+  [ Normal Submission ]       [ Hard Timeout Triggered ] &rarr; Server worker automatically auto-submits attempt upon <code>hardDeadline</code>
+  |                           |
+  +-------------+-------------+
+                |
+                v
+  [ Server Evaluation Worker ] &rarr; Matches answers against answer keys; Applies negative marking if enabled; Creates Result
+  </div>
+
+  <h2>3. Anti-Cheating & Proctoring Mechanisms (MVP vs. Post-MVP)</h2>
+  <ul>
+    <li><strong>Full-Screen Lock & Blur Detection (MVP):</strong> Browser <code>window.onblur</code> events trigger warning dialogs. Exceeding 3 blur events auto-submits the exam with an academic integrity infraction flag.</li>
+    <li><strong>Copy-Paste & Context Menu Disable (MVP):</strong> CSS and JavaScript restrictions preventing learners from copying question text to search engines.</li>
+    <li><strong>IP / Multiple Device Lock (MVP):</strong> An active exam attempt locks the user session; concurrent logins from another IP address are blocked until the exam completes.</li>
+    <li><strong>Webcam AI Proctoring (Future v2+):</strong> Facial detection, tab monitoring, and periodic snapshots deferred until post-MVP.</li>
+  </ul>
+</div>
+
+<!-- ================= SECTION 13: EVALUATION SYSTEM ================= -->
+<div class="avoid-break">
+  <h1 class="section-title"><span class="num">13</span> Evaluation, Grading & Academic Results System</h1>
+  <p>The evaluation system determines learner competency and dictates certificate eligibility. It combines automated computation with instructor moderation:</p>
+
+  <h2>Grading Algorithms & Negative Marking</h2>
+  <ul>
+    <li><strong>Instant Scoring:</strong> For objective questions (MCQ, True/False), evaluation executes in under 200ms upon submission. Correct options yield positive points; incorrect choices apply negative marking if designated by the instructor (e.g., -0.25 marks per error to penalize guessing).</li>
+    <li><strong>Passing Score Thresholds:</strong> Courses enforce a configurable passing percentage (default 70%). Students falling below threshold receive actionable breakdown feedback and must observe a 24-hour retake cooldown period.</li>
+    <li><strong>Grading Curves & Letter Grades:</strong>
+      A+ (80-100%), A (70-79%), B (60-69%), C (50-59%), F (&lt;50%).
+    </li>
+  </ul>
+
+  <h2>Certificate Issuance Pipeline</h2>
+  <p>Upon achieving &ge;70% on the final course exam AND 100% lesson watch completion, the system automatically dispatches an asynchronous job to generate an accredited completion certificate. The PDF features a cryptographically generated SHA-256 hash, student full name, instructor signature, completion date, and an interactive QR code linking to <code>techsprout.edu/verify/:certificateId</code>.</p>
+</div>
+
+<!-- ================= SECTION 14: ROLES & RBAC MATRIX ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">14</span> Student, Teacher & Admin Role Matrix</h1>
+  <p>Access control is strictly enforced via Role-Based Access Control (RBAC). Below is the comprehensive permissions matrix across the three core personas:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 35%;">Platform Feature / Operation</th>
+        <th style="width: 20%; text-align: center;">Student</th>
+        <th style="width: 20%; text-align: center;">Instructor / Teacher</th>
+        <th style="width: 25%; text-align: center;">Administrator</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Browse Public Course Catalog & Syllabus</td>
+        <td style="text-align: center;">&#10004; Allowed</td>
+        <td style="text-align: center;">&#10004; Allowed</td>
+        <td style="text-align: center;">&#10004; Allowed</td>
+      </tr>
+      <tr>
+        <td>Enroll in Free & Paid Courses</td>
+        <td style="text-align: center;">&#10004; Allowed</td>
+        <td style="text-align: center;">&#10004; Allowed</td>
+        <td style="text-align: center;">&#10004; Allowed (Bypass Pay)</td>
+      </tr>
+      <tr>
+        <td>Watch Paid Course Video Lectures</td>
+        <td style="text-align: center;">&#10004; Enrolled Only</td>
+        <td style="text-align: center;">&#10004; Own Courses</td>
+        <td style="text-align: center;">&#10004; All Courses</td>
+      </tr>
+      <tr>
+        <td>Take Quizzes & Final Exams</td>
+        <td style="text-align: center;">&#10004; Enrolled Only</td>
+        <td style="text-align: center;">&#10004; Preview Mode</td>
+        <td style="text-align: center;">&#10004; Preview Mode</td>
+      </tr>
+      <tr>
+        <td>Create Course Drafts & Modules</td>
+        <td style="text-align: center;">&#10008; Forbidden</td>
+        <td style="text-align: center;">&#10004; Allowed</td>
+        <td style="text-align: center;">&#10004; Allowed</td>
+      </tr>
+      <tr>
+        <td>Publish Course Directly to Public Storefront</td>
+        <td style="text-align: center;">&#10008; Forbidden</td>
+        <td style="text-align: center;">&#10008; Requires Admin Review</td>
+        <td style="text-align: center;">&#10004; Direct Publish</td>
+      </tr>
+      <tr>
+        <td>Create Question Pools & Final Exams</td>
+        <td style="text-align: center;">&#10008; Forbidden</td>
+        <td style="text-align: center;">&#10004; Own Courses</td>
+        <td style="text-align: center;">&#10004; All Courses</td>
+      </tr>
+      <tr>
+        <td>Grade Subjective Student Assignments</td>
+        <td style="text-align: center;">&#10008; Forbidden</td>
+        <td style="text-align: center;">&#10004; Own Students</td>
+        <td style="text-align: center;">&#10004; Allowed</td>
+      </tr>
+      <tr>
+        <td>View Course Financials & Royalties</td>
+        <td style="text-align: center;">&#10008; Forbidden</td>
+        <td style="text-align: center;">&#10004; Own Earnings</td>
+        <td style="text-align: center;">&#10004; Platform-Wide</td>
+      </tr>
+      <tr>
+        <td>Manage User Accounts & Elevate Roles</td>
+        <td style="text-align: center;">&#10008; Forbidden</td>
+        <td style="text-align: center;">&#10008; Forbidden</td>
+        <td style="text-align: center;">&#10004; Full Control</td>
+      </tr>
+      <tr>
+        <td>Issue Refunds & Void Enrollments</td>
+        <td style="text-align: center;">&#10008; Forbidden</td>
+        <td style="text-align: center;">&#10008; Forbidden</td>
+        <td style="text-align: center;">&#10004; Allowed</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ================= SECTION 15: SECURITY AUDIT ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">15</span> Security Requirements & Threat Mitigation</h1>
+  <p>An enterprise LMS processes sensitive personal identifiable information (PII), proprietary curriculum intellectual property, and financial transactions. Below is the security audit and OWASP Top 10 mitigation framework:</p>
+
+  <div class="callout callout-critical avoid-break">
+    <div class="callout-title">Critical Vulnerabilities Detected in Current TechSprout Repository</div>
+    <ul>
+      <li><strong>Plaintext Passwords (CWE-312):</strong> In <code>src/app/api/(user)/register/route.ts</code>, <code>User.create({ ...bodyData })</code> persists passwords directly to MongoDB without cryptographic hashing. <em>Remediation: Hash passwords using Argon2id with 64MB memory cost prior to insert.</em></li>
+      <li><strong>Mass Assignment & Role Escalation (CWE-915):</strong> The register endpoint accepts unchecked JSON objects. A malicious request specifying <code>{ "role": "admin" }</code> immediately gains superuser privileges. <em>Remediation: Explicit DTO sanitization via Zod schemas, hardcoding new registrations to <code>role: 'student'</code>.</em></li>
+      <li><strong>Missing Route Guarding (CWE-285):</strong> <code>src/middleware.ts</code> is an empty stub. Admin dashboards and internal user data are vulnerable to unauthenticated scraping. <em>Remediation: Implement NextAuth middleware enforcing valid JWT sessions and role matching.</em></li>
+      <li><strong>Unbounded SMS / OTP Abuse (CWE-307):</strong> The OTP mechanism lacks sliding-window rate limiting. Attackers could spam requests, depleting platform SMS gateway funds. <em>Remediation: Redis rate limiter restricting requests to 3 per phone number per 15 minutes.</em></li>
+    </ul>
+  </div>
+
+  <h2>OWASP Top 10 LMS Hardening Guidelines</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">OWASP Threat Category</th>
+        <th style="width: 35%;">LMS Attack Vector</th>
+        <th style="width: 40%;">Architectural Countermeasure</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>A01: Broken Access Control</strong></td>
+        <td>Student modifies lesson ID in URL to view unpurchased lectures.</td>
+        <td>Server-side enrollment verification before returning video streaming tokens.</td>
+      </tr>
+      <tr>
+        <td><strong>A02: Cryptographic Failures</strong></td>
+        <td>Cleartext credentials intercepted in transit.</td>
+        <td>Enforce TLS 1.3, HSTS headers, and Argon2id password hashing with distinct per-user salts.</td>
+      </tr>
+      <tr>
+        <td><strong>A03: Injection</strong></td>
+        <td>NoSQL query injection via malicious MongoDB operators (<code>$gt</code>, <code>$or</code>).</td>
+        <td>Strict Zod schema validation; Mongoose parameterized models; sanitize user input.</td>
+      </tr>
+      <tr>
+        <td><strong>A04: Insecure Design</strong></td>
+        <td>Exam answers sent in client payload and inspected via DevTools.</td>
+        <td>Answer keys NEVER sent to client. Evaluation performed strictly on server upon submission.</td>
+      </tr>
+      <tr>
+        <td><strong>A05: Security Misconfiguration</strong></td>
+        <td>Exposing stack traces or database connection URIs in error responses.</td>
+        <td>Sanitize production API errors via <code>errorResponse()</code>; disable verbose Next.js error overlays.</td>
+      </tr>
+      <tr>
+        <td><strong>A07: Identification & Auth Failures</strong></td>
+        <td>Brute-forcing 6-digit OTP codes or passwords.</td>
+        <td>Maximum 5 incorrect attempts before invalidating OTP and locking account for 30 minutes.</td>
+      </tr>
+      <tr>
+        <td><strong>A08: Software & Data Integrity</strong></td>
+        <td>Tampered payment webhook payloads granting free course access.</td>
+        <td>HMAC-SHA256 signature verification on all SSLCommerz and bKash IPN webhooks.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ================= SECTION 16: QA / SQA LAUNCH AUDIT ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">16</span> QA / SQA Launch Audit & Defect Catalog</h1>
+  <p>A rigorous quality assurance audit of the active repository identified numerous functional, visual, and linking defects that must be resolved prior to public beta release:</p>
+
+  <h2>Active Codebase Defect Log</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 15%;">Defect ID</th>
+        <th style="width: 25%;">File / Location</th>
+        <th style="width: 15%;">Severity</th>
+        <th style="width: 45%;">Defect Description & Root Cause</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>BUG-001</strong></td>
+        <td><code>src/components/forms/Register.tsx</code> (Lines 169-170)</td>
+        <td><span class="badge badge-critical">Critical</span></td>
+        <td>Confirm Password field is bound to form control <code>name="name"</code>. Entering a password confirmation overwrites the user's Full Name.</td>
+      </tr>
+      <tr>
+        <td><strong>BUG-002</strong></td>
+        <td><code>src/components/forms/Register.tsx</code> (Line 60)</td>
+        <td><span class="badge badge-critical">Critical</span></td>
+        <td>Submit handler posts user credentials to scratch endpoint <code>/test</code> instead of <code>/api/register</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>BUG-003</strong></td>
+        <td><code>src/auth.ts</code> (Lines 13-17)</td>
+        <td><span class="badge badge-critical">Critical</span></td>
+        <td>Credentials provider <code>authorize()</code> returns <code>user = null</code> unconditionally. Authentication always fails.</td>
+      </tr>
+      <tr>
+        <td><strong>BUG-004</strong></td>
+        <td><code>src/components/Footer.tsx</code> (Lines 24, 32, 44)</td>
+        <td><span class="badge badge-high">High</span></td>
+        <td>Dead links to non-existent routes: <code>/about</code> (404), <code>/blog</code> (404), <code>/terms-conditions</code> (404). Correct paths are <code>/about-us</code>, <code>/blogs</code>, <code>/terms-and-condition</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>BUG-005</strong></td>
+        <td><code>src/components/Footer.tsx</code> (Lines 11-14)</td>
+        <td><span class="badge badge-medium">Medium</span></td>
+        <td>Social links lack scheme protocols (e.g. <code>www.x.com</code> instead of <code>https://x.com</code>). Causes Next.js router to navigate to relative broken routes.</td>
+      </tr>
+      <tr>
+        <td><strong>BUG-006</strong></td>
+        <td><code>src/components/header/Header.tsx</code> (Line 282)</td>
+        <td><span class="badge badge-high">High</span></td>
+        <td>Mobile navigation sheet renders Register as a standalone <code>&lt;Button&gt;</code> without an enclosing <code>&lt;Link&gt;</code>. Clicking Register on mobile is completely non-responsive.</td>
+      </tr>
+      <tr>
+        <td><strong>BUG-007</strong></td>
+        <td><code>src/components/MouseFollower.tsx</code> (Lines 11-27)</td>
+        <td><span class="badge badge-medium">Medium</span></td>
+        <td>Animation frame loop is initiated in <code>useEffect</code> without returning a cleanup function to invoke <code>cancelAnimationFrame()</code>. Leads to memory leaks during route transitions.</td>
+      </tr>
+      <tr>
+        <td><strong>BUG-008</strong></td>
+        <td><code>src/components/forms/Login.tsx</code> (Line 95)</td>
+        <td><span class="badge badge-low">Low</span></td>
+        <td>Password input placeholder reads <em>"Enter you name"</em> instead of <em>"Enter your password"</em>. Multiple occurrences of "you" instead of "your" across forms.</td>
+      </tr>
+      <tr>
+        <td><strong>BUG-009</strong></td>
+        <td><code>src/app/courses/[course]/page.tsx</code> (Line 200)</td>
+        <td><span class="badge badge-low">Low</span></td>
+        <td>Spelling error in course sidebar title: <em>"Recourses"</em> instead of <em>"Resources"</em>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Pre-Launch QA Test Plan & Coverage Matrix</h2>
+  <ul>
+    <li><strong>Functional Automated Testing (Jest + Playwright):</strong> End-to-end testing for User Registration &rarr; OTP Verification &rarr; Course Purchase via Sandbox bKash &rarr; Lesson Playback &rarr; Final Quiz &rarr; Certificate Generation.</li>
+    <li><strong>Load & Performance Stress Testing (k6):</strong> Validate that Next.js Route Handlers and MongoDB Atlas can comfortably handle 500 concurrent students taking an exam simultaneously without latency spiking above 500ms.</li>
+    <li><strong>Accessibility (WCAG 2.1 AA):</strong> Ensure color contrast ratios &ge; 4.5:1 on all text badges, full keyboard tab navigation through curriculum drawers, and proper ARIA labels on all modal dialogs.</li>
+  </ul>
+</div>
+
+<!-- ================= SECTION 17: MOBILE STRATEGY ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">17</span> Mobile Application Strategy & API Convergence</h1>
+  <p>While the immediate focus is web launch, more than 75% of Bangladeshi learners access educational content via Android smartphones. A deliberate mobile convergence strategy prevents architectural duplication:</p>
+
+  <div class="diagram-box">
+  +-----------------------------------------------------------------------------------+
+  |                       Unified Backend REST API (/api/v1/...)                      |
+  +-----------------------------------------------------------------------------------+
+                                           |
+           +-------------------------------+-------------------------------+
+           |                                                               |
+  [ Web Application (Next.js 16) ]                         [ Mobile App (React Native / Flutter) ]
+  &bull; Server-Side Rendering (SEO)                         &bull; Native Video Surface (ExoPlayer/AVPlayer)
+  &bull; Desktop Curriculum Management                      &bull; Offline Encrypted Video Downloads
+  &bull; Comprehensive Admin & Instructor Dashboards        &bull; Biometric Authentication (Fingerprint/FaceID)
+  &bull; Browser Cookie Session                             &bull; Push Notifications (FCM / OneSignal)
+  </div>
+
+  <h2>Architectural Rules for Mobile Readiness</h2>
+  <ul>
+    <li><strong>Stateless REST Contracts:</strong> All <code>/api/v1/</code> endpoints must support Authorization Bearer headers in addition to browser cookies, enabling native mobile apps to authenticate without session workarounds.</li>
+    <li><strong>Offline Video DRM & Encryption:</strong> Video downloads on mobile must use AES-128 encrypted HLS segments stored within secure app sandboxes, preventing students from ripping video files.</li>
+    <li><strong>Mobile Exam Experience:</strong> The mobile exam screen must feature large touch-friendly radio targets (&ge;48px height) and background-pause safeguards in case of incoming cellular phone calls.</li>
+  </ul>
+</div>
+
+<!-- ================= SECTION 18: DEVELOPMENT ROADMAP ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">18</span> Sequential Product Development Roadmap</h1>
+  <p>To ensure engineering rigor, the transformation of TechSprout School is organized into 14 sequential phases. Each phase represents a strict delivery gate:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 12%;">Phase</th>
+        <th style="width: 25%;">Phase Name</th>
+        <th style="width: 45%;">Core Deliverables & Engineering Scope</th>
+        <th style="width: 18%;">Exit Gate Criteria</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Phase 1</strong></td>
+        <td>Product & Technical Audit</td>
+        <td>Complete codebase inspection, competitor benchmark, MVP definition, architecture document (Current Phase).</td>
+        <td>Approved Specification PDF</td>
+      </tr>
+      <tr>
+        <td><strong>Phase 2</strong></td>
+        <td>Security & Core Sanitization</td>
+        <td>Fix registration bug (BUG-001/002), sanitize schemas, implement Argon2id hashing, clean dead footer links.</td>
+        <td>Zero Critical Security Flaws</td>
+      </tr>
+      <tr>
+        <td><strong>Phase 3</strong></td>
+        <td>Database & Domain Modeling</td>
+        <td>Deploy MongoDB Atlas Mongoose models with compound indexes, soft deletes, and automated database seed scripts.</td>
+        <td>Validated Database Seeds</td>
+      </tr>
+      <tr>
+        <td><strong>Phase 4</strong></td>
+        <td>Authentication & RBAC</td>
+        <td>Build <code>/api/v1/auth</code> endpoints, Redis OTP sliding-window limiter, SMS gateway integration, NextAuth session guards.</td>
+        <td>Working Phone OTP & Login</td>
+      </tr>
+      <tr>
+        <td><strong>Phase 5</strong></td>
+        <td>Course & Media Infrastructure</td>
+        <td>Curriculum schemas (Course &rarr; Module &rarr; Lesson), Bunny.net video transcode pipeline, presigned S3 upload URLs.</td>
+        <td>HLS Video Ingest Working</td>
+      </tr>
+      <tr>
+        <td><strong>Phase 6</strong></td>
+        <td>Student Learning Portal</td>
+        <td>Distraction-free video player, curriculum drawer, lesson completion tracking, and progress percentage computation.</td>
+        <td>Live Course Player Tested</td>
+      </tr>
+      <tr>
+        <td><strong>Phase 7</strong></td>
+        <td>Examination & Evaluation</td>
+        <td>Timed MCQ engine, randomized question draws, anti-cheating blur detection, auto-grading, and Results table.</td>
+        <td>Automated Quiz Grading</td>
+      </tr>
+      <tr>
+        <td><strong>Phase 8</strong></td>
+        <td>MFS Payments & Checkout</td>
+        <td>SSLCommerz / bKash merchant gateway integration, atomic enrollment transactions, IPN webhook signature verification.</td>
+        <td>Successful Sandbox Payments</td>
+      </tr>
+      <tr>
+        <td><strong>Phase 9</strong></td>
+        <td>Student & Admin Portals</td>
+        <td>Student dashboard with active enrollments and quiz scores; Admin moderation dashboard for courses and revenues.</td>
+        <td>Functional Role Dashboards</td>
+      </tr>
+      <tr>
+        <td><strong>Phase 10</strong></td>
+        <td>Bilingual Localization (i18n)</td>
+        <td>Integrate <code>next-intl</code> dictionary routing, Google Fonts Hind Siliguri, localized Bengali numbers and Taka currency.</td>
+        <td>100% Bilingual UI Verified</td>
+      </tr>
+      <tr>
+        <td><strong>Phase 11</strong></td>
+        <td>Accredited Certificates</td>
+        <td>PDFKit dynamic certificate generation upon 100% completion, cryptographic hash generation, public verification page.</td>
+        <td>Scannable QR Verification</td>
+      </tr>
+      <tr>
+        <td><strong>Phase 12</strong></td>
+        <td>Comprehensive SQA & Hardening</td>
+        <td>Automated end-to-end Playwright test suite, k6 stress testing, OWASP Top 10 penetration review.</td>
+        <td>Zero P0/P1 Defects Remaining</td>
+      </tr>
+      <tr>
+        <td><strong>Phase 13</strong></td>
+        <td>Production Staging & Launch</td>
+        <td>Vercel production deployment, MongoDB Atlas production cluster, Cloudflare CDN rules, DNS setup, Public Beta.</td>
+        <td>Live Production Launch</td>
+      </tr>
+      <tr>
+        <td><strong>Phase 14</strong></td>
+        <td>Native Mobile Apps (v2)</td>
+        <td>React Native / Flutter mobile app leveraging existing <code>/api/v1/</code> REST endpoints with offline video caching.</td>
+        <td>Google Play & App Store Release</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ================= SECTION 19: MVP TIMELINE ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">19</span> MVP Research & Estimated Time Frame to Launch</h1>
+  <p>Building a professional, launch-ready LMS requires methodical execution across database design, secure payment handling, and media streaming. The estimated timeline to achieve a public MVP release is detailed below:</p>
+
+  <h2>1. Minimum Launchable Product (MLP) Definition</h2>
+  <p>The absolute minimum product capable of accepting paying students and delivering educational value must include:
+    <strong>Functional Phone OTP Auth</strong>, <strong>10 Live Video Courses</strong>, <strong>HLS Player with Progress Tracking</strong>, <strong>End-of-Course MCQ Exam</strong>, <strong>bKash/Nagad Checkout</strong>, <strong>Automated PDF Certificate</strong>, and <strong>Bilingual UI Chrome</strong>. Everything else can be added iteratively post-launch.
+  </p>
+
+  <h2>2. Critical Launch Blockers & Risk Factors</h2>
+  <ul>
+    <li><strong>Payment Gateway Merchant Onboarding:</strong> Merchant account approval for bKash, Nagad, and SSLCommerz typically takes 10 to 20 business days in Bangladesh due to trade license and KYC compliance verification. <em>Action: Initiate merchant registration immediately.</em></li>
+    <li><strong>SMS Aggregator Sender ID Approval:</strong> Non-masking or masking SMS sender ID approval from BTRC can take 5 to 10 days. <em>Action: Secure SMS gateway credentials during Phase 2.</em></li>
+    <li><strong>Curriculum Video Production:</strong> Technical platforms fail when engineering completes but course content is delayed. At least 5 complete courses must be fully recorded, edited, and encoded prior to public launch.</li>
+  </ul>
+</div>
+
+<!-- ================= SECTION 20: FULL PRODUCT TIMELINE ================= -->
+<div class="avoid-break">
+  <h1 class="section-title"><span class="num">20</span> Full Product Development Timeline</h1>
+  <p>To provide realistic planning estimates for stakeholders, we present two staffing scenarios:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 30%;">Development Phase</th>
+        <th style="width: 25%; text-align: center;">Scenario A: Solo Full-Stack Engineer</th>
+        <th style="width: 25%; text-align: center;">Scenario B: Small Cross-Functional Team<br><em>(2 Full-Stack + 1 Frontend + 1 QA)</em></th>
+        <th style="width: 20%;">Key Dependencies</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Phases 1–3: Research, Fixes & DB</td>
+        <td style="text-align: center;">15 Working Days (3 Weeks)</td>
+        <td style="text-align: center;">6 Working Days (1.2 Weeks)</td>
+        <td>Approved Architecture</td>
+      </tr>
+      <tr>
+        <td>Phases 4–5: Auth, RBAC & Media</td>
+        <td style="text-align: center;">22 Working Days (4.4 Weeks)</td>
+        <td style="text-align: center;">10 Working Days (2 Weeks)</td>
+        <td>SMS & Bunny.net Accounts</td>
+      </tr>
+      <tr>
+        <td>Phases 6–7: Player, Progress & Exams</td>
+        <td style="text-align: center;">25 Working Days (5 Weeks)</td>
+        <td style="text-align: center;">12 Working Days (2.4 Weeks)</td>
+        <td>Course & Media Engine</td>
+      </tr>
+      <tr>
+        <td>Phases 8–9: Payments & Dashboards</td>
+        <td style="text-align: center;">20 Working Days (4 Weeks)</td>
+        <td style="text-align: center;">10 Working Days (2 Weeks)</td>
+        <td>Payment Gateway Sandbox</td>
+      </tr>
+      <tr>
+        <td>Phases 10–11: i18n & Certificates</td>
+        <td style="text-align: center;">14 Working Days (2.8 Weeks)</td>
+        <td style="text-align: center;">7 Working Days (1.4 Weeks)</td>
+        <td>Translation Catalogs</td>
+      </tr>
+      <tr>
+        <td>Phases 12–13: SQA, Staging & Launch</td>
+        <td style="text-align: center;">18 Working Days (3.6 Weeks)</td>
+        <td style="text-align: center;">9 Working Days (1.8 Weeks)</td>
+        <td>All Features Deployed</td>
+      </tr>
+      <tr style="background: #F1F5F9; font-weight: bold;">
+        <td>TOTAL ESTIMATED EFFORT</td>
+        <td style="text-align: center; color: #0284C7;">114 Working Days (~23 Calendar Weeks)</td>
+        <td style="text-align: center; color: #059669;">54 Working Days (~11 Calendar Weeks)</td>
+        <td>Ready for Public Beta</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-info avoid-break">
+    <div class="callout-title">Schedule Assumptions</div>
+    <p>Estimates assume standard 5-day work weeks, timely availability of merchant payment credentials, and no major scope pivots. A small dedicated team reduces calendar time by more than 50% through parallel development of frontend portals, backend services, and test automation suites.</p>
+  </div>
+</div>
+
+<!-- ================= SECTION 21: INFRASTRUCTURE & COSTS ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">21</span> Infrastructure, Cloud Resources & Operational Costs</h1>
+  <p>To ensure financial sustainability, the operational infrastructure is modeled across three growth stages: Early MVP (0–500 active students), Growth Stage (500–5,000 active students), and Scale Stage (5,000+ active students):</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 20%;">Resource Category</th>
+        <th style="width: 25%;">Recommended Provider</th>
+        <th style="width: 30%;">Technical Function</th>
+        <th style="width: 25%;">Cost & Scaling Factors</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Web & API Hosting</strong></td>
+        <td>Vercel Pro / DigitalOcean App Platform</td>
+        <td>Next.js 16 serverless route handlers, Edge middleware, automatic SSL.</td>
+        <td>Vercel Pro ($20/dev/mo) handles up to 10k monthly visitors easily.</td>
+      </tr>
+      <tr>
+        <td><strong>Managed Database</strong></td>
+        <td>MongoDB Atlas (Dedicated Tier)</td>
+        <td>High-availability replica set (M10/M20), automated daily backups, VPC peering.</td>
+        <td>Free tier (M0) for staging; $57–$140/mo for M10 production cluster.</td>
+      </tr>
+      <tr>
+        <td><strong>Video CDN & Transcoding</strong></td>
+        <td>Bunny.net Stream / Cloudflare Stream</td>
+        <td>Multi-bitrate HLS adaptive streaming, signed DRM tokens, watermark embedding.</td>
+        <td>$0.01 per GB egress; approx. $0.005/min transcoding. Extremely cost-effective.</td>
+      </tr>
+      <tr>
+        <td><strong>Document & Asset Storage</strong></td>
+        <td>Cloudflare R2 / AWS S3</td>
+        <td>Student assignment submissions, course PDFs, instructor thumbnails.</td>
+        <td>Cloudflare R2 provides zero egress fees ($0.015/GB/mo storage).</td>
+      </tr>
+      <tr>
+        <td><strong>In-Memory Cache & Limiter</strong></td>
+        <td>Upstash Redis</td>
+        <td>OTP code verification, rate limiting, session token invalidation.</td>
+        <td>Free tier handles 10,000 requests/day; then $0.20 per 100k requests.</td>
+      </tr>
+      <tr>
+        <td><strong>Transactional SMS Gateway</strong></td>
+        <td>Greenweb BD / SSL Wireless</td>
+        <td>6-digit OTP delivery to Grameenphone, Banglalink, Robi, Teletalk.</td>
+        <td>Approx. ৳ 0.25 to ৳ 0.35 BDT per SMS. Masking sender IDs incur setup fee.</td>
+      </tr>
+      <tr>
+        <td><strong>Transactional Email</strong></td>
+        <td>Resend / Amazon SES</td>
+        <td>Welcome emails, purchase receipts, certificate delivery.</td>
+        <td>Resend offers 3,000 free emails/mo; then $20/mo for 50,000 emails.</td>
+      </tr>
+      <tr>
+        <td><strong>Payment Gateway Processing</strong></td>
+        <td>SSLCommerz / bKash Direct Merchant</td>
+        <td>Processing bKash, Nagad, Rocket, Visa, Mastercard transactions.</td>
+        <td>bKash merchant fee: 1.2%–1.5%; SSLCommerz MDR: 2.0%–3.5% per successful transaction.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ================= SECTION 22: LAUNCH READINESS CHECKLIST ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">22</span> Master Launch Readiness Checklist</h1>
+  <p>Every item reflects the verified state of the current codebase. Items marked <em>Complete</em> have been verified through active source inspection:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Domain Category</th>
+        <th style="width: 50%;">Verification Item</th>
+        <th style="width: 25%;">Current Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td rowspan="3"><strong>Frontend & UI</strong></td>
+        <td>Responsive landing page, banner, categories, and testimonials</td>
+        <td><span class="status-tag status-complete">[x] Complete</span></td>
+      </tr>
+      <tr>
+        <td>Course browsing catalog and search inputs functional</td>
+        <td><span class="status-tag status-mock">[ ] In Progress (Mock)</span></td>
+      </tr>
+      <tr>
+        <td>Course video player with curriculum drawer and progress bar</td>
+        <td><span class="status-tag status-missing">[ ] Not Started</span></td>
+      </tr>
+
+      <tr>
+        <td rowspan="3"><strong>Authentication</strong></td>
+        <td>Registration endpoint with Argon2id password hashing</td>
+        <td><span class="status-tag status-broken">[!] Needs Review (Broken)</span></td>
+      </tr>
+      <tr>
+        <td>Phone number with 6-digit SMS OTP verification</td>
+        <td><span class="status-tag status-mock">[ ] In Progress (UI Only)</span></td>
+      </tr>
+      <tr>
+        <td>Role-based route guarding via Next.js middleware</td>
+        <td><span class="status-tag status-broken">[!] Needs Review (Stub)</span></td>
+      </tr>
+
+      <tr>
+        <td rowspan="3"><strong>Academic Engine</strong></td>
+        <td>Course & Module schema with database relations</td>
+        <td><span class="status-tag status-partial">[ ] In Progress (Loose)</span></td>
+      </tr>
+      <tr>
+        <td>Online timed MCQ examination and auto-grading engine</td>
+        <td><span class="status-tag status-missing">[ ] Not Started</span></td>
+      </tr>
+      <tr>
+        <td>Automated PDF certificate generation with verification QR</td>
+        <td><span class="status-tag status-missing">[ ] Not Started</span></td>
+      </tr>
+
+      <tr>
+        <td rowspan="2"><strong>Monetization</strong></td>
+        <td>Shopping cart and checkout summary interface</td>
+        <td><span class="status-tag status-mock">[ ] In Progress (Cart Stub)</span></td>
+      </tr>
+      <tr>
+        <td>bKash / Nagad / SSLCommerz IPN webhook integration</td>
+        <td><span class="status-tag status-missing">[ ] Not Started</span></td>
+      </tr>
+
+      <tr>
+        <td rowspan="2"><strong>Localization</strong></td>
+        <td>Bilingual subpath routing (<code>/bn</code> and <code>/en</code>) via next-intl</td>
+        <td><span class="status-tag status-missing">[ ] Not Started</span></td>
+      </tr>
+      <tr>
+        <td>Bangla typography and localized Bengali numerals</td>
+        <td><span class="status-tag status-missing">[ ] Not Started</span></td>
+      </tr>
+
+      <tr>
+        <td rowspan="2"><strong>Dashboards</strong></td>
+        <td>Student portal (enrolled courses, certificates, receipts)</td>
+        <td><span class="status-tag status-missing">[ ] Not Started</span></td>
+      </tr>
+      <tr>
+        <td>Admin moderation panel (approvals, revenues, users)</td>
+        <td><span class="status-tag status-mock">[ ] In Progress (Stubs)</span></td>
+      </tr>
+
+      <tr>
+        <td rowspan="2"><strong>QA & Security</strong></td>
+        <td>OWASP Top 10 hardening and NoSQL sanitization</td>
+        <td><span class="status-tag status-missing">[ ] Not Started</span></td>
+      </tr>
+      <tr>
+        <td>Resolution of all active codebase bugs (BUG-001 to BUG-009)</td>
+        <td><span class="status-tag status-broken">[!] Needs Review</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ================= SECTION 23: CRITICAL GAPS ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">23</span> Critical Gaps Found in Current TechSprout</h1>
+  <p>The following issues represent severe impediments to launching TechSprout School. They are prioritized by security risk, operational failure potential, and user experience impact:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 14%;">Severity</th>
+        <th style="width: 26%;">Identified Problem & Location</th>
+        <th style="width: 35%;">Business & Security Impact</th>
+        <th style="width: 25%;">Recommended Solution</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="badge badge-critical">CRITICAL</span></td>
+        <td><strong>Plaintext Password Storage</strong><br><code>src/app/api/(user)/register/route.ts</code></td>
+        <td>Data breach will expose user passwords in clear text, causing catastrophic brand damage and legal liability.</td>
+        <td>Adopt Argon2id via <code>argon2</code> npm library with salt prior to MongoDB write.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-critical">CRITICAL</span></td>
+        <td><strong>Mass Assignment / Role Theft</strong><br><code>src/app/api/(user)/register/route.ts</code></td>
+        <td>Any attacker can send <code>role: 'admin'</code> in the registration body and gain full control over the platform.</td>
+        <td>Strip <code>role</code> from user input; enforce <code>role = 'student'</code> on public signup.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-critical">CRITICAL</span></td>
+        <td><strong>Register Form Field Overwrite</strong><br><code>src/components/forms/Register.tsx:169</code></td>
+        <td>Typing a confirm password completely overwrites the user's Full Name, preventing successful registration.</td>
+        <td>Bind form field correctly to <code>name="passwordConfirmation"</code>.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td><strong>Broken Authentication Pipeline</strong><br><code>src/auth.ts:14</code></td>
+        <td>NextAuth <code>authorize()</code> returns <code>null</code>. No student or teacher can log in to access purchased content.</td>
+        <td>Implement credentials verification against MongoDB password hash.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td><strong>100% Mock Data Dependency</strong><br><code>src/lib/mockData/mockData.ts</code></td>
+        <td>Catalog is static; database updates do not reflect on frontend; dynamic purchases impossible.</td>
+        <td>Migrate mock arrays to MongoDB collections and query via REST API handlers.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td><strong>Missing Route Middleware</strong><br><code>src/middleware.ts</code></td>
+        <td>Protected pages (admin, student) have no authentication checks and can be accessed by any visitor.</td>
+        <td>Implement JWT token verification and redirect unauthenticated requests to <code>/login</code>.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-medium">MEDIUM</span></td>
+        <td><strong>Dead Links across Footer</strong><br><code>src/components/Footer.tsx</code></td>
+        <td>Visitors clicking About, Blog, or Terms receive jarring 404 error pages, eroding trust.</td>
+        <td>Fix link hrefs to match existing file system paths (e.g., <code>/about-us</code>).</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-low">LOW</span></td>
+        <td><strong>Grammatical Inconsistencies</strong><br>Multiple form placeholder inputs</td>
+        <td>Placeholders read "Enter you email" and "Enter you name", creating an unprofessional impression.</td>
+        <td>Perform global search-and-replace updating "you" to "your".</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ================= SECTION 24: RECOMMENDED NEXT STEPS ================= -->
+<div class="page-break">
+  <h1 class="section-title"><span class="num">24</span> Recommended Immediate Next Steps (30-Day Plan)</h1>
+  <p>To transition from planning into high-velocity execution, the engineering team should follow this prioritized 30-day tactical roadmap:</p>
+
+  <div class="diagram-box">
+  [ Days 1 - 5: Critical Bug & Security Patching ]
+  &bull; Fix Register.tsx confirm password field binding (BUG-001)
+  &bull; Route registration to /api/v1/auth/register instead of scratch /test
+  &bull; Integrate Argon2id password hashing and Zod input sanitization
+  &bull; Correct dead footer navigation links (BUG-004)
+        |
+        v
+  [ Days 6 - 12: Database Schema & Migration ]
+  &bull; Implement strict Mongoose schemas (User, Course, Module, Lesson, Enrollment, Exam)
+  &bull; Create database migration script loading mockData.ts into MongoDB Atlas
+  &bull; Establish compound indexes for fast course queries and unique phone/email lookups
+        |
+        v
+  [ Days 13 - 20: Authentication & Session Engine ]
+  &bull; Complete NextAuth v5 authorize handler with password verification
+  &bull; Build Redis-backed 6-digit phone OTP verification service
+  &bull; Implement route guard middleware protecting /dashboard/* routes
+        |
+        v
+  [ Days 21 - 30: Course Catalog API & Player Prototype ]
+  &bull; Replace mockApi.ts with real REST API endpoints (/api/v1/courses)
+  &bull; Build functional course learning player UI with module/lesson sidebar
+  &bull; Integrate test video stream via Bunny.net Stream or Cloudflare Stream
+  </div>
+
+  <div class="callout callout-success avoid-break">
+    <div class="callout-title">Immediate Management Directive</div>
+    <p>The senior engineering team should immediately create a new feature branch (<code>feat/security-auth-remediation</code>) to address BUG-001, BUG-002, and the plaintext password flaw before any further UI styling or marketing efforts take place.</p>
+  </div>
+</div>
+
+<!-- ================= SECTION 25: REFERENCES ================= -->
+<div class="avoid-break">
+  <h1 class="section-title"><span class="num">25</span> Technical References & Industry Standards</h1>
+  <p>The architectural recommendations, security frameworks, and technical standards detailed in this specification are grounded in authoritative industry documentation:</p>
+
+  <ul>
+    <li><strong>OWASP Foundation:</strong> <em>OWASP Top 10: 2021 (A01: Broken Access Control, A02: Cryptographic Failures, A07: Identification and Authentication Failures)</em>. Official documentation: <a href="https://owasp.org/Top10/">owasp.org/Top10</a>.</li>
+    <li><strong>IETF RFC 7519:</strong> <em>JSON Web Token (JWT) Architecture and Best Current Practices</em>. Standards Track: <a href="https://datatracker.ietf.org/doc/html/rfc7519">rfc7519</a>.</li>
+    <li><strong>IETF RFC 9110:</strong> <em>HTTP Semantics, Status Codes, and REST API Conventions</em>. Standards Track: <a href="https://datatracker.ietf.org/doc/html/rfc9110">rfc9110</a>.</li>
+    <li><strong>Next.js 16 Documentation:</strong> <em>Route Handlers, Server Components, Turbopack, and Middleware Conventions</em>. Vercel: <a href="https://nextjs.org/docs">nextjs.org/docs</a>.</li>
+    <li><strong>W3C Web Accessibility Initiative:</strong> <em>Web Content Accessibility Guidelines (WCAG) 2.1 AA Standards</em>. Official recommendation: <a href="https://www.w3.org/WAI/standards-guidelines/wcag/">w3.org/WAI</a>.</li>
+    <li><strong>BTRC (Bangladesh Telecommunication Regulatory Commission):</strong> <em>National Regulatory Directives on A2P SMS Aggregation and Masking Standards</em>.</li>
+    <li><strong>SSLCommerz & bKash Developer Portals:</strong> <em>Merchant Integration API Specification v4.0, IPN Webhook Verification, and Tokenized Checkout Guidelines</em>.</li>
+  </ul>
+</div>
+
+</body>
+</html>
