@@ -39,21 +39,25 @@ export default function RegisterForm() {
     try {
       setIsSubmitting(true);
       setServerError('');
+
+      const rawPhone = values.phoneNumber?.trim() || '';
+      const normalizedPhone = rawPhone.replace(/^\+?88/, '').trim() || undefined;
+
       const userData = {
-        name: values.name,
-        username: values.userName,
-        email: values.email,
-        phone: values.phoneNumber,
+        name: values.name.trim(),
+        username: values.userName.trim(),
+        email: values.email.trim(),
+        phone: normalizedPhone,
         password: values.password,
       };
 
       const response = await axiosInstance.post('/api/v1/auth/register', userData);
 
       if (response.data.success) {
-        if (values.phoneNumber) {
+        if (normalizedPhone) {
           try {
-            await axiosInstance.post('/api/v1/auth/otp/send', { phone: values.phoneNumber });
-            setPhoneNumber(values.phoneNumber);
+            await axiosInstance.post('/api/v1/auth/otp/send', { phone: normalizedPhone });
+            setPhoneNumber(normalizedPhone);
             setModalStatus('open');
           } catch {
             window.location.href = '/dashboard';
@@ -63,8 +67,35 @@ export default function RegisterForm() {
         }
       }
     } catch (err: unknown) {
-      const errorObj = err as { response?: { data?: { message?: string } } };
-      const message = errorObj.response?.data?.message || 'Registration failed. Please check your information.';
+      const errorObj = err as {
+        response?: {
+          data?: {
+            message?: string;
+            details?: Record<string, string[]>;
+          };
+        };
+      };
+      const errData = errorObj.response?.data;
+      let message = errData?.message || 'Registration failed. Please check your information.';
+
+      if (errData?.details && typeof errData.details === 'object') {
+        const fieldMessages: string[] = [];
+        for (const [field, errors] of Object.entries(errData.details)) {
+          const formField =
+            field === 'username' ? 'userName' : field === 'phone' ? 'phoneNumber' : field;
+          if (Array.isArray(errors) && errors.length > 0) {
+            fieldMessages.push(errors[0]);
+            form.setError(formField as 'name' | 'userName' | 'email' | 'phoneNumber' | 'password' | 'passwordConfirmation', {
+              type: 'server',
+              message: errors[0],
+            });
+          }
+        }
+        if (fieldMessages.length > 0) {
+          message = fieldMessages.join('. ');
+        }
+      }
+
       setServerError(message);
     } finally {
       setIsSubmitting(false);
@@ -168,6 +199,9 @@ export default function RegisterForm() {
                       className='h-12 rounded-xl bg-white'
                     />
                   </FormControl>
+                  <p className='text-xs text-muted-foreground mt-1'>
+                    Must be at least 8 characters with uppercase, lowercase, and numbers.
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}

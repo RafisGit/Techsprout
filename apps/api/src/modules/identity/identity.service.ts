@@ -43,6 +43,18 @@ export class IdentityService {
       }
     }
 
+    if (dto.phone) {
+      const existingPhone = await this.db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.phone, dto.phone))
+        .limit(1);
+
+      if (existingPhone.length > 0) {
+        throw new ApiException('Phone number is already registered', HttpStatus.BAD_REQUEST, 'PHONE_EXISTS');
+      }
+    }
+
     // 2. Hash password with Scrypt + random salt
     const passwordHash = await CryptoUtil.hashPassword(dto.password);
 

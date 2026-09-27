@@ -22,8 +22,18 @@ export const registerSchema = z.object({
     .toLowerCase(),
   phone: z
     .string()
-    .regex(BANGLADESHI_PHONE_REGEX, 'Invalid Bangladeshi phone number (e.g., 01712345678)')
-    .optional(),
+    .optional()
+    .transform((val) => {
+      if (!val || typeof val !== 'string') return undefined;
+      const trimmed = val.trim().replace(/^\+?88/, '');
+      return trimmed === '' ? undefined : trimmed;
+    })
+    .pipe(
+      z
+        .string()
+        .regex(BANGLADESHI_PHONE_REGEX, 'Invalid Bangladeshi phone number (e.g., 01712345678)')
+        .optional()
+    ),
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters long')

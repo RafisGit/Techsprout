@@ -1,6 +1,6 @@
 import z from 'zod';
 
-const BANGLADESHI_PHONE_REGEX = /^01[3-9]\d{8}$/;
+const BANGLADESHI_PHONE_REGEX = /^(?:\+?88)?(01[3-9]\d{8})$/;
 
 export const registerSchema = z
   .object({
@@ -14,11 +14,14 @@ export const registerSchema = z
       }),
     userName: z
       .string()
-      .min(2, {
-        message: 'User name must be at least 2 characters.',
+      .min(3, {
+        message: 'Username must be at least 3 characters.',
       })
-      .max(50, {
-        message: 'User name must not exceed 50 characters.',
+      .max(30, {
+        message: 'Username must not exceed 30 characters.',
+      })
+      .regex(/^[a-zA-Z0-9_-]+$/, {
+        message: 'Username can only contain letters, numbers, underscores, and dashes.',
       }),
     email: z.email({
       message: 'Please enter a valid email address.',
@@ -27,9 +30,20 @@ export const registerSchema = z
       message:
         'Invalid Bangladeshi phone number. Must start with 01 and be 11 digits long (e.g., 017XXXXXXXX).',
     }),
-    password: z.string().min(6, {
-      message: 'Password must be at least 6 characters.',
-    }),
+    password: z
+      .string()
+      .min(8, {
+        message: 'Password must be at least 8 characters long.',
+      })
+      .regex(/[A-Z]/, {
+        message: 'Password must contain at least one uppercase letter.',
+      })
+      .regex(/[a-z]/, {
+        message: 'Password must contain at least one lowercase letter.',
+      })
+      .regex(/[0-9]/, {
+        message: 'Password must contain at least one number.',
+      }),
     passwordConfirmation: z.string(),
   })
   .refine((data) => data.password === data.passwordConfirmation, {
