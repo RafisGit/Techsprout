@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "skipLibCheck": true,
+    "composite": false
+  },
+  "references": [
+    { "path": "./packages/contracts" },
+    { "path": "./apps/api" }
+  ],
+  "files": [],
+  "exclude": ["node_modules", "dist", ".next"]
+}
