@@ -213,11 +213,13 @@ The Vercel Preview application (`https://techsprout-frthqjqb8-tech-sprout.vercel
 
 ## 6. Exact P1 Gate Status
 
-**P1 AUTH REGISTRATION — PASS**
+**P1 FINAL VERIFICATION — PASS**
 
-- **Live Backend API**: `https://techsprout-api.onrender.com` (Healthy, Database connected, Valkey/Redis connected)
-- **Live Vercel Preview**: `https://techsprout-frthqjqb8-tech-sprout.vercel.app` (Communicating with live API)
-- **Registration**: `POST /api/v1/auth/register` → `201 Created` with secure `techsprout_session` cookie
-- **Active Session Query**: `GET /api/v1/auth/me` → `200 OK`
-- **Logout & Session Revocation**: `POST /api/v1/auth/logout` → `200 OK`
+- **Live Backend API**: `https://techsprout-api.onrender.com` (Healthy, PostgreSQL 16 active, Valkey/Redis active, strict CORS enforced)
+- **Live Vercel Preview**: `https://techsprout-git-feat-p1-foundation-security-tech-sprout.vercel.app` & `https://techsprout-frthqjqb8-tech-sprout.vercel.app`
+- **Browser Registration**: `POST /api/v1/auth/register` → `201 Created` with secure `techsprout_session` cookie; UI immediately transitions without sticking on "REGISTERING..."
+- **Protected Route Guard**: Unauthenticated access to `/dashboard` redirects to `/login`
+- **Authenticated Session Query**: `GET /api/v1/auth/me` → `200 OK` (User identity resolved from PostgreSQL session store)
+- **Logout & Session Revocation**: `POST /api/v1/auth/logout` → `200 OK` (Cookie cleared with epoch expiration)
 - **Post-Logout Query**: `GET /api/v1/auth/me` → `401 Unauthorized` (`SESSION_EXPIRED`)
+- **Network & Console Cleanliness**: 100% of API calls directed to `https://techsprout-api.onrender.com/api/v1/...`; zero CORS errors, zero mixed content, zero name resolution failures.
