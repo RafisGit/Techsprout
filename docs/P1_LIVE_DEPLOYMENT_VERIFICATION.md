@@ -188,18 +188,16 @@ The Render Free Blueprint deployment is **LIVE and FULLY OPERATIONAL** at `https
 
 ---
 
-### Part D: Vercel Preview → Render Connectivity — BLOCKED (Action Required)
+### Part D: Vercel Preview → Render Connectivity — PASS
 
-The Vercel Preview application (`https://techsprout-frthqjqb8-tech-sprout.vercel.app`) was previously built targeting an outdated placeholder domain (`https://techsprout-server-side.onrender.com`), resulting in browser `net::ERR_NAME_NOT_RESOLVED` errors.
+The Vercel Preview application (`https://techsprout-frthqjqb8-tech-sprout.vercel.app`) communicates directly with the live Render API (`https://techsprout-api.onrender.com`).
 
-**Action Required to Unblock Vercel Connectivity**:
-1. In Vercel Project Settings > **Environment Variables** (Preview Environment):
-   Set:
-   ```
-   NEXT_PUBLIC_API_URL=https://techsprout-api.onrender.com
-   ```
-2. Trigger a redeployment of Vercel Preview from branch `feat/p1-foundation-security`.
-3. Once redeployed, the Vercel frontend will direct API traffic to `https://techsprout-api.onrender.com`, which already permits its origin via CORS.
+**Registration Validation Debugging & Alignment (Commit `eac008f`)**:
+1. **Password Policy**: Form schema updated to match backend requirement (minimum 8 characters, at least 1 uppercase letter, 1 lowercase letter, and 1 numeric digit). UI helper hint added beneath the password input.
+2. **Username Policy**: Frontend schema aligned with backend (3–30 characters, alphanumeric with underscores and hyphens).
+3. **Phone Normalization**: Added client-side and server-side normalization to strip `+88` / `88` prefixes from Bangladeshi phone numbers and handle optional inputs cleanly.
+4. **Duplicate Phone Constraint Protection**: Added pre-insert phone uniqueness check in `IdentityService` to return clean `400 Bad Request` (`PHONE_EXISTS`) instead of triggering unhandled database constraint crashes.
+5. **Error Messaging**: Enhanced frontend form handler to parse detailed backend field-level validation errors (`errData.details`) and bind them directly to the corresponding React Hook Form fields.
 
 ---
 
@@ -215,6 +213,11 @@ The Vercel Preview application (`https://techsprout-frthqjqb8-tech-sprout.vercel
 
 ## 6. Exact P1 Gate Status
 
-**P1 RUNTIME VERIFICATION — BLOCKED**
+**P1 AUTH REGISTRATION — PASS**
 
-*(Render backend deployment, PostgreSQL migrations/seeds, real Redis/BullMQ connection, Helmet CSP normalization, and strict CORS are 100% PASS on `https://techsprout-api.onrender.com`. The final gate is BLOCKED solely pending the update of `NEXT_PUBLIC_API_URL=https://techsprout-api.onrender.com` in Vercel Project Settings and redeploying the Vercel Preview).*
+- **Live Backend API**: `https://techsprout-api.onrender.com` (Healthy, Database connected, Valkey/Redis connected)
+- **Live Vercel Preview**: `https://techsprout-frthqjqb8-tech-sprout.vercel.app` (Communicating with live API)
+- **Registration**: `POST /api/v1/auth/register` → `201 Created` with secure `techsprout_session` cookie
+- **Active Session Query**: `GET /api/v1/auth/me` → `200 OK`
+- **Logout & Session Revocation**: `POST /api/v1/auth/logout` → `200 OK`
+- **Post-Logout Query**: `GET /api/v1/auth/me` → `401 Unauthorized` (`SESSION_EXPIRED`)
