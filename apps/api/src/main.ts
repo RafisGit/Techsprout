@@ -7,6 +7,7 @@ import { Logger } from '@nestjs/common';
 import { env } from './config/env.config';
 import { initSentry } from './common/observability/sentry';
 import { StructuredLoggerService } from './common/observability/structured-logger.service';
+import { parseAllowedOrigins, buildCspDirectives } from './common/security/csp.util';
 
 async function bootstrap() {
   // Initialize Sentry SDK
@@ -22,18 +23,14 @@ async function bootstrap() {
   // 1. Versioned Global Prefix: /api/v1
   app.setGlobalPrefix('api/v1');
 
+  // Parse and normalize allowed origins from WEB_ORIGIN (reused across Helmet & CORS)
+  const customOrigins = parseAllowedOrigins(env.WEB_ORIGIN);
+
   // 2. Security Headers (Helmet)
   app.use(
     helmet({
       contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "'unsafe-inline'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-          imgSrc: ["'self'", 'data:', 'https:'],
-          connectSrc: ["'self'", env.WEB_ORIGIN],
-          frameAncestors: ["'none'"],
-        },
+        directives: buildCspDirectives(customOrigins),
       },
       crossOriginEmbedderPolicy: false,
     })
@@ -43,7 +40,6 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // 4. Strict CORS whitelist (Never allow '*')
-  const customOrigins = env.WEB_ORIGIN ? env.WEB_ORIGIN.split(',').map((s) => s.trim()) : [];
   app.enableCors({
     origin: [
       ...customOrigins,

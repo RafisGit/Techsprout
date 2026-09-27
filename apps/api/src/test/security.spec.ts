@@ -8,6 +8,8 @@ import { CryptoUtil } from '../common/auth/crypto.util';
 import { users, roles, userRoles, sessions, auditLogs, otps, accounts } from '../database/schema';
 import { eq, and } from 'drizzle-orm';
 import { ApiException } from '../common/errors/api-error';
+import helmet from 'helmet';
+import { parseAllowedOrigins, buildCspDirectives } from '../common/security/csp.util';
 
 describe('P1 — Foundation & Security Master Test Suite', () => {
   let db: any;
@@ -424,5 +426,66 @@ describe('P1 — Foundation & Security Master Test Suite', () => {
     const updatedLogs = await auditService.list();
     expect(updatedLogs.length).toBe(initialCount + 1);
     expect(updatedLogs[0].action).toBe('ADMIN_ROLE_CHANGE_TEST');
+  });
+
+  // ==========================================
+  // SCENARIO S: Helmet CSP connect-src Multi-Origin Normalization
+  // ==========================================
+  it('SCENARIO S: WEB_ORIGIN containing comma-separated origins produces separate connect-src CSP sources and does not crash Helmet', () => {
+    // 1. Basic comma-separated string should yield distinct array entries
+    const testOrigins = 'https://originA.com,https://originB.com';
+    const parsed = parseAllowedOrigins(testOrigins);
+    expect(parsed).toEqual(['https://originA.com', 'https://originB.com']);
+
+    const directives = buildCspDirectives(parsed);
+    expect(directives.connectSrc).toEqual([
+      "'self'",
+      'https://originA.com',
+      'https://originB.com',
+    ]);
+    expect(directives.connectSrc.some((item) => item.includes(','))).toBe(false);
+
+    // 2. Ensure Helmet initialization succeeds without "invalid directive value" error
+    expect(() => {
+      helmet({
+        contentSecurityPolicy: {
+          directives,
+        },
+        crossOriginEmbedderPolicy: false,
+      });
+    }).not.toThrow();
+
+    // 3. Test edge cases: whitespace trimming, deduplication, accidental empty commas
+    const messyOrigins = '  https://originA.com  , , https://originB.com , https://originA.com ,  ';
+    const parsedMessy = parseAllowedOrigins(messyOrigins);
+    expect(parsedMessy).toEqual(['https://originA.com', 'https://originB.com']);
+
+    // 4. Verify exact Render/Vercel multi-origin environment variable
+    const renderVercelOrigins =
+      'https://techsprout-frthqjqb8-tech-sprout.vercel.app,https://techsprout-git-feat-p1-foundation-security-tech-sprout.vercel.app';
+    const parsedRender = parseAllowedOrigins(renderVercelOrigins);
+    expect(parsedRender).toEqual([
+      'https://techsprout-frthqjqb8-tech-sprout.vercel.app',
+      'https://techsprout-git-feat-p1-foundation-security-tech-sprout.vercel.app',
+    ]);
+
+    const renderDirectives = buildCspDirectives(parsedRender);
+    expect(renderDirectives.connectSrc).toHaveLength(3);
+    expect(renderDirectives.connectSrc[0]).toBe("'self'");
+    expect(renderDirectives.connectSrc[1]).toBe(
+      'https://techsprout-frthqjqb8-tech-sprout.vercel.app'
+    );
+    expect(renderDirectives.connectSrc[2]).toBe(
+      'https://techsprout-git-feat-p1-foundation-security-tech-sprout.vercel.app'
+    );
+
+    expect(() => {
+      helmet({
+        contentSecurityPolicy: {
+          directives: renderDirectives,
+        },
+        crossOriginEmbedderPolicy: false,
+      });
+    }).not.toThrow();
   });
 });

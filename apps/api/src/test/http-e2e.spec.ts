@@ -3,9 +3,11 @@ import request from 'supertest';
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { AppModule } from '../app.module';
 import { DatabaseService, DRIZZLE_DB } from '../database/drizzle.provider';
 import { createTestDatabase } from './test-helper';
+import { parseAllowedOrigins, buildCspDirectives } from '../common/security/csp.util';
 
 describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
   let app: INestApplication;
@@ -32,6 +34,18 @@ describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api/v1');
+
+    const testOrigins = parseAllowedOrigins(
+      'https://techsprout-frthqjqb8-tech-sprout.vercel.app,https://techsprout-git-feat-p1-foundation-security-tech-sprout.vercel.app'
+    );
+    app.use(
+      helmet({
+        contentSecurityPolicy: {
+          directives: buildCspDirectives(testOrigins),
+        },
+        crossOriginEmbedderPolicy: false,
+      })
+    );
     app.use(cookieParser());
     await app.init();
   });
@@ -51,6 +65,16 @@ describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
     expect(res.body.status).toBe('ok');
     expect(res.body.environment).toBeDefined();
     expect(res.body.services.database).toBe('up');
+  });
+
+  it('1b. HTTP response includes Content-Security-Policy with separated connect-src origins and zero commas', async () => {
+    const res = await request(app.getHttpServer()).get('/api/v1/health');
+    const csp = res.headers['content-security-policy'];
+    expect(csp).toBeDefined();
+    expect(csp).toContain("connect-src 'self' https://techsprout-frthqjqb8-tech-sprout.vercel.app https://techsprout-git-feat-p1-foundation-security-tech-sprout.vercel.app");
+    const connectSrcPart = csp.split(';').find((p: string) => p.trim().startsWith('connect-src'));
+    expect(connectSrcPart).toBeDefined();
+    expect(connectSrcPart).not.toContain(',');
   });
 
   it('2. GET /api/v1/health/ready returns ready status', async () => {
