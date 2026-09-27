@@ -1,0 +1,601 @@
+openapi: 3.1.0
+info:
+  title: TechSprout School LMS API
+  version: 1.0.0
+  description: >
+    Production-grade REST API for TechSprout School LMS (Foundation & Security Phase P1).
+    All routes versioned under /api/v1.
+servers:
+  - url: http://localhost:3001/api/v1
+    description: Local Development API Server
+  - url: https://api.techsprout.edu/api/v1
+    description: Production API Server
+paths:
+  /health:
+    get:
+      summary: System Health & Readiness Check
+      description: Returns health status of the API service, database, and background workers.
+      operationId: getHealth
+      tags:
+        - Health
+      responses:
+        '200':
+          description: System operational
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: System degraded or dependencies down
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /auth/register:
+    post:
+      summary: Register a new user
+      description: Validates input, hashes password, assigns student role, and creates identity.
+      operationId: registerUser
+      tags:
+        - Identity & Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Validation error or duplicate account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /auth/login:
+    post:
+      summary: User Login
+      description: Verifies credentials, issues HttpOnly session cookie, and returns user profile.
+      operationId: loginUser
+      tags:
+        - Identity & Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: techsprout_session=abc123xyz; Path=/; HttpOnly; SameSite=Lax
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid email or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /auth/logout:
+    post:
+      summary: User Logout
+      description: Revokes current session and clears the session cookie.
+      operationId: logoutUser
+      tags:
+        - Identity & Authentication
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessResponse'
+        '401':
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /auth/me:
+    get:
+      summary: Get Current User Session
+      description: Returns the currently authenticated user's profile and roles.
+      operationId: getCurrentUser
+      tags:
+        - Identity & Authentication
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Authenticated user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /auth/otp/send:
+    post:
+      summary: Send Phone OTP
+      description: Generates a 6-digit OTP code, stores it with 180s TTL, and dispatches via SMS gateway.
+      operationId: sendOtp
+      tags:
+        - OTP & Phone Verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpSendRequest'
+      responses:
+        '200':
+          description: OTP dispatched
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessResponse'
+        '400':
+          description: Invalid phone number
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '429':
+          description: Rate limit exceeded (max 3 per 15 mins)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /auth/otp/verify:
+    post:
+      summary: Verify Phone OTP
+      description: Verifies 6-digit OTP code within TTL, marks phone as verified, and invalidates the code.
+      operationId: verifyOtp
+      tags:
+        - OTP & Phone Verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpVerifyRequest'
+      responses:
+        '200':
+          description: OTP verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid, expired, or already used OTP code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /admin/users:
+    get:
+      summary: List all users (Admin only)
+      description: Returns list of registered users with role and status details.
+      operationId: listUsers
+      tags:
+        - Admin
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserDto'
+        '401':
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Forbidden (Requires Admin role)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /admin/roles/assign:
+    post:
+      summary: Assign Role to User (Admin only)
+      description: Assigns or revokes privileged roles. Generates immutable audit log record.
+      operationId: assignRole
+      tags:
+        - Admin
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+                - role
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                role:
+                  type: string
+                  enum: [student, admin]
+      responses:
+        '200':
+          description: Role updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessResponse'
+        '401':
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '403':
+          description: Forbidden (Requires Admin role)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /admin/audit-logs:
+    get:
+      summary: Retrieve Audit Logs (Admin only)
+      description: Returns append-only system audit logs.
+      operationId: getAuditLogs
+      tags:
+        - Admin
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLogDto'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: techsprout_session
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required:
+        - name
+        - username
+        - email
+        - password
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 50
+          example: 'Rahim Ahmed'
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+          pattern: '^[a-zA-Z0-9_-]+$'
+          example: 'rahim_bd'
+        email:
+          type: string
+          format: email
+          example: 'rahim@techsprout.edu'
+        phone:
+          type: string
+          pattern: '^01[3-9]\\d{8}$'
+          example: '01712345678'
+        password:
+          type: string
+          minLength: 8
+          example: 'SuperSecureP@ss123'
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: 'rahim@techsprout.edu'
+        password:
+          type: string
+          example: 'SuperSecureP@ss123'
+
+    OtpSendRequest:
+      type: object
+      required:
+        - phone
+      properties:
+        phone:
+          type: string
+          pattern: '^01[3-9]\\d{8}$'
+          example: '01712345678'
+
+    OtpVerifyRequest:
+      type: object
+      required:
+        - phone
+        - otp
+      properties:
+        phone:
+          type: string
+          pattern: '^01[3-9]\\d{8}$'
+          example: '01712345678'
+        otp:
+          type: string
+          minLength: 6
+          maxLength: 6
+          pattern: '^\\d{6}$'
+          example: '482910'
+
+    UserDto:
+      type: object
+      required:
+        - id
+        - name
+        - username
+        - email
+        - role
+        - isVerified
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [student, admin]
+        isVerified:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/UserDto'
+
+    AuthResponse:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 'Authentication successful'
+        user:
+          $ref: '#/components/schemas/UserDto'
+        token:
+          type: string
+
+    ApiSuccessResponse:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+        data:
+          type: object
+        requestId:
+          type: string
+        timestamp:
+          type: string
+
+    ApiErrorResponse:
+      type: object
+      required:
+        - success
+        - message
+        - errorCode
+        - statusCode
+        - timestamp
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: 'Invalid credentials provided'
+        errorCode:
+          type: string
+          example: 'AUTH_INVALID_CREDENTIALS'
+        statusCode:
+          type: integer
+          example: 401
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          example: 'req_8f1b2c3d4e5f'
+        details:
+          type: object
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+        - uptime
+        - environment
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        timestamp:
+          type: string
+        uptime:
+          type: number
+        environment:
+          type: string
+        services:
+          type: object
+          properties:
+            database:
+              type: string
+              enum: [up, down]
+            redis:
+              type: string
+              enum: [up, down]
+
+    AuditLogDto:
+      type: object
+      required:
+        - id
+        - action
+        - targetType
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        actorId:
+          type: string
+          format: uuid
+          nullable: true
+        action:
+          type: string
+        targetType:
+          type: string
+        targetId:
+          type: string
+          nullable: true
+        ipAddress:
+          type: string
+          nullable: true
+        userAgent:
+          type: string
+          nullable: true
+        requestId:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+        createdAt:
+          type: string
+          format: date-time

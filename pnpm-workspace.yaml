@@ -1,8 +1,17 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
 allowBuilds:
-  '@tailwindcss/oxide': set this to true or false
-  sharp: set this to true or false
-  unrs-resolver: set this to true or false
+  '@tailwindcss/oxide': true
+  sharp: true
+  unrs-resolver: true
+  '@nestjs/core': true
+  esbuild: true
+  msgpackr-extract: true
 onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - sharp
   - unrs-resolver
+  - '@nestjs/core'
+  - esbuild
+  - msgpackr-extract

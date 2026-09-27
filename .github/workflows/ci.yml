@@ -1,0 +1,96 @@
+name: P1 Foundation & Security CI
+
+on:
+  push:
+    branches: [main, feat/*]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Lint, Typecheck & Security Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: techsprout_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js v20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install Monorepo Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck Workspace Packages
+        run: |
+          pnpm --filter @techsprout/contracts typecheck
+          pnpm --filter @techsprout/api typecheck
+
+      - name: Validate OpenAPI Contract
+        run: |
+          npx @redocly/cli lint packages/contracts/openapi.yaml
+
+      - name: Run Database Migrations
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/techsprout_test
+        run: |
+          pnpm --filter @techsprout/api db:migrate
+          pnpm --filter @techsprout/api db:seed
+
+      - name: Run P1 Master Security & RBAC Test Suite
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/techsprout_test
+          REDIS_URL: redis://localhost:6379
+          AUTH_SECRET: ci_secret_key_minimum_32_characters_for_tests
+        run: |
+          pnpm --filter @techsprout/api test
+
+      - name: Monorepo Production Build
+        run: |
+          pnpm --filter @techsprout/contracts build
+          pnpm --filter @techsprout/api build
