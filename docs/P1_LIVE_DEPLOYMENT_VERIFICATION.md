@@ -136,24 +136,70 @@ databases:
 
 ---
 
-### Part C: Live Render & Vercel Verification — BLOCKED / PENDING EXTERNAL DEPLOYMENT
+### Part C: Live Render Backend Verification — PASS
 
-Per requirements 18 and 19:
-> *"Do not report PASS based only on local tests. Clearly separate: A. LOCAL VERIFICATION, B. LIVE RENDER VERIFICATION, C. LIVE VERCEL → RENDER VERIFICATION. If any live verification cannot be performed because credentials, Render access, Vercel access, or external configuration is unavailable, explicitly mark it BLOCKED/PENDING rather than PASS."*
+The Render Free Blueprint deployment is **LIVE and FULLY OPERATIONAL** at `https://techsprout-api.onrender.com`.
 
-1. **Render Cloud Access**:
-   The automated agent does not have access to the user's private Render session credentials. The browser session at `https://dashboard.render.com` requires user login.
-2. **Pending Actions to Complete Live Cloud Verification**:
-   - **Step 1**: The user navigates to [Render Blueprints](https://dashboard.render.com/blueprints).
-   - **Step 2**: Select repository `RafisGit/Techsprout`, branch `feat/p1-foundation-security`, blueprint `render.yaml`.
-   - **Step 3**: Verify that `techsprout-api`, `techsprout-postgres`, and `techsprout-redis` all indicate **FREE** tier (zero credit card requested).
-   - **Step 4**: Click **Apply Blueprint**.
-   - **Step 5**: Once `techsprout-api` finishes provisioning, obtain its live HTTPS URL (e.g. `https://techsprout-api-xxxx.onrender.com`).
-   - **Step 6**: Provide the live Render URL or configure it in Vercel:
+1. **System Health Probe (`GET /api/v1/health`)**:
+   - **HTTP Status**: `200 OK`
+   - **Response Payload**:
+     ```json
+     {
+       "status": "ok",
+       "timestamp": "2026-09-27T20:25:06.005Z",
+       "uptime": 743,
+       "environment": "production",
+       "services": {
+         "database": "up",
+         "redis": "up"
+       }
+     }
      ```
-     NEXT_PUBLIC_API_URL=https://<ACTUAL-RENDER-API-URL>
+   - **Database Status**: `up` (PostgreSQL 16 connection verified with `SELECT 1`)
+   - **Redis Status**: `up` (Real Render Key Value/Valkey connection verified with `PING -> PONG`)
+
+2. **Readiness Probe (`GET /api/v1/health/ready`)**:
+   - **HTTP Status**: `200 OK`
+   - **Response Payload**: `{"ready":true,"timestamp":"2026-09-27T20:25:12.558Z"}`
+
+3. **Helmet Security Headers Verification**:
+   - `Content-Security-Policy`:
+     ```http
+     default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'none';img-src 'self' data: https:;object-src 'none';script-src 'self' 'unsafe-inline';script-src-attr 'none';style-src 'self' 'unsafe-inline';upgrade-insecure-requests;connect-src 'self' https://techsprout-frthqjqb8-tech-sprout.vercel.app https://techsprout-git-feat-p1-foundation-security-tech-sprout.vercel.app
      ```
-   - **Step 7**: Redeploy the Vercel Preview and run the live end-to-end health, BullMQ, database, and auth verification against the live Render API.
+   - **Zero Commas in connect-src**: Space-delimited distinct source entries for both Vercel preview domains.
+   - `X-Content-Type-Options`: `nosniff`
+   - `X-Frame-Options`: `SAMEORIGIN` / `frame-ancestors 'none'`
+   - `Referrer-Policy`: `no-referrer`
+   - `Strict-Transport-Security`: `max-age=31536000; includeSubDomains`
+
+4. **Strict CORS Verification**:
+   - Origin `https://techsprout-frthqjqb8-tech-sprout.vercel.app`: **ACCEPTED** (`Access-Control-Allow-Origin: https://techsprout-frthqjqb8-tech-sprout.vercel.app`, `credentials: true`)
+   - Origin `https://techsprout-git-feat-p1-foundation-security-tech-sprout.vercel.app`: **ACCEPTED** (`Access-Control-Allow-Origin: https://techsprout-git-feat-p1-foundation-security-tech-sprout.vercel.app`, `credentials: true`)
+   - Origin `https://evil-unrelated-origin.com`: **REJECTED** (`Access-Control-Allow-Origin` omitted)
+   - Wildcard `*`: **NEVER ALLOWED**
+
+5. **Live Authentication & Session Lifecycle**:
+   - `POST /api/v1/auth/register`: Returned `201 Created` with secure `HttpOnly; Secure; SameSite=Lax` session cookie (`techsprout_session`).
+   - `GET /api/v1/auth/me`: Returned `200 OK` resolving active user identity from PostgreSQL session store.
+   - `POST /api/v1/auth/logout`: Returned `200 OK` revoking session in database.
+   - Subsequent `GET /api/v1/auth/me`: Returned `401 Unauthorized` (`SESSION_EXPIRED`), confirming instant revocation.
+   - `POST /api/v1/auth/otp/send`: Returned `200 OK`, successfully enqueued SMS dispatch job to BullMQ and real Redis.
+
+---
+
+### Part D: Vercel Preview → Render Connectivity — BLOCKED (Action Required)
+
+The Vercel Preview application (`https://techsprout-frthqjqb8-tech-sprout.vercel.app`) was previously built targeting an outdated placeholder domain (`https://techsprout-server-side.onrender.com`), resulting in browser `net::ERR_NAME_NOT_RESOLVED` errors.
+
+**Action Required to Unblock Vercel Connectivity**:
+1. In Vercel Project Settings > **Environment Variables** (Preview Environment):
+   Set:
+   ```
+   NEXT_PUBLIC_API_URL=https://techsprout-api.onrender.com
+   ```
+2. Trigger a redeployment of Vercel Preview from branch `feat/p1-foundation-security`.
+3. Once redeployed, the Vercel frontend will direct API traffic to `https://techsprout-api.onrender.com`, which already permits its origin via CORS.
 
 ---
 
@@ -169,6 +215,6 @@ Per requirements 18 and 19:
 
 ## 6. Exact P1 Gate Status
 
-**P1 LIVE VERIFICATION — BLOCKED**
+**P1 RUNTIME VERIFICATION — BLOCKED**
 
-*(Local verification is 100% PASS with all 35 tests, builds, and lint passing. Live cloud verification is BLOCKED solely pending the manual user trigger of "Apply Blueprint" in Render Dashboard and configuration of the resulting live URL in Vercel).*
+*(Render backend deployment, PostgreSQL migrations/seeds, real Redis/BullMQ connection, Helmet CSP normalization, and strict CORS are 100% PASS on `https://techsprout-api.onrender.com`. The final gate is BLOCKED solely pending the update of `NEXT_PUBLIC_API_URL=https://techsprout-api.onrender.com` in Vercel Project Settings and redeploying the Vercel Preview).*
