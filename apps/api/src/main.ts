@@ -43,8 +43,15 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // 4. Strict CORS whitelist (Never allow '*')
+  const customOrigins = env.WEB_ORIGIN ? env.WEB_ORIGIN.split(',').map((s) => s.trim()) : [];
   app.enableCors({
-    origin: [env.WEB_ORIGIN, 'http://localhost:3000'],
+    origin: [
+      ...customOrigins,
+      'http://localhost:3000',
+      'https://techsprout-frthqjqb8-tech-sprout.vercel.app',
+      /^https:\/\/techsprout-.*-tech-sprout\.vercel\.app$/,
+      /^https:\/\/techsprout-git-.*-tech-sprout\.vercel\.app$/,
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
@@ -70,8 +77,8 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   const port = env.PORT || 3001;
-  await app.listen(port);
-  logger.log(`TechSprout API server successfully started on http://localhost:${port}/api/v1`);
+  await app.listen(port, '0.0.0.0');
+  logger.log(`TechSprout API server successfully started on http://0.0.0.0:${port}/api/v1`);
   logger.log(`OpenAPI Swagger documentation available on http://localhost:${port}/api/docs`);
 }
 
