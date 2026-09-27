@@ -289,28 +289,37 @@ export class IdentityService {
 
     let googleProfile: { sub: string; email: string; name: string };
 
-    if (code.startsWith('mock_code:')) {
-      const parts = code.split(':');
-      const sub = parts[1] || 'google_sub_12345';
-      const email = parts[2] ? decodeURIComponent(parts[2]) : 'googleuser@gmail.com';
-      const name = parts[3] ? decodeURIComponent(parts[3]) : 'Google Test User';
-      googleProfile = { sub, email, name };
-    } else if (code.startsWith('mock_code_')) {
-      const remainder = code.slice('mock_code_'.length);
-      const parts = remainder.split(':');
-      if (parts.length >= 3) {
-        googleProfile = {
-          sub: parts[0],
-          email: decodeURIComponent(parts[1]),
-          name: decodeURIComponent(parts[2]),
-        };
+    if (code.startsWith('mock_code:') || code.startsWith('mock_code_')) {
+      if (env.NODE_ENV === 'production') {
+        throw new ApiException(
+          'Mock OAuth codes are disabled in production environment',
+          HttpStatus.BAD_REQUEST,
+          'INVALID_OAUTH_CODE'
+        );
+      }
+      if (code.startsWith('mock_code:')) {
+        const parts = code.split(':');
+        const sub = parts[1] || 'google_sub_12345';
+        const email = parts[2] ? decodeURIComponent(parts[2]) : 'googleuser@gmail.com';
+        const name = parts[3] ? decodeURIComponent(parts[3]) : 'Google Test User';
+        googleProfile = { sub, email, name };
       } else {
-        const simpleParts = remainder.split('_');
-        googleProfile = {
-          sub: simpleParts[0] || 'google_sub_12345',
-          email: simpleParts[1] ? decodeURIComponent(simpleParts[1]) : 'googleuser@gmail.com',
-          name: simpleParts[2] ? decodeURIComponent(simpleParts[2]) : 'Google Test User',
-        };
+        const remainder = code.slice('mock_code_'.length);
+        const parts = remainder.split(':');
+        if (parts.length >= 3) {
+          googleProfile = {
+            sub: parts[0],
+            email: decodeURIComponent(parts[1]),
+            name: decodeURIComponent(parts[2]),
+          };
+        } else {
+          const simpleParts = remainder.split('_');
+          googleProfile = {
+            sub: simpleParts[0] || 'google_sub_12345',
+            email: simpleParts[1] ? decodeURIComponent(simpleParts[1]) : 'googleuser@gmail.com',
+            name: simpleParts[2] ? decodeURIComponent(simpleParts[2]) : 'Google Test User',
+          };
+        }
       }
     } else {
       // Live production code exchange
