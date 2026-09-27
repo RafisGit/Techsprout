@@ -35,8 +35,7 @@ services:
     plan: free
     region: oregon
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter @techsprout/contracts build && pnpm --filter @techsprout/api build
-    preDeployCommand: pnpm --filter @techsprout/api db:migrate && pnpm --filter @techsprout/api db:seed
-    startCommand: node apps/api/dist/main.js
+    startCommand: node apps/api/dist/database/migrate.js && node apps/api/dist/database/seed/seed.js && node apps/api/dist/main.js
     healthCheckPath: /api/v1/health
 
   - type: keyvalue
