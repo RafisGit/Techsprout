@@ -107,16 +107,17 @@ databases:
 5. **Vitest Unit & Integration Test Suite**:
    ```
    ✓ src/test/postgres-integration.spec.ts (6 tests)
-   ✓ src/test/http-e2e.spec.ts (11 tests)
-   ✓ src/test/security.spec.ts (18 tests)
+   ✓ src/test/http-e2e.spec.ts (12 tests)
+   ✓ src/test/security.spec.ts (19 tests)
 
    Test Files: 3 passed (3)
-   Tests:      35 passed (35)
+   Tests:      37 passed (37)
    Exit Code: 0 (Zero errors)
    ```
-6. **Production Runtime Hardening**:
-   - Explicitly patched `apps/api/src/modules/identity/identity.service.ts` to reject mock Google OAuth codes when `NODE_ENV === 'production'`.
-   - Committed and pushed to `origin feat/p1-foundation-security` (commit `771a96f`).
+6. **Production Runtime Hardening & Security Middleware**:
+   - Explicitly patched `apps/api/src/modules/identity/identity.service.ts` to reject mock Google OAuth codes when `NODE_ENV === 'production'` (commit `771a96f`).
+   - Reclassified production build type packages (`@types/express`, `@types/pg`, `@types/cookie-parser`, `@types/node`) into `dependencies` for `NODE_ENV=production` build success (commit `7a80a26`).
+   - Fixed Helmet CSP `connect-src` invalid directive value crash caused by comma-separated multi-origin `WEB_ORIGIN` by normalizing origins into separate CSP entries and synchronizing with CORS (commit `1122afe`).
 
 ---
 
