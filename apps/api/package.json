@@ -12,7 +12,9 @@
     "test:e2e": "vitest run src/test/e2e.spec.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/database/migrate.ts",
-    "db:seed": "tsx src/database/seed/seed.ts"
+    "db:migrate:prod": "node dist/database/migrate.js",
+    "db:seed": "tsx src/database/seed/seed.ts",
+    "db:seed:prod": "node dist/database/seed/seed.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",

@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 import * as path from 'path';
+import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
@@ -13,7 +14,9 @@ async function runMigrations() {
   const db = drizzle(pool);
 
   try {
-    const migrationsFolder = path.resolve(__dirname, './migrations');
+    const localMigrations = path.resolve(__dirname, './migrations');
+    const srcMigrations = path.resolve(__dirname, '../../src/database/migrations');
+    const migrationsFolder = fs.existsSync(localMigrations) ? localMigrations : srcMigrations;
     console.log(`Reading migrations from: ${migrationsFolder}`);
     await migrate(db, { migrationsFolder });
     console.log('Migrations applied successfully.');
