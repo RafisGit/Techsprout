@@ -5,6 +5,9 @@ info:
   description: >
     Production-grade REST API for TechSprout School LMS (Foundation & Security Phase P1).
     All routes versioned under /api/v1.
+  license:
+    name: MIT
+    identifier: MIT
 servers:
   - url: http://localhost:3001/api/v1
     description: Local Development API Server
@@ -13,11 +16,12 @@ servers:
 paths:
   /health:
     get:
-      summary: System Health & Readiness Check
-      description: Returns health status of the API service, database, and background workers.
+      summary: System Health Check
+      description: Returns health status of the API service and its backing database.
       operationId: getHealth
       tags:
         - Health
+      security: []
       responses:
         '200':
           description: System operational
@@ -26,11 +30,37 @@ paths:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
         '503':
-          description: System degraded or dependencies down
+          description: System degraded or database down
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
+
+  /health/ready:
+    get:
+      summary: Readiness Probe
+      description: Lightweight readiness check probe for orchestrators and load balancers.
+      operationId: getReadiness
+      tags:
+        - Health
+      security: []
+      responses:
+        '200':
+          description: Application ready to accept traffic
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ready
+                  - timestamp
+                properties:
+                  ready:
+                    type: boolean
+                    example: true
+                  timestamp:
+                    type: string
+                    format: date-time
 
   /auth/register:
     post:
@@ -39,6 +69,7 @@ paths:
       operationId: registerUser
       tags:
         - Identity & Authentication
+      security: []
       requestBody:
         required: true
         content:
@@ -72,6 +103,7 @@ paths:
       operationId: loginUser
       tags:
         - Identity & Authentication
+      security: []
       requestBody:
         required: true
         content:
@@ -98,6 +130,109 @@ paths:
                 $ref: '#/components/schemas/ApiErrorResponse'
         '429':
           description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+  /auth/google:
+    get:
+      summary: Initiate Google OAuth 2.0 flow
+      description: Returns Google authorization URL and state parameter for client-initiated OAuth flow.
+      operationId: initiateGoogleOAuth
+      tags:
+        - Identity & Authentication
+      security: []
+      parameters:
+        - name: redirectUri
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Authorization initiation payload
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - url
+                  - state
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  url:
+                    type: string
+                    format: uri
+                  state:
+                    type: string
+
+  /auth/google/callback:
+    get:
+      summary: Google OAuth 2.0 GET Callback
+      description: Handles Google OAuth authorization code redirect and issues session cookie.
+      operationId: handleGoogleCallbackGet
+      tags:
+        - Identity & Authentication
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Authenticated via Google OAuth
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid authorization code or state mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+
+    post:
+      summary: Google OAuth 2.0 POST Callback
+      description: Alternative direct exchange endpoint for single-page applications.
+      operationId: handleGoogleCallbackPost
+      tags:
+        - Identity & Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+                - state
+              properties:
+                code:
+                  type: string
+                state:
+                  type: string
+      responses:
+        '200':
+          description: Authenticated via Google OAuth
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid authorization code or state mismatch
           content:
             application/json:
               schema:
@@ -158,6 +293,7 @@ paths:
       operationId: sendOtp
       tags:
         - OTP & Phone Verification
+      security: []
       requestBody:
         required: true
         content:
@@ -186,11 +322,12 @@ paths:
 
   /auth/otp/verify:
     post:
-      summary: Verify Phone OTP
-      description: Verifies 6-digit OTP code within TTL, marks phone as verified, and invalidates the code.
+      summary: Verify Phone OTP and establish session
+      description: Atomically verifies 6-digit OTP code, creates or links student user, and returns session.
       operationId: verifyOtp
       tags:
         - OTP & Phone Verification
+      security: []
       requestBody:
         required: true
         content:
@@ -199,7 +336,7 @@ paths:
               $ref: '#/components/schemas/OtpVerifyRequest'
       responses:
         '200':
-          description: OTP verified
+          description: OTP verified and session created
           content:
             application/json:
               schema:
@@ -361,26 +498,28 @@ components:
         name:
           type: string
           minLength: 2
-          maxLength: 50
-          example: 'Rahim Ahmed'
+          maxLength: 100
+          example: 'Rafiqul Islam'
         username:
           type: string
           minLength: 3
-          maxLength: 30
-          pattern: '^[a-zA-Z0-9_-]+$'
-          example: 'rahim_bd'
+          maxLength: 50
+          pattern: '^[a-zA-Z0-9_]+$'
+          example: 'rafiqul_islam'
         email:
           type: string
           format: email
-          example: 'rahim@techsprout.edu'
+          maxLength: 255
+          example: 'rafiqul@techsprout.edu'
         phone:
           type: string
-          pattern: '^01[3-9]\\d{8}$'
+          pattern: '^(?:\\+8801|01)[3-9][0-9]{8}$'
           example: '01712345678'
         password:
           type: string
           minLength: 8
-          example: 'SuperSecureP@ss123'
+          maxLength: 100
+          example: 'StrongP@ssword123'
 
     LoginRequest:
       type: object
@@ -391,10 +530,10 @@ components:
         email:
           type: string
           format: email
-          example: 'rahim@techsprout.edu'
+          example: 'student@techsprout.edu'
         password:
           type: string
-          example: 'SuperSecureP@ss123'
+          example: 'StudentPassword123!'
 
     OtpSendRequest:
       type: object
@@ -403,7 +542,7 @@ components:
       properties:
         phone:
           type: string
-          pattern: '^01[3-9]\\d{8}$'
+          pattern: '^(?:\\+8801|01)[3-9][0-9]{8}$'
           example: '01712345678'
 
     OtpVerifyRequest:
@@ -414,13 +553,13 @@ components:
       properties:
         phone:
           type: string
-          pattern: '^01[3-9]\\d{8}$'
+          pattern: '^(?:\\+8801|01)[3-9][0-9]{8}$'
           example: '01712345678'
         otp:
           type: string
           minLength: 6
           maxLength: 6
-          pattern: '^\\d{6}$'
+          pattern: '^[0-9]{6}$'
           example: '482910'
 
     UserDto:
@@ -445,8 +584,9 @@ components:
           type: string
           format: email
         phone:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         role:
           type: string
           enum: [student, admin]
@@ -456,7 +596,9 @@ components:
           type: string
           format: date-time
         updatedAt:
-          type: string
+          type:
+            - string
+            - "null"
           format: date-time
 
     UserResponse:
@@ -575,25 +717,30 @@ components:
           type: string
           format: uuid
         actorId:
-          type: string
+          type:
+            - string
+            - "null"
           format: uuid
-          nullable: true
         action:
           type: string
         targetType:
           type: string
         targetId:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         ipAddress:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         userAgent:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         requestId:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         metadata:
           type: object
         createdAt:

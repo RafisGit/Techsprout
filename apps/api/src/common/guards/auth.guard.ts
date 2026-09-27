@@ -61,6 +61,7 @@ export class AuthGuard implements CanActivate {
         expiresAt: sessions.expiresAt,
         userName: users.name,
         userEmail: users.email,
+        userPhone: users.phone,
         username: users.username,
         isVerified: users.isVerified,
         isActive: users.isActive,
@@ -94,6 +95,7 @@ export class AuthGuard implements CanActivate {
     request.user = {
       id: session.userId,
       email: session.userEmail,
+      phone: session.userPhone,
       username: session.username,
       name: session.userName,
       role: session.roleName || 'student',

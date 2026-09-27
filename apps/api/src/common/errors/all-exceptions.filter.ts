@@ -9,6 +9,7 @@ import {
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../http/correlation-id.middleware';
 import { ApiException } from './api-error';
+import { Sentry } from '../observability/sentry';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -43,6 +44,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
     } else if (exception instanceof Error) {
       // Don't leak raw database/internal error messages in production
       this.logger.error(`[${requestId}] Unhandled exception: ${exception.message}`, exception.stack);
+      Sentry.captureException(exception, {
+        extra: {
+          requestId,
+          path: request.url,
+          method: request.method,
+        },
+      });
       message = 'An unexpected error occurred while processing your request';
       errorCode = 'SERVER_ERROR';
     }

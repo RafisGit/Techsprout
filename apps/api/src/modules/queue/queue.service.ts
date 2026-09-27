@@ -6,6 +6,7 @@ import { env } from '../../config/env.config';
 export interface TestJobPayload {
   message: string;
   timestamp: string;
+  deduplicationKey?: string;
 }
 
 @Injectable()
@@ -14,6 +15,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   private redisConnection: IORedis | null = null;
   private queue: Queue | null = null;
   private worker: Worker | null = null;
+  private isConnected = false;
 
   onModuleInit() {
     this.initQueue();
@@ -23,21 +25,32 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     try {
       this.redisConnection = new IORedis(env.REDIS_URL || 'redis://localhost:6379', {
         maxRetriesPerRequest: null,
+        enableReadyCheck: false,
         retryStrategy: (times) => {
           if (times > 3) {
-            this.logger.warn('Redis connection retry limit reached. Operating queue in standby mode.');
-            return null; // Stop retrying
+            this.logger.warn('Redis retry limit reached. Operating BullMQ queue in fallback mode.');
+            return null;
           }
-          return Math.min(times * 100, 2000);
+          return Math.min(times * 150, 1500);
         },
         lazyConnect: true,
       });
 
-      this.redisConnection.on('error', (err) => {
-        this.logger.warn(`Redis notice: ${err.message}. Queue running in degraded/resilient mode.`);
+      this.redisConnection.on('connect', () => {
+        this.isConnected = true;
+        this.logger.log('Redis connection established for BullMQ queue.');
       });
 
-      // 1. Establish BullMQ Queue with retry & dead-letter settings
+      this.redisConnection.on('error', (err) => {
+        this.isConnected = false;
+        this.logger.warn(`Redis notice: ${err.message}. Queue operating in resilient standby.`);
+      });
+
+      this.redisConnection.connect().catch(() => {
+        this.logger.warn('Initial Redis connection deferred; queue in standby.');
+      });
+
+      // 1. Establish BullMQ Queue with exponential backoff & dead-letter retention
       this.queue = new Queue('techsprout-queue', {
         connection: this.redisConnection,
         defaultJobOptions: {
@@ -47,17 +60,17 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
             delay: 1000,
           },
           removeOnComplete: true,
-          removeOnFail: false, // Preserves failed jobs for dead-letter inspection
+          removeOnFail: false, // Dead-letter retention for audit & inspection
         },
       });
 
-      // 2. Establish Worker
+      // 2. Establish BullMQ Worker
       this.worker = new Worker(
         'techsprout-queue',
         async (job: Job) => {
           this.logger.log(`[QUEUE_WORKER] Processing job: id=${job.id} name=${job.name}`);
-          if (job.name === 'ping-test') {
-            return { processed: true, echo: job.data };
+          if (job.name === 'ping-test' || job.name === 'sms-dispatch') {
+            return { processed: true, data: job.data };
           }
           return { acknowledged: true };
         },
@@ -72,34 +85,50 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
         this.logger.error(`[QUEUE_WORKER] Job failed after retries: id=${job?.id} error=${err.message}`);
       });
 
-      this.logger.log('Queue and worker foundation established successfully.');
-    } catch (error) {
-      this.logger.warn('Redis queue initialization deferred (Redis offline).');
+      this.logger.log('BullMQ queue and worker lifecycle established.');
+    } catch {
+      this.logger.warn('Redis queue initialization deferred.');
     }
   }
 
   /**
-   * Dispatches a safe lifecycle test job.
+   * Health check probe for Redis/BullMQ connection.
+   */
+  async isHealthy(): Promise<boolean> {
+    if (!this.redisConnection || !this.isConnected) {
+      return false;
+    }
+    try {
+      const res = await this.redisConnection.ping();
+      return res === 'PONG';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Dispatches a safe lifecycle job with idempotency/deduplication key support.
    */
   async dispatchTestJob(payload: TestJobPayload) {
-    if (!this.queue) {
-      this.logger.warn('Queue unavailable; mock-processing test job.');
-      return { id: 'mock-test-id', data: payload };
+    if (!this.queue || !this.isConnected) {
+      this.logger.log(`[QUEUE_FALLBACK] Mock-processing job: ${payload.message}`);
+      return { id: 'fallback-id', data: payload };
     }
 
     try {
+      const jobId = payload.deduplicationKey || `job_${Date.now()}`;
       const job = await this.queue.add('ping-test', payload, {
-        jobId: `test_${Date.now()}`,
+        jobId,
       });
       return { id: job.id, data: job.data };
     } catch (err) {
-      this.logger.warn(`Could not dispatch to Redis: ${(err as Error).message}`);
+      this.logger.warn(`Could not dispatch job to Redis: ${(err as Error).message}`);
       return { id: 'fallback-id', data: payload };
     }
   }
 
   async onModuleDestroy() {
-    this.logger.log('Gracefully shutting down queues and workers...');
+    this.logger.log('Gracefully shutting down BullMQ workers and Redis connections...');
     if (this.worker) {
       await this.worker.close();
     }

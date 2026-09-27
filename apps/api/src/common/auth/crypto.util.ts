@@ -2,6 +2,8 @@ import * as crypto from 'crypto';
 
 export class CryptoUtil {
   private static readonly KEY_LEN = 64;
+  private static readonly DEFAULT_PEPPER =
+    process.env.AUTH_SECRET || 'techsprout_secure_otp_hmac_pepper_minimum_32_characters';
 
   /**
    * Hashes a password using Scrypt with a 16-byte cryptographically random salt.
@@ -48,10 +50,28 @@ export class CryptoUtil {
   }
 
   /**
-   * Hashes an OTP code with SHA-256 before database storage.
+   * Hashes an OTP code with HMAC-SHA256 and server-side pepper before database storage.
+   * Prevents precomputed rainbow table attacks on the 6-digit keyspace.
    */
-  static hashOtp(otp: string): string {
-    return crypto.createHash('sha256').update(otp).digest('hex');
+  static hashOtp(otp: string, pepper: string = this.DEFAULT_PEPPER): string {
+    return crypto.createHmac('sha256', pepper).update(otp).digest('hex');
+  }
+
+  /**
+   * Verifies an OTP code against stored HMAC-SHA256 hash using timingSafeEqual.
+   */
+  static verifyOtpHash(
+    otp: string,
+    storedHash: string,
+    pepper: string = this.DEFAULT_PEPPER
+  ): boolean {
+    const computedHash = this.hashOtp(otp, pepper);
+    const computedBuffer = Buffer.from(computedHash, 'hex');
+    const storedBuffer = Buffer.from(storedHash, 'hex');
+    if (computedBuffer.length !== storedBuffer.length) {
+      return false;
+    }
+    return crypto.timingSafeEqual(computedBuffer, storedBuffer);
   }
 
   /**
@@ -59,5 +79,24 @@ export class CryptoUtil {
    */
   static generateSessionToken(): string {
     return crypto.randomBytes(32).toString('hex');
+  }
+
+  /**
+   * Generates a cryptographically random OAuth state token.
+   */
+  static generateOAuthState(): string {
+    return crypto.randomBytes(24).toString('hex');
+  }
+
+  /**
+   * Generates PKCE code_verifier and code_challenge (S256).
+   */
+  static generatePkce(): { codeVerifier: string; codeChallenge: string } {
+    const codeVerifier = crypto.randomBytes(32).toString('base64url');
+    const codeChallenge = crypto
+      .createHash('sha256')
+      .update(codeVerifier)
+      .digest('base64url');
+    return { codeVerifier, codeChallenge };
   }
 }

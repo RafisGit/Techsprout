@@ -9,6 +9,7 @@ export interface AuthenticatedRequest extends Request {
     email: string;
     username: string;
     name: string;
+    phone?: string | null;
     role: string;
     isVerified: boolean;
   };

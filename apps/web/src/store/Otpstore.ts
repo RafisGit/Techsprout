@@ -4,7 +4,9 @@ import { persist, devtools } from 'zustand/middleware';
 
 type OtpState = {
   modalStatus: boolean;
+  phoneNumber: string;
   setModalStatus: (status: string) => void;
+  setPhoneNumber: (phone: string) => void;
 };
 
 const useOtpStore = create<OtpState>()(
@@ -12,6 +14,7 @@ const useOtpStore = create<OtpState>()(
     persist(
       immer((set) => ({
         modalStatus: false,
+        phoneNumber: '',
         setModalStatus: (status) =>
           set(
             (state) => {
@@ -19,6 +22,14 @@ const useOtpStore = create<OtpState>()(
             },
             false,
             'opt/setModalStatus'
+          ),
+        setPhoneNumber: (phone) =>
+          set(
+            (state) => {
+              state.phoneNumber = phone;
+            },
+            false,
+            'opt/setPhoneNumber'
           ),
       })),
       { name: 'otp-storage' }

@@ -20,7 +20,7 @@ import { axiosInstance } from '@/lib/axiosInstance';
 import { useState } from 'react';
 
 export default function OtpModal() {
-  const { modalStatus, setModalStatus } = useOtpStore();
+  const { modalStatus, setModalStatus, phoneNumber } = useOtpStore();
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
 
@@ -35,10 +35,15 @@ export default function OtpModal() {
     try {
       setIsVerifying(true);
       setError('');
-      // In P1, OTP verification accepts the code
+
+      if (!phoneNumber) {
+        setError('Phone number is missing. Please restart verification.');
+        return;
+      }
+
       const response = await axiosInstance.post('/api/v1/auth/otp/verify', {
         otp: data.otp,
-        phone: '01700000000', // fallback or store-linked phone
+        phone: phoneNumber,
       });
 
       if (response.data.success) {

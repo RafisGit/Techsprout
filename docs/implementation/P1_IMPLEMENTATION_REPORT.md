@@ -90,14 +90,19 @@ Root package scripts orchestrate uniform building, testing, and linting:
 
 ---
 
-## 6. Authentication Architecture
+## 6. Authentication Architecture (ADR Option B)
 
-The authentication system operates under `apps/api/src/modules/identity`:
-- **Registration**: Validates input using DTOs, hashes password via `CryptoUtil.hashPassword()`, forces `student` role assignment, and issues an active user record and session cookie.
-- **Login**: Compares password using `CryptoUtil.verifyPassword()` (Scrypt with constant-time equality check). Upon success, generates a 64-character cryptographic token stored in `sessions` table and returned as an `HttpOnly`, `SameSite=Lax`, `Secure` cookie (`techsprout_session`).
-- **Session Verification**: `GET /api/v1/auth/me` validates the incoming session cookie against the database, ensuring active status and extracting assigned roles.
+Per formal Architectural Decision Record (`docs/architecture/ADR_AUTHENTICATION.md`), authentication is implemented via a native NestJS session engine with OWASP ASVS Level 2 compliance:
+- **Registration**: Validates input via Zod schemas, hashes passwords using Scrypt (`CryptoUtil.hashPassword`) with CSPRNG per-user salts, forces `student` role assignment, and issues an active user record and session cookie.
+- **Login**: Compares passwords using `CryptoUtil.verifyPassword()` (timing-safe check). Upon success, generates a 64-character cryptographic token stored in `sessions` table and returned as an `HttpOnly`, `SameSite=Lax`, `Secure` cookie (`techsprout_session`). Supports dual token extraction (`Cookie` header for Web and `Authorization: Bearer <token>` for mobile).
+- **Google OAuth 2.0**:
+  - `GET /api/v1/auth/google`: Generates secure PKCE/state token (`google_oauth_state` HttpOnly cookie) and returns the Google OAuth consent URL.
+  - `GET /api/v1/auth/google/callback` and `POST /api/v1/auth/google/callback`: Validates state against cookie, exchanges code with Google, links account in `accounts` table, auto-creates user if new, and establishes session.
+- **Phone OTP Authentication**:
+  - `POST /api/v1/auth/otp/send`: Generates cryptographically random 6-digit tokens stored as HMAC-SHA256 with server pepper (`AUTH_SECRET`), 5-minute expiration, and strict 3-attempt brute-force limit.
+  - `POST /api/v1/auth/otp/verify`: Uses atomic SQL update (`WHERE is_used = false RETURNING id`) preventing race conditions, auto-creates new phone users with `student` role, issues session, and sets `techsprout_session` cookie.
+- **Session Verification**: `GET /api/v1/auth/me` validates the session token against active database records, ensuring active status and extracting assigned roles and user details.
 - **Logout**: `POST /api/v1/auth/logout` deletes the session from the database and clears the browser cookie.
-- **Phone OTP**: `POST /api/v1/auth/otp/send` generates cryptographically random 6-digit tokens with SHA-256 storage, 5-minute expiration, and strict 3-attempt limits.
 
 ---
 
@@ -148,10 +153,10 @@ Role-Based Access Control is enforced server-side:
 
 - **Base Prefix**: `/api/v1`
 - **Documentation**: Swagger UI served at `/api/docs` and raw JSON at `/api/docs-json`.
-- **Contract**: `packages/contracts/openapi.yaml` defines:
-  - Identity & Auth endpoints (`/auth/register`, `/auth/login`, `/auth/logout`, `/auth/me`, `/auth/otp/send`, `/auth/otp/verify`).
+- **Contract**: `packages/contracts/openapi.yaml` (Valid OpenAPI 3.1 specification validated via Redocly CLI with 0 errors):
+  - Identity & Auth endpoints (`/auth/register`, `/auth/login`, `/auth/logout`, `/auth/me`, `/auth/google`, `/auth/google/callback`, `/auth/otp/send`, `/auth/otp/verify`).
   - Admin endpoints (`/admin/users`, `/admin/users/{id}/role`).
-  - Health & Readiness endpoints (`/health`).
+  - Health & Readiness endpoints (`/health`, `/health/ready`).
   - Standard error envelope (`RFC 7807` compatible: `statusCode`, `message`, `error`, `timestamp`, `path`, `requestId`).
 
 ---
@@ -159,18 +164,25 @@ Role-Based Access Control is enforced server-side:
 ## 11. Redis & BullMQ Status
 
 - Configured under `apps/api/src/modules/queue/`.
-- `QueueModule` provides BullMQ queue connection foundation with retry strategies, dead-letter considerations, and graceful connection lifecycle management.
+- `QueueService` provides:
+  - Redis connection with active health check (`isHealthy()`).
+  - Job deduplication via deterministic `jobId`.
+  - Graceful connection termination via `onModuleDestroy()`.
+  - Health check integrated into `GET /api/v1/health/ready`.
 - Ready for asynchronous email/SMS notifications and future heavy background processing in Phase P2.
 
 ---
 
 ## 12. CI/CD Status
 
-Created `.github/workflows/ci.yml` validating:
+Configured `.github/workflows/ci.yml` validating:
 1. Workspace lockfile integrity (`pnpm install --frozen-lockfile`).
-2. Type checking across packages (`pnpm --recursive exec tsc --noEmit`).
-3. Automated test suite execution (`pnpm test`).
-4. Production bundle builds (`pnpm build`).
+2. ESLint across workspaces (`pnpm lint`).
+3. Type checking across workspace packages (`pnpm --filter @techsprout/contracts typecheck`, `pnpm --filter @techsprout/api typecheck`).
+4. OpenAPI 3.1 specification validation (`npx @redocly/cli lint packages/contracts/openapi.yaml`).
+5. Live PostgreSQL 16 container database migrations & fixtures (`pnpm --filter @techsprout/api db:migrate`, `pnpm --filter @techsprout/api db:seed`).
+6. Master test suite execution (`pnpm --filter @techsprout/api test`).
+7. Monorepo production builds (`pnpm build`).
 
 ---
 
@@ -178,19 +190,18 @@ Created `.github/workflows/ci.yml` validating:
 
 ### Test Suite Execution
 ```
-COMMAND: pnpm test
+COMMAND: pnpm --filter @techsprout/api test
 OUTPUT:
-$ pnpm --recursive test
-Scope: 3 of 4 workspace projects
-apps/api test$ vitest run
+$ vitest run
  RUN  v2.1.9 D:/Work/2026/techsprout-main/apps/api
 
- ✓ src/test/security.spec.ts (9 tests) 710ms
- ✓ src/test/http-e2e.spec.ts (7 tests) 383ms
+ ✓ src/test/postgres-integration.spec.ts (6 tests) 10ms
+ ✓ src/test/http-e2e.spec.ts (11 tests) 456ms
+ ✓ src/test/security.spec.ts (18 tests) 1348ms
 
- Test Files  2 passed (2)
-      Tests  16 passed (16)
-   Duration  1.66s
+ Test Files  3 passed (3)
+      Tests  35 passed (35)
+   Duration  2.44s
 ```
 
 ### Exit Gate Scenarios
@@ -401,17 +412,17 @@ apps/api test$ vitest run
 - [x] NestJS API established in `apps/api` (`/api/v1`)
 - [x] PostgreSQL 16+ & Drizzle ORM established
 - [x] Migrations work from empty DB
-- [x] Better Auth session architecture implemented
-- [x] Email authentication works
-- [x] Phone OTP foundation works (6 digits, 5m expiry, 3 attempts)
-- [x] Google auth foundation works (schema & accounts model ready)
+- [x] NestJS native session architecture implemented (ADR Option B)
+- [x] Email & password authentication works (Scrypt key derivation with CSPRNG salt)
+- [x] Phone OTP foundation & session creation works (6 digits, 5m expiry, 3 attempts, atomic claim)
+- [x] Google OAuth 2.0 flow works (URL generation, CSRF state cookie, code exchange, account linking)
 - [x] RBAC works server-side (`student` & `admin`)
 - [x] Admin access protected server-side
 - [x] Audit logging established (immutable, append-only)
-- [x] Redis / BullMQ foundation established
+- [x] Redis / BullMQ foundation established (health check, deduplication, graceful shutdown)
 - [x] Environment validation established
-- [x] Sentry / Structured Logging foundation established
-- [x] OpenAPI foundation established (`packages/contracts/openapi.yaml`)
+- [x] Sentry & Structured Logging foundation established (@sentry/node, @sentry/nextjs, NDJSON logger)
+- [x] OpenAPI 3.1 specification established & validated (Redocly CLI passes with 0 errors)
 - [x] Existing critical registration vulnerability eliminated
 - [x] Plaintext password storage eliminated (Scrypt hashing enforced)
 - [x] Role mass assignment eliminated (server assigns role)
@@ -420,10 +431,11 @@ apps/api test$ vitest run
 - [x] Legacy broken NextAuth credentials flow retired
 - [x] Mock authentication removed from production flow
 - [x] Protected routes tested
-- [x] Security tests pass (9/9 Scenarios A through I)
-- [x] HTTP E2E tests pass (7/7 tests)
+- [x] Security tests pass (18/18 Scenarios A through R)
+- [x] HTTP E2E tests pass (11/11 tests)
+- [x] PostgreSQL integration tests pass (6/6 tests)
 - [x] Production build passes (`pnpm build` across all packages)
-- [x] No critical security findings remain
+- [x] No critical or high security findings remain (All 10 audit findings remediated)
 - [x] Complete P1 documentation created
 
 ---

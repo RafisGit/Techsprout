@@ -2,6 +2,7 @@
   "name": "techsprout-monorepo",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@9.15.4",
   "scripts": {
     "dev": "pnpm --parallel dev",
     "dev:web": "pnpm --filter @techsprout/web dev",

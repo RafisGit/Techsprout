@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import { AppModule } from '../app.module';
@@ -50,22 +50,29 @@ describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('ok');
     expect(res.body.environment).toBeDefined();
+    expect(res.body.services.database).toBe('up');
   });
 
-  it('2. GET /api/v1/auth/me without credentials returns 401 UNAUTHENTICATED', async () => {
+  it('2. GET /api/v1/health/ready returns ready status', async () => {
+    const res = await request(app.getHttpServer()).get('/api/v1/health/ready');
+    expect(res.status).toBe(200);
+    expect(res.body.ready).toBe(true);
+  });
+
+  it('3. GET /api/v1/auth/me without credentials returns 401 UNAUTHENTICATED', async () => {
     const res = await request(app.getHttpServer()).get('/api/v1/auth/me');
     expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);
     expect(res.body.errorCode).toBe('UNAUTHENTICATED');
   });
 
-  it('3. GET /api/v1/admin/users without credentials returns 401 UNAUTHENTICATED', async () => {
+  it('4. GET /api/v1/admin/users without credentials returns 401 UNAUTHENTICATED', async () => {
     const res = await request(app.getHttpServer()).get('/api/v1/admin/users');
     expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);
   });
 
-  it('4. POST /api/v1/auth/register with attempted role=admin grants only student role', async () => {
+  it('5. POST /api/v1/auth/register with attempted role=admin grants only student role', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/v1/auth/register')
       .send({
@@ -83,8 +90,7 @@ describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
     expect(res.body.user.role).not.toBe('admin');
   });
 
-  it('5. Student user cannot access /api/v1/admin/users (403 FORBIDDEN)', async () => {
-    // Login as student
+  it('6. Student user cannot access /api/v1/admin/users (403 FORBIDDEN)', async () => {
     const loginRes = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .send({
@@ -96,7 +102,6 @@ describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
     const cookies = loginRes.headers['set-cookie'];
     expect(cookies).toBeDefined();
 
-    // Attempt to access admin endpoint with student cookie
     const adminRes = await request(app.getHttpServer())
       .get('/api/v1/admin/users')
       .set('Cookie', cookies);
@@ -106,8 +111,7 @@ describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
     expect(adminRes.body.errorCode).toBe('FORBIDDEN');
   });
 
-  it('6. Admin user can access /api/v1/admin/users (200 OK)', async () => {
-    // Login as admin
+  it('7. Admin user can access /api/v1/admin/users (200 OK)', async () => {
     const loginRes = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .send({
@@ -119,7 +123,6 @@ describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
     const cookies = loginRes.headers['set-cookie'];
     expect(cookies).toBeDefined();
 
-    // Access admin endpoint
     const adminRes = await request(app.getHttpServer())
       .get('/api/v1/admin/users')
       .set('Cookie', cookies);
@@ -129,8 +132,72 @@ describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
     expect(Array.isArray(adminRes.body.data)).toBe(true);
   });
 
-  it('7. Logout invalidates session cookie', async () => {
-    // Login
+  it('8. Phone OTP send and verify establishes authenticated session with HttpOnly cookie', async () => {
+    const phone = '01755443322';
+    const sendRes = await request(app.getHttpServer())
+      .post('/api/v1/auth/otp/send')
+      .send({ phone });
+
+    expect(sendRes.status).toBe(200);
+    expect(sendRes.body.success).toBe(true);
+    const code = sendRes.body.debugCode;
+    expect(code).toBeDefined();
+
+    // Verify OTP
+    const verifyRes = await request(app.getHttpServer())
+      .post('/api/v1/auth/otp/verify')
+      .send({ phone, otp: code });
+
+    expect(verifyRes.status).toBe(200);
+    expect(verifyRes.body.success).toBe(true);
+    expect(verifyRes.body.user.phone).toBe(phone);
+    expect(verifyRes.body.token).toBeDefined();
+
+    const setCookies = verifyRes.headers['set-cookie'];
+    expect(setCookies).toBeDefined();
+    expect(setCookies[0]).toContain('techsprout_session');
+
+    // Access /auth/me with session cookie
+    const meRes = await request(app.getHttpServer())
+      .get('/api/v1/auth/me')
+      .set('Cookie', setCookies);
+
+    expect(meRes.status).toBe(200);
+    expect(meRes.body.data.phone).toBe(phone);
+  });
+
+  it('9. GET /api/v1/auth/google initiates OAuth and returns authorization URL', async () => {
+    const res = await request(app.getHttpServer()).get('/api/v1/auth/google');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.url).toContain('https://accounts.google.com');
+    expect(res.body.state).toBeDefined();
+
+    const cookies = res.headers['set-cookie'];
+    expect(cookies).toBeDefined();
+    expect(cookies[0]).toContain('google_oauth_state');
+  });
+
+  it('10. GET /api/v1/auth/google/callback validates code and state and issues session cookie', async () => {
+    const state = 'valid_e2e_state_123';
+    const mockCode = 'mock_code:e2e_google_sub:user%40google.com:E2EGoogleUser';
+
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/auth/google/callback?code=${mockCode}&state=${state}`)
+      .set('Cookie', [`google_oauth_state=${state}`]);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.user.email).toBe('user@google.com');
+    expect(res.body.token).toBeDefined();
+
+    const cookies = res.headers['set-cookie'];
+    expect(cookies).toBeDefined();
+    const cookieList = Array.isArray(cookies) ? cookies : [cookies as string];
+    expect(cookieList.some((c: string) => c.includes('techsprout_session'))).toBe(true);
+  });
+
+  it('11. Logout invalidates session cookie', async () => {
     const loginRes = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .send({
@@ -140,14 +207,12 @@ describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
 
     const cookies = loginRes.headers['set-cookie'];
 
-    // Logout
     const logoutRes = await request(app.getHttpServer())
       .post('/api/v1/auth/logout')
       .set('Cookie', cookies);
 
     expect(logoutRes.status).toBe(200);
 
-    // Attempt to access /auth/me with revoked cookie
     const meRes = await request(app.getHttpServer())
       .get('/api/v1/auth/me')
       .set('Cookie', cookies);

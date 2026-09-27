@@ -67,6 +67,9 @@ jobs:
       - name: Install Monorepo Dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint Workspace Packages
+        run: pnpm lint
+
       - name: Typecheck Workspace Packages
         run: |
           pnpm --filter @techsprout/contracts typecheck
@@ -93,5 +96,4 @@ jobs:
 
       - name: Monorepo Production Build
         run: |
-          pnpm --filter @techsprout/contracts build
-          pnpm --filter @techsprout/api build
+          pnpm build

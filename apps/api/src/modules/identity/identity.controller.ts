@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Body,
+  Query,
   Req,
   Res,
   HttpStatus,
@@ -106,6 +107,98 @@ export class IdentityController {
       userAgent,
       req.id
     );
+
+    res.cookie('techsprout_session', result.token, {
+      httpOnly: true,
+      secure: env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      expires: result.expiresAt,
+    });
+
+    return {
+      success: true,
+      message: result.message,
+      user: result.user,
+      token: result.token,
+    };
+  }
+
+  @Public()
+  @Get('google')
+  @ApiOperation({ summary: 'Initiate Google OAuth 2.0 authorization flow' })
+  @ApiResponse({ status: 200, description: 'Google authorization URL and state' })
+  async googleAuth(
+    @Query('redirectUri') redirectUri: string,
+    @Res({ passthrough: true }) res: Response
+  ) {
+    const { url, state } = this.identityService.getGoogleAuthUrl(redirectUri);
+
+    res.cookie('google_oauth_state', state, {
+      httpOnly: true,
+      secure: env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 10 * 60 * 1000, // 10 minutes
+    });
+
+    return {
+      success: true,
+      url,
+      state,
+    };
+  }
+
+  @Public()
+  @Get('google/callback')
+  @ApiOperation({ summary: 'Google OAuth 2.0 GET callback handler' })
+  @ApiResponse({ status: 200, description: 'Authenticated via Google' })
+  async googleCallbackGet(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Req() req: AuthenticatedRequest,
+    @Res({ passthrough: true }) res: Response
+  ) {
+    return this.executeGoogleCallback(code, state, req, res);
+  }
+
+  @Public()
+  @Post('google/callback')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Google OAuth 2.0 POST callback handler' })
+  @ApiResponse({ status: 200, description: 'Authenticated via Google' })
+  async googleCallbackPost(
+    @Body() body: { code: string; state: string },
+    @Req() req: AuthenticatedRequest,
+    @Res({ passthrough: true }) res: Response
+  ) {
+    return this.executeGoogleCallback(body?.code, body?.state, req, res);
+  }
+
+  private async executeGoogleCallback(
+    code: string,
+    state: string,
+    req: AuthenticatedRequest,
+    res: Response
+  ) {
+    const expectedState =
+      req.cookies?.['google_oauth_state'] ||
+      (req.headers['x-oauth-state'] as string) ||
+      state;
+
+    const ip = req.ip || (req.headers['x-forwarded-for'] as string);
+    const userAgent = req.headers['user-agent'];
+
+    const result = await this.identityService.handleGoogleCallback(
+      code,
+      state,
+      expectedState,
+      ip,
+      userAgent,
+      req.id
+    );
+
+    res.clearCookie('google_oauth_state', { path: '/' });
 
     res.cookie('techsprout_session', result.token, {
       httpOnly: true,

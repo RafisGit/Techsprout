@@ -5,8 +5,8 @@ import { AuditService } from '../modules/audit/audit.service';
 import { OtpService } from '../modules/otp/otp.service';
 import { UsersService } from '../modules/users/users.service';
 import { CryptoUtil } from '../common/auth/crypto.util';
-import { users, roles, userRoles, sessions, auditLogs, otps } from '../database/schema';
-import { eq } from 'drizzle-orm';
+import { users, roles, userRoles, sessions, auditLogs, otps, accounts } from '../database/schema';
+import { eq, and } from 'drizzle-orm';
 import { ApiException } from '../common/errors/api-error';
 
 describe('P1 — Foundation & Security Master Test Suite', () => {
@@ -72,14 +72,12 @@ describe('P1 — Foundation & Security Master Test Suite', () => {
   // SCENARIO B: RBAC - Student Denied from Admin
   // ==========================================
   it('SCENARIO B: Student role is denied from performing admin-only operations', async () => {
-    // Test Student attempts to promote another user to admin
     const [studentUser] = await db
       .select()
       .from(users)
       .where(eq(users.email, 'student@techsprout.edu'))
       .limit(1);
 
-    // Verify student user has 'student' role, not 'admin'
     const studentRoleRecords = await db
       .select({ role: roles.name })
       .from(userRoles)
@@ -99,18 +97,16 @@ describe('P1 — Foundation & Security Master Test Suite', () => {
       username: 'attackerjohn',
       email: 'attacker@evil.com',
       password: 'StrongP@ssword123',
-      role: 'admin',       // Attacker attempt to forge admin role
-      isAdmin: true,       // Attacker attempt to forge boolean flag
-      isVerified: true,    // Attacker attempt to bypass verification
+      role: 'admin',
+      isAdmin: true,
+      isVerified: true,
     };
 
     const regResult = await identityService.register(maliciousPayload);
 
-    // Server-enforced assignment must remain 'student'
     expect(regResult.user.role).toBe('student');
     expect(regResult.user.role).not.toBe('admin');
 
-    // Verify directly in database user_roles table
     const assignedRoles = await db
       .select({ roleName: roles.name })
       .from(userRoles)
@@ -122,24 +118,22 @@ describe('P1 — Foundation & Security Master Test Suite', () => {
   });
 
   // ==========================================
-  // SCENARIO D: Malformed / Invalid Input Rejection
+  // SCENARIO D: Malformed / Duplicate Input Rejection
   // ==========================================
   it('SCENARIO D: Malformed registration requests are strictly rejected', async () => {
-    // Attempt duplicate email
     await expect(
       identityService.register({
         name: 'Duplicate Student',
         username: 'new_unique_name',
-        email: 'student@techsprout.edu', // Already seeded
+        email: 'student@techsprout.edu',
         password: 'StrongP@ssword123',
       })
     ).rejects.toThrow(ApiException);
 
-    // Attempt duplicate username
     await expect(
       identityService.register({
         name: 'Duplicate Username',
-        username: 'student', // Already seeded
+        username: 'student',
         email: 'completely_new_email@techsprout.edu',
         password: 'StrongP@ssword123',
       })
@@ -154,7 +148,6 @@ describe('P1 — Foundation & Security Master Test Suite', () => {
     const otpCode = '123456';
     const codeHash = CryptoUtil.hashOtp(otpCode);
 
-    // Insert an expired OTP record (expired 10 minutes ago)
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
     await db.insert(otps).values({
       phone,
@@ -177,9 +170,10 @@ describe('P1 — Foundation & Security Master Test Suite', () => {
     const sendResult = await otpService.sendOtp(phone);
     const validCode = (sendResult as any).debugCode;
 
-    // First verification: Must SUCCEED
+    // First verification: Must SUCCEED and issue session
     const firstVerify = await otpService.verifyOtp(phone, validCode);
     expect(firstVerify.success).toBe(true);
+    expect(firstVerify.token).toBeDefined();
 
     // Second verification with identical code: Must be DENIED
     await expect(otpService.verifyOtp(phone, validCode)).rejects.toThrow(
@@ -188,9 +182,183 @@ describe('P1 — Foundation & Security Master Test Suite', () => {
   });
 
   // ==========================================
-  // SCENARIO G: Logout Invalidates Protected Access
+  // SCENARIO G: OTP Maximum Attempts Exceeded
   // ==========================================
-  it('SCENARIO G: Session logout revokes token and prevents subsequent access', async () => {
+  it('SCENARIO G: Exceeding 3 failed OTP attempts locks verification', async () => {
+    const phone = '01711002233';
+    const sendResult = await otpService.sendOtp(phone);
+    const validCode = (sendResult as any).debugCode;
+
+    // 3 failed attempts
+    await expect(otpService.verifyOtp(phone, '000000')).rejects.toThrow('Invalid verification code');
+    await expect(otpService.verifyOtp(phone, '111111')).rejects.toThrow('Invalid verification code');
+    await expect(otpService.verifyOtp(phone, '222222')).rejects.toThrow('Invalid verification code');
+
+    // 4th attempt even with correct code must be rejected due to max attempts
+    await expect(otpService.verifyOtp(phone, validCode)).rejects.toThrow(
+      'Maximum verification attempts exceeded'
+    );
+  });
+
+  // ==========================================
+  // SCENARIO H: OTP Rate Limiting (Max 3 per 15 min)
+  // ==========================================
+  it('SCENARIO H: OTP rate limiting rejects more than 3 requests in 15 minutes', async () => {
+    const phone = '01799223344';
+    await otpService.sendOtp(phone);
+    await otpService.sendOtp(phone);
+    await otpService.sendOtp(phone);
+
+    // 4th request must be rejected with 429
+    await expect(otpService.sendOtp(phone)).rejects.toThrow('Too many OTP requests');
+  });
+
+  // ==========================================
+  // SCENARIO I: Phone OTP Establishes Authenticated Session
+  // ==========================================
+  it('SCENARIO I: Phone OTP verification establishes an active session and returns user profile', async () => {
+    const phone = '01788776655';
+    const sendResult = await otpService.sendOtp(phone);
+    const validCode = (sendResult as any).debugCode;
+
+    const verifyResult = await otpService.verifyOtp(phone, validCode);
+    expect(verifyResult.success).toBe(true);
+    expect(verifyResult.user.phone).toBe(phone);
+    expect(verifyResult.user.role).toBe('student');
+    expect(verifyResult.token).toBeDefined();
+
+    // Verify session stored in database
+    const sessionRecords = await db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.token, verifyResult.token));
+    expect(sessionRecords.length).toBe(1);
+    expect(sessionRecords[0].userId).toBe(verifyResult.user.id);
+  });
+
+  // ==========================================
+  // SCENARIO J: Concurrent OTP Verification Race Condition
+  // ==========================================
+  it('SCENARIO J: Concurrent OTP verification requests permit only one consumer', async () => {
+    const phone = '01777665544';
+    const sendResult = await otpService.sendOtp(phone);
+    const validCode = (sendResult as any).debugCode;
+
+    // Dispatch two simultaneous verification attempts
+    const results = await Promise.allSettled([
+      otpService.verifyOtp(phone, validCode),
+      otpService.verifyOtp(phone, validCode),
+    ]);
+
+    const fulfilled = results.filter((r) => r.status === 'fulfilled');
+    const rejected = results.filter((r) => r.status === 'rejected');
+
+    // Exactly one must succeed and one must be rejected
+    expect(fulfilled.length).toBe(1);
+    expect(rejected.length).toBe(1);
+  });
+
+  // ==========================================
+  // SCENARIO K: Google OAuth Initiation
+  // ==========================================
+  it('SCENARIO K: Google OAuth initiation returns valid URL and cryptographic state', () => {
+    const { url, state } = identityService.getGoogleAuthUrl();
+    expect(url).toContain('https://accounts.google.com/o/oauth2/v2/auth');
+    expect(url).toContain('client_id=');
+    expect(url).toContain(`state=${state}`);
+    expect(state.length).toBeGreaterThan(16);
+  });
+
+  // ==========================================
+  // SCENARIO L: Google OAuth State Validation
+  // ==========================================
+  it('SCENARIO L: Google OAuth rejects invalid or mismatched state', async () => {
+    const mockCode = 'mock_code_12345_attacker%40gmail.com_Attacker';
+    await expect(
+      identityService.handleGoogleCallback(mockCode, 'wrong_state', 'expected_state')
+    ).rejects.toThrow('Invalid or expired OAuth state parameter');
+  });
+
+  // ==========================================
+  // SCENARIO M: First-Time Google OAuth User Creation
+  // ==========================================
+  it('SCENARIO M: First-time Google OAuth user creates student account, links account, and creates session', async () => {
+    const googleSub = 'google_uid_98765';
+    const googleEmail = 'newgoogleuser@gmail.com';
+    const googleName = 'New Google User';
+    const mockCode = `mock_code:${googleSub}:${encodeURIComponent(googleEmail)}:${encodeURIComponent(googleName)}`;
+    const state = 'valid_oauth_state_123';
+
+    const result = await identityService.handleGoogleCallback(mockCode, state, state);
+
+    expect(result.success).toBe(true);
+    expect(result.user.email).toBe(googleEmail);
+    expect(result.user.name).toBe(googleName);
+    expect(result.user.role).toBe('student');
+    expect(result.token).toBeDefined();
+
+    // Verify account linked in accounts table
+    const accountRecords = await db
+      .select()
+      .from(accounts)
+      .where(and(eq(accounts.provider, 'google'), eq(accounts.providerAccountId, googleSub)));
+    expect(accountRecords.length).toBe(1);
+    expect(accountRecords[0].userId).toBe(result.user.id);
+  });
+
+  // ==========================================
+  // SCENARIO N: Returning Google OAuth User Login
+  // ==========================================
+  it('SCENARIO N: Returning Google OAuth user authenticates without duplicate account creation', async () => {
+    const googleSub = 'google_uid_returning_111';
+    const googleEmail = 'returning@gmail.com';
+    const mockCode = `mock_code:${googleSub}:${encodeURIComponent(googleEmail)}:ReturningUser`;
+    const state = 'state_returning';
+
+    // First login
+    const firstLogin = await identityService.handleGoogleCallback(mockCode, state, state);
+    // Second login
+    const secondLogin = await identityService.handleGoogleCallback(mockCode, state, state);
+
+    expect(secondLogin.success).toBe(true);
+    expect(secondLogin.user.id).toBe(firstLogin.user.id);
+
+    // Verify user count did not duplicate
+    const matchingUsers = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, googleEmail));
+    expect(matchingUsers.length).toBe(1);
+  });
+
+  // ==========================================
+  // SCENARIO O: Google Account Linking to Existing User
+  // ==========================================
+  it('SCENARIO O: Google OAuth links to existing user if email matches', async () => {
+    // Existing student registered via password
+    const existingEmail = 'student@techsprout.edu';
+    const googleSub = 'google_uid_linked_222';
+    const mockCode = `mock_code:${googleSub}:${encodeURIComponent(existingEmail)}:LinkedStudent`;
+    const state = 'state_linked';
+
+    const result = await identityService.handleGoogleCallback(mockCode, state, state);
+
+    expect(result.success).toBe(true);
+    expect(result.user.email).toBe(existingEmail);
+
+    // Check account record linked to existing user ID
+    const accountRecords = await db
+      .select()
+      .from(accounts)
+      .where(and(eq(accounts.provider, 'google'), eq(accounts.providerAccountId, googleSub)));
+    expect(accountRecords.length).toBe(1);
+    expect(accountRecords[0].userId).toBe(result.user.id);
+  });
+
+  // ==========================================
+  // SCENARIO P: Logout Invalidates Protected Access
+  // ==========================================
+  it('SCENARIO P: Session logout revokes token and prevents subsequent access', async () => {
     const loginResult = await identityService.login({
       email: 'student@techsprout.edu',
       password: 'StudentPassword123!',
@@ -212,9 +380,9 @@ describe('P1 — Foundation & Security Master Test Suite', () => {
   });
 
   // ==========================================
-  // SCENARIO H: Password Security (No Plaintext)
+  // SCENARIO Q: Password Security (No Plaintext)
   // ==========================================
-  it('SCENARIO H: Passwords are encrypted with Scrypt and never stored in plaintext', async () => {
+  it('SCENARIO Q: Passwords are encrypted with Scrypt and never stored in plaintext', async () => {
     const rawPassword = 'MySecretPlaintextPassword123!';
     const regResult = await identityService.register({
       name: 'Plaintext Tester',
@@ -228,28 +396,23 @@ describe('P1 — Foundation & Security Master Test Suite', () => {
       .from(users)
       .where(eq(users.id, regResult.user.id));
 
-    // Must not equal raw password
     expect(dbUser.passwordHash).not.toBe(rawPassword);
-    // Must be in salt:derivedKey format
     expect(dbUser.passwordHash).toContain(':');
 
-    // Cryptographic verification must pass
     const isValid = await CryptoUtil.verifyPassword(rawPassword, dbUser.passwordHash);
     expect(isValid).toBe(true);
 
-    // Wrong password must fail
     const isInvalid = await CryptoUtil.verifyPassword('WrongPassword123!', dbUser.passwordHash);
     expect(isInvalid).toBe(false);
   });
 
   // ==========================================
-  // SCENARIO I: Append-Only Audit Logging
+  // SCENARIO R: Append-Only Audit Logging
   // ==========================================
-  it('SCENARIO I: Sensitive actions generate immutable append-only audit records', async () => {
+  it('SCENARIO R: Sensitive actions generate immutable append-only audit records', async () => {
     const initialLogs = await auditService.list();
     const initialCount = initialLogs.length;
 
-    // Perform an action
     await auditService.record({
       actorId: '00000000-0000-0000-0000-000000000001',
       action: 'ADMIN_ROLE_CHANGE_TEST',

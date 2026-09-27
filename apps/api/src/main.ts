@@ -5,10 +5,19 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { Logger } from '@nestjs/common';
 import { env } from './config/env.config';
+import { initSentry } from './common/observability/sentry';
+import { StructuredLoggerService } from './common/observability/structured-logger.service';
 
 async function bootstrap() {
+  // Initialize Sentry SDK
+  initSentry();
+
+  const structuredLogger = new StructuredLoggerService();
+  const app = await NestFactory.create(AppModule, {
+    logger: structuredLogger,
+  });
+
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
 
   // 1. Versioned Global Prefix: /api/v1
   app.setGlobalPrefix('api/v1');

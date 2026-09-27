@@ -19,7 +19,7 @@ import { useState } from 'react';
 import { Input } from '../ui/input';
 
 export default function RegisterForm() {
-  const { setModalStatus } = useOtpStore();
+  const { setModalStatus, setPhoneNumber } = useOtpStore();
   const [serverError, setServerError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -53,6 +53,7 @@ export default function RegisterForm() {
         if (values.phoneNumber) {
           try {
             await axiosInstance.post('/api/v1/auth/otp/send', { phone: values.phoneNumber });
+            setPhoneNumber(values.phoneNumber);
             setModalStatus('open');
           } catch {
             window.location.href = '/dashboard';

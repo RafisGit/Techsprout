@@ -1,16 +1,20 @@
-import { Controller, Get, Inject } from '@nestjs/common';
+import { Controller, Get, Inject, Optional } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import { sql } from 'drizzle-orm';
 import { env } from '../../config/env.config';
+import { QueueService } from '../../modules/queue/queue.service';
 
 @ApiTags('Health')
 @Controller('health')
 export class HealthController {
   private readonly startTime = Date.now();
 
-  constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {}
+  constructor(
+    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
+    @Optional() @Inject(QueueService) private readonly queueService?: QueueService
+  ) {}
 
   @Public()
   @Get()
@@ -25,6 +29,16 @@ export class HealthController {
       dbStatus = 'down';
     }
 
+    let redisStatus: 'up' | 'down' = 'down';
+    if (this.queueService) {
+      try {
+        const isHealthy = await this.queueService.isHealthy();
+        redisStatus = isHealthy ? 'up' : 'down';
+      } catch {
+        redisStatus = 'down';
+      }
+    }
+
     return {
       status: dbStatus === 'up' ? 'ok' : 'degraded',
       timestamp: new Date().toISOString(),
@@ -32,6 +46,7 @@ export class HealthController {
       environment: env.NODE_ENV,
       services: {
         database: dbStatus,
+        redis: redisStatus,
       },
     };
   }
@@ -39,6 +54,7 @@ export class HealthController {
   @Public()
   @Get('ready')
   @ApiOperation({ summary: 'Readiness Probe' })
+  @ApiResponse({ status: 200, description: 'Application ready' })
   async getReadiness() {
     await this.db.execute(sql`SELECT 1`);
     return {

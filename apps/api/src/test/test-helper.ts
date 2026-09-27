@@ -11,7 +11,7 @@ export async function createTestDatabase() {
   // Register gen_random_uuid function for UUID generation
   memDb.public.registerFunction({
     name: 'gen_random_uuid',
-    returns: memDb.public.getType('uuid') as any,
+    returns: (memDb.public as any).getType('uuid'),
     implementation: () => crypto.randomUUID(),
     impure: true,
   });
@@ -94,6 +94,16 @@ export async function createTestDatabase() {
       ip_address varchar(45),
       user_agent text,
       expires_at timestamp with time zone NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS accounts (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE cascade,
+      provider varchar(50) NOT NULL,
+      provider_account_id varchar(255) NOT NULL,
+      access_token text,
+      refresh_token text,
       created_at timestamp with time zone DEFAULT now() NOT NULL
     );
 
