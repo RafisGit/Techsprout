@@ -2,13 +2,13 @@
 # Declaratively provisions:
 # 1. NestJS REST API Web Service (Node.js runtime, pnpm monorepo)
 # 2. Managed PostgreSQL 16 Database (with pre-deploy migrations & seeds)
-# 3. Managed Redis 7 Key-Value Store (BullMQ queue & session engine)
+# 3. Managed Redis / Key-Value Store (BullMQ queue & session engine)
 
 services:
   - type: web
     name: techsprout-api
     runtime: node
-    plan: starter
+    plan: free
     region: oregon
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter @techsprout/contracts build && pnpm --filter @techsprout/api build
     preDeployCommand: pnpm --filter @techsprout/api db:migrate && pnpm --filter @techsprout/api db:seed
@@ -25,7 +25,7 @@ services:
           property: connectionString
       - key: REDIS_URL
         fromService:
-          type: redis
+          type: keyvalue
           name: techsprout-redis
           property: connectionString
       - key: AUTH_SECRET
@@ -33,9 +33,9 @@ services:
       - key: WEB_ORIGIN
         value: https://techsprout-frthqjqb8-tech-sprout.vercel.app,https://techsprout-git-feat-p1-foundation-security-tech-sprout.vercel.app
 
-  - type: redis
+  - type: keyvalue
     name: techsprout-redis
-    plan: starter
+    plan: free
     region: oregon
     ipAllowList: []
     maxmemoryPolicy: noeviction
@@ -44,6 +44,6 @@ databases:
   - name: techsprout-postgres
     databaseName: techsprout
     user: techsprout
-    plan: starter
+    plan: free
     region: oregon
     postgresMajorVersion: 16
