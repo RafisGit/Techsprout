@@ -7,6 +7,10 @@ export const SEED_ROLES = [
     name: 'admin',
     description: 'System administrator with full privileges',
   },
+  {
+    name: 'instructor',
+    description: 'Course instructor with curriculum authoring privileges',
+  },
 ];
 
 export const SEED_USERS = [
@@ -26,6 +30,15 @@ export const SEED_USERS = [
     phone: '01700000002',
     password: 'StudentPassword123!',
     role: 'student',
+    isVerified: true,
+  },
+  {
+    name: 'Dr. Sarah Mitchell',
+    username: 'instructor',
+    email: 'instructor@techsprout.edu',
+    phone: '01700000003',
+    password: 'InstructorPassword123!',
+    role: 'instructor',
     isVerified: true,
   },
 ];

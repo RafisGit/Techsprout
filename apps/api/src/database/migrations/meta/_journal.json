@@ -8,6 +8,13 @@
       "when": 1727430000000,
       "tag": "0000_initial_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790706794581,
+      "tag": "0001_whole_living_tribunal",
+      "breakpoints": true
     }
   ]
 }

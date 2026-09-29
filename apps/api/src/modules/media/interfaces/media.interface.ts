@@ -11,6 +11,7 @@ export type AllowedVideoFolder = 'techsprout/videos/courses' | 'techsprout/video
 export type MediaFolder = AllowedImageFolder | AllowedVideoFolder;
 
 export interface MediaUploadResult {
+  id?: string;
   publicId: string;
   secureUrl: string;
   resourceType: MediaResourceType;

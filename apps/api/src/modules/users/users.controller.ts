@@ -25,8 +25,8 @@ import { ApiException } from '../../common/errors/api-error';
 
 const assignRoleSchema = z.object({
   userId: z.string().uuid('Invalid user ID'),
-  role: z.enum(['student', 'admin'], {
-    errorMap: () => ({ message: 'Role must be student or admin' }),
+  role: z.enum(['student', 'admin', 'instructor'], {
+    errorMap: () => ({ message: 'Role must be student, instructor, or admin' }),
   }),
 });
 

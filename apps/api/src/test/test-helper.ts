@@ -143,6 +143,84 @@ export async function createTestDatabase() {
       metadata text,
       created_at timestamp with time zone DEFAULT now() NOT NULL
     );
+
+    CREATE TYPE storage_provider AS ENUM('CLOUDINARY', 'LOCAL', 'S3');
+    CREATE TYPE course_level AS ENUM('BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'ALL_LEVELS');
+    CREATE TYPE course_status AS ENUM('DRAFT', 'PUBLISHED', 'ARCHIVED');
+    CREATE TYPE course_visibility AS ENUM('PUBLIC', 'PRIVATE');
+    CREATE TYPE lesson_type AS ENUM('VIDEO', 'TEXT', 'PDF');
+
+    CREATE TABLE IF NOT EXISTS categories (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      name varchar(100) NOT NULL UNIQUE,
+      slug varchar(120) NOT NULL UNIQUE,
+      description text,
+      is_active boolean DEFAULT true NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS media (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      storage_provider storage_provider DEFAULT 'CLOUDINARY' NOT NULL,
+      storage_key varchar(255) NOT NULL UNIQUE,
+      public_url text NOT NULL,
+      original_filename varchar(255) NOT NULL,
+      mime_type varchar(100) NOT NULL,
+      file_size integer NOT NULL,
+      duration_seconds integer,
+      metadata text,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS courses (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      category_id uuid NOT NULL REFERENCES categories(id) ON DELETE restrict,
+      instructor_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      title varchar(200) NOT NULL,
+      slug varchar(250) NOT NULL UNIQUE,
+      short_description varchar(500),
+      description text,
+      status course_status DEFAULT 'DRAFT' NOT NULL,
+      visibility course_visibility DEFAULT 'PUBLIC' NOT NULL,
+      price numeric(10, 2) DEFAULT '0.00' NOT NULL,
+      currency varchar(3) DEFAULT 'USD' NOT NULL,
+      level course_level DEFAULT 'BEGINNER' NOT NULL,
+      language varchar(50) DEFAULT 'English' NOT NULL,
+      duration_minutes integer DEFAULT 0 NOT NULL,
+      thumbnail_media_id uuid REFERENCES media(id) ON DELETE set null,
+      published_at timestamp with time zone,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS modules (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      course_id uuid NOT NULL REFERENCES courses(id) ON DELETE cascade,
+      title varchar(200) NOT NULL,
+      description text,
+      position integer NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT modules_course_position_uq UNIQUE(course_id, position)
+    );
+
+    CREATE TABLE IF NOT EXISTS lessons (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      module_id uuid NOT NULL REFERENCES modules(id) ON DELETE cascade,
+      title varchar(200) NOT NULL,
+      description text,
+      lesson_type lesson_type DEFAULT 'VIDEO' NOT NULL,
+      position integer NOT NULL,
+      duration_seconds integer DEFAULT 0 NOT NULL,
+      is_preview boolean DEFAULT false NOT NULL,
+      media_id uuid REFERENCES media(id) ON DELETE set null,
+      content text,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT lessons_module_position_uq UNIQUE(module_id, position)
+    );
   `);
 
   // Seed baseline roles

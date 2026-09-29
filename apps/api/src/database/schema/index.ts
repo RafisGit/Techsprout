@@ -2,3 +2,8 @@ export * from './users';
 export * from './roles';
 export * from './otps';
 export * from './audit';
+export * from './categories';
+export * from './media';
+export * from './courses';
+export * from './modules';
+export * from './lessons';

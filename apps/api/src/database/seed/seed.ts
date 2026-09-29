@@ -2,8 +2,10 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { eq } from 'drizzle-orm';
 import { roles, users, userRoles } from '../schema';
+import * as schema from '../schema';
 import { SEED_ROLES, SEED_USERS } from './fixtures';
 import { CryptoUtil } from '../../common/auth/crypto.util';
+import { seedCatalog } from './catalog.seeder';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
@@ -12,7 +14,7 @@ async function runSeed() {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/techsprout',
   });
-  const db = drizzle(pool);
+  const db = drizzle(pool, { schema });
 
   try {
     // 1. Seed Roles
@@ -61,6 +63,9 @@ async function runSeed() {
         console.log(`- User already exists: ${userData.email}`);
       }
     }
+
+    // 4. Seed Catalog (Categories, Courses, Modules, Lessons)
+    await seedCatalog(db);
 
     console.log('Seeding completed successfully.');
   } catch (error) {

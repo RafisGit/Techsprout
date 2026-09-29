@@ -2,6 +2,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MediaResourceType } from '../interfaces/media.interface';
 
 export class MediaResponseDto {
+  @ApiPropertyOptional({ description: 'PostgreSQL Media ID (UUID)' })
+  id?: string;
+
   @ApiProperty({ description: 'Cloudinary Public ID' })
   publicId!: string;
 

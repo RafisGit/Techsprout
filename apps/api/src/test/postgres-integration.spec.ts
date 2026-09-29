@@ -72,7 +72,10 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
 
     const result = await pool.query(`
       SELECT table_name FROM information_schema.tables 
-      WHERE table_schema = 'public' AND table_name IN ('users', 'sessions', 'roles', 'user_roles', 'otps', 'audit_logs', 'accounts');
+      WHERE table_schema = 'public' AND table_name IN (
+        'users', 'sessions', 'roles', 'user_roles', 'otps', 'audit_logs', 'accounts',
+        'categories', 'media', 'courses', 'modules', 'lessons'
+      );
     `);
 
     const tableNames = result.rows.map((r: any) => r.table_name);
@@ -83,6 +86,11 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
     expect(tableNames).toContain('otps');
     expect(tableNames).toContain('audit_logs');
     expect(tableNames).toContain('accounts');
+    expect(tableNames).toContain('categories');
+    expect(tableNames).toContain('media');
+    expect(tableNames).toContain('courses');
+    expect(tableNames).toContain('modules');
+    expect(tableNames).toContain('lessons');
   });
 
   it('2. Real PostgreSQL: Enforces unique database constraints on users', async () => {

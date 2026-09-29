@@ -1,4 +1,4 @@
-import { Injectable, Logger, HttpStatus, Inject } from '@nestjs/common';
+import { Injectable, Logger, HttpStatus, Inject, Optional } from '@nestjs/common';
 import { CloudinaryService } from './cloudinary/cloudinary.service';
 import {
   FilePayload,
@@ -11,6 +11,9 @@ import {
 import { ApiException } from '../../common/errors/api-error';
 import { SignedUploadRequestDto } from './dto/signed-upload-request.dto';
 import * as crypto from 'crypto';
+import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
+import { media, Media, NewMedia } from '../../database/schema/media';
+import { eq } from 'drizzle-orm';
 
 @Injectable()
 export class MediaService {
@@ -47,10 +50,14 @@ export class MediaService {
     video: ['techsprout/videos/courses', 'techsprout/videos/lessons'],
   };
 
-  constructor(@Inject(CloudinaryService) private readonly cloudinaryService: CloudinaryService) {}
+  constructor(
+    @Inject(CloudinaryService) private readonly cloudinaryService: CloudinaryService,
+    @Optional() @Inject(DRIZZLE_DB) private readonly db?: DrizzleDB
+  ) {}
 
   /**
-   * Upload an image asset to Cloudinary.
+   * Upload an image asset to Cloudinary and persist to PostgreSQL media table.
+   * If DB persistence fails, compensates by deleting orphaned asset from Cloudinary.
    */
   async uploadImage(file: FilePayload, options?: UploadMediaOptions): Promise<MediaUploadResult> {
     this.validateImageFile(file);
@@ -68,7 +75,73 @@ export class MediaService {
       tags: options?.tags,
     });
 
+    let persistedMediaId: string | undefined;
+
+    if (this.db) {
+      try {
+        const metadata = JSON.stringify({
+          width: result.width,
+          height: result.height,
+          format: result.format,
+          resourceType: 'image',
+        });
+
+        const [inserted] = await this.db
+          .insert(media)
+          .values({
+            storageProvider: 'CLOUDINARY',
+            storageKey: result.public_id,
+            publicUrl: result.secure_url,
+            originalFilename: file.originalname || 'unknown',
+            mimeType: file.mimetype || 'image/jpeg',
+            fileSize: result.bytes || (file.size ?? file.buffer.length),
+            durationSeconds: null,
+            metadata,
+          })
+          .returning();
+
+        persistedMediaId = inserted?.id;
+      } catch (dbErr: any) {
+        this.logger.error(
+          `Database persistence failed for uploaded image (${result.public_id}): ${dbErr.message}. Executing compensation cleanup...`
+        );
+
+        // CASE B: Compensation - cleanup orphaned asset from Cloudinary
+        try {
+          await this.cloudinaryService.destroy(result.public_id, {
+            resource_type: 'image',
+            invalidate: true,
+          });
+          this.logger.log(`Compensated orphaned Cloudinary image (${result.public_id})`);
+        } catch (cleanupErr: any) {
+          this.logger.error(
+            `Failed to cleanup orphaned Cloudinary image (${result.public_id}): ${cleanupErr.message}`
+          );
+        }
+
+        // CASE D: Unique storage_key constraint collision
+        if (
+          dbErr.code === '23505' ||
+          dbErr.message?.includes('duplicate key') ||
+          dbErr.message?.includes('unique constraint')
+        ) {
+          throw new ApiException(
+            `Media with storage key "${result.public_id}" already exists`,
+            HttpStatus.CONFLICT,
+            'DUPLICATE_MEDIA'
+          );
+        }
+
+        throw new ApiException(
+          `Failed to persist media asset record: ${dbErr.message}`,
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          'MEDIA_PERSISTENCE_FAILED'
+        );
+      }
+    }
+
     return {
+      id: persistedMediaId,
       publicId: result.public_id,
       secureUrl: result.secure_url,
       resourceType: 'image',
@@ -82,7 +155,8 @@ export class MediaService {
   }
 
   /**
-   * Upload a video asset to Cloudinary.
+   * Upload a video asset to Cloudinary and persist to PostgreSQL media table.
+   * If DB persistence fails, compensates by deleting orphaned asset from Cloudinary.
    */
   async uploadVideo(file: FilePayload, options?: UploadMediaOptions): Promise<MediaUploadResult> {
     this.validateVideoFile(file);
@@ -100,7 +174,74 @@ export class MediaService {
       tags: options?.tags,
     });
 
+    let persistedMediaId: string | undefined;
+
+    if (this.db) {
+      try {
+        const metadata = JSON.stringify({
+          width: result.width,
+          height: result.height,
+          format: result.format,
+          resourceType: 'video',
+          duration: result.duration,
+        });
+
+        const [inserted] = await this.db
+          .insert(media)
+          .values({
+            storageProvider: 'CLOUDINARY',
+            storageKey: result.public_id,
+            publicUrl: result.secure_url,
+            originalFilename: file.originalname || 'unknown',
+            mimeType: file.mimetype || 'video/mp4',
+            fileSize: result.bytes || (file.size ?? file.buffer.length),
+            durationSeconds: result.duration ? Math.round(result.duration) : null,
+            metadata,
+          })
+          .returning();
+
+        persistedMediaId = inserted?.id;
+      } catch (dbErr: any) {
+        this.logger.error(
+          `Database persistence failed for uploaded video (${result.public_id}): ${dbErr.message}. Executing compensation cleanup...`
+        );
+
+        // CASE B: Compensation - cleanup orphaned asset from Cloudinary
+        try {
+          await this.cloudinaryService.destroy(result.public_id, {
+            resource_type: 'video',
+            invalidate: true,
+          });
+          this.logger.log(`Compensated orphaned Cloudinary video (${result.public_id})`);
+        } catch (cleanupErr: any) {
+          this.logger.error(
+            `Failed to cleanup orphaned Cloudinary video (${result.public_id}): ${cleanupErr.message}`
+          );
+        }
+
+        // CASE D: Unique storage_key constraint collision
+        if (
+          dbErr.code === '23505' ||
+          dbErr.message?.includes('duplicate key') ||
+          dbErr.message?.includes('unique constraint')
+        ) {
+          throw new ApiException(
+            `Media with storage key "${result.public_id}" already exists`,
+            HttpStatus.CONFLICT,
+            'DUPLICATE_MEDIA'
+          );
+        }
+
+        throw new ApiException(
+          `Failed to persist media asset record: ${dbErr.message}`,
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          'MEDIA_PERSISTENCE_FAILED'
+        );
+      }
+    }
+
     return {
+      id: persistedMediaId,
       publicId: result.public_id,
       secureUrl: result.secure_url,
       resourceType: 'video',
@@ -115,7 +256,7 @@ export class MediaService {
   }
 
   /**
-   * Delete an image asset from Cloudinary.
+   * Delete an image asset from Cloudinary and remove its PostgreSQL record.
    */
   async deleteImage(publicId: string): Promise<MediaDeleteResult> {
     this.validatePublicId(publicId);
@@ -125,6 +266,14 @@ export class MediaService {
       invalidate: true,
     });
 
+    if (this.db) {
+      try {
+        await this.db.delete(media).where(eq(media.storageKey, publicId));
+      } catch (err: any) {
+        this.logger.warn(`Failed to delete media DB record for storageKey=${publicId}: ${err.message}`);
+      }
+    }
+
     return {
       publicId,
       result: res.result,
@@ -133,7 +282,7 @@ export class MediaService {
   }
 
   /**
-   * Delete a video asset from Cloudinary.
+   * Delete a video asset from Cloudinary and remove its PostgreSQL record.
    */
   async deleteVideo(publicId: string): Promise<MediaDeleteResult> {
     this.validatePublicId(publicId);
@@ -143,11 +292,48 @@ export class MediaService {
       invalidate: true,
     });
 
+    if (this.db) {
+      try {
+        await this.db.delete(media).where(eq(media.storageKey, publicId));
+      } catch (err: any) {
+        this.logger.warn(`Failed to delete media DB record for storageKey=${publicId}: ${err.message}`);
+      }
+    }
+
     return {
       publicId,
       result: res.result,
       resourceType: 'video',
     };
+  }
+
+  /**
+   * Fetch a media record by PostgreSQL UUID.
+   */
+  async getMediaById(id: string): Promise<Media | null> {
+    if (!this.db) return null;
+    const [record] = await this.db.select().from(media).where(eq(media.id, id)).limit(1);
+    return record || null;
+  }
+
+  /**
+   * Fetch a media record by Cloudinary storage key (public_id).
+   */
+  async getMediaByStorageKey(storageKey: string): Promise<Media | null> {
+    if (!this.db) return null;
+    const [record] = await this.db.select().from(media).where(eq(media.storageKey, storageKey)).limit(1);
+    return record || null;
+  }
+
+  /**
+   * Directly insert a media record (e.g., during seed or registered uploads).
+   */
+  async persistMediaRecord(record: NewMedia): Promise<Media> {
+    if (!this.db) {
+      throw new ApiException('Database connection not available', HttpStatus.INTERNAL_SERVER_ERROR, 'DB_UNAVAILABLE');
+    }
+    const [inserted] = await this.db.insert(media).values(record).returning();
+    return inserted;
   }
 
   /**
