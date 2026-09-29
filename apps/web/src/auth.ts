@@ -9,7 +9,7 @@ export interface AuthUser {
   username: string;
   email: string;
   phone?: string | null;
-  role: 'student' | 'admin';
+  role: 'student' | 'admin' | 'instructor';
   isVerified: boolean;
 }
 
