@@ -16,9 +16,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useRouter } from 'next/navigation';
 import { NavItemWithDropdown } from './nav-item-with-dropdown';
 import { DialogTitle } from '@radix-ui/react-dialog';
-import { getCategories } from '@/lib/mockData/mockApi';
+import { useQuery } from '@tanstack/react-query';
+import { fetchPublicCategories } from '@/lib/api/catalog';
 
 const navigationItems = [
   {
@@ -53,12 +55,25 @@ const navigationItems = [
   },
 ];
 
-const categories = getCategories();
-
 export function Header() {
+  const router = useRouter();
   const [cartCount] = React.useState(0);
   const [selectedCategory, setSelectedCategory] = React.useState('Categories');
+  const [searchInput, setSearchInput] = React.useState('');
   const [isScrolled, setIsScrolled] = React.useState(false);
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ['publicCategories'],
+    queryFn: fetchPublicCategories,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchInput.trim()) {
+      router.push(`/courses?search=${encodeURIComponent(searchInput.trim())}`);
+    }
+  };
 
   React.useEffect(() => {
     const handleScroll = () => {
@@ -123,37 +138,46 @@ export function Header() {
             <DropdownMenuContent align='start' className='w-[200px]'>
               <DropdownMenuItem
                 className='cursor-pointer'
-                onClick={() => setSelectedCategory('all categories')}
+                onClick={() => {
+                  setSelectedCategory('All Categories');
+                  router.push('/courses');
+                }}
               >
                 All Categories
               </DropdownMenuItem>
               {categories.map((category) => (
                 <DropdownMenuItem
-                  key={category}
-                  onClick={() => setSelectedCategory(category)}
+                  key={category.id}
+                  onClick={() => {
+                    setSelectedCategory(category.name);
+                    router.push(`/categories/${category.slug}`);
+                  }}
                   className='cursor-pointer'
                 >
-                  {category}
+                  {category.name}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
 
           {/* Search Input */}
-          <div className='relative max-w-xs flex-1'>
+          <form onSubmit={handleSearch} className='relative max-w-xs flex-1'>
             <input
               type='text'
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               placeholder='Search courses...'
               className='focus:border-primary focus:ring-primary h-10 w-full rounded-md border border-gray-300 pr-10 pl-4 text-sm focus:ring-2 focus:outline-none'
             />
             <Button
+              type='submit'
               size={'icon'}
               variant={'ghost'}
               className='hover:text-primary absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 transform text-gray-400 hover:bg-transparent'
             >
               <Search />
             </Button>
-          </div>
+          </form>
         </div>
 
         {/* Right Side Actions */}
@@ -194,20 +218,23 @@ export function Header() {
               <DialogTitle className='sr-only'>Mobile Navigation Menu</DialogTitle>
               <div className='mt-12 flex flex-col space-y-4'>
                 {/* Mobile Search (inside sheet) */}
-                <div className='relative'>
+                <form onSubmit={handleSearch} className='relative'>
                   <input
                     type='text'
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
                     placeholder='Search courses...'
                     className='focus:border-primary focus:ring-primary h-10 w-full rounded-md border border-gray-300 pr-10 pl-4 focus:ring-2 focus:outline-none'
                   />
                   <Button
+                    type='submit'
                     size={'icon'}
                     variant={'ghost'}
                     className='hover:text-primary absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 transform text-gray-400 hover:bg-transparent'
                   >
                     <Search />
                   </Button>
-                </div>
+                </form>
 
                 {/* Mobile Categories Dropdown (inside sheet) */}
                 <DropdownMenu>
@@ -222,17 +249,23 @@ export function Header() {
                   <DropdownMenuContent align='start' className='w-full'>
                     <DropdownMenuItem
                       className='cursor-pointer'
-                      onClick={() => setSelectedCategory('all categories')}
+                      onClick={() => {
+                        setSelectedCategory('All Categories');
+                        router.push('/courses');
+                      }}
                     >
                       All Categories
                     </DropdownMenuItem>
                     {categories.map((category) => (
                       <DropdownMenuItem
-                        key={category}
-                        onClick={() => setSelectedCategory(category)}
+                        key={category.id}
+                        onClick={() => {
+                          setSelectedCategory(category.name);
+                          router.push(`/categories/${category.slug}`);
+                        }}
                         className='cursor-pointer'
                       >
-                        {category}
+                        {category.name}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>

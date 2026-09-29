@@ -210,3 +210,50 @@ export async function fetchAdminUsers(limit = 100, offset = 0): Promise<AdminUse
   });
   return response.data.data;
 }
+
+// ==========================================
+// PUBLIC CATALOG API
+// ==========================================
+
+export interface PublicCourseQueryParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  categoryId?: string;
+  categorySlug?: string;
+  level?: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'ALL_LEVELS' | string;
+  language?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  sortBy?: 'createdAt' | 'price' | 'title';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export async function fetchPublicCourses(
+  params?: PublicCourseQueryParams
+): Promise<PaginatedCoursesData> {
+  const response = await axiosInstance.get('/api/v1/courses', { params });
+  return response.data.data;
+}
+
+export async function fetchPublicCourseBySlug(slug: string): Promise<CourseDto> {
+  const response = await axiosInstance.get(`/api/v1/courses/${encodeURIComponent(slug)}`);
+  return response.data.data;
+}
+
+export async function fetchPublicCategories(): Promise<CategoryDto[]> {
+  const response = await axiosInstance.get('/api/v1/categories');
+  return response.data.data;
+}
+
+export async function fetchPublicCategoryCourses(
+  slug: string,
+  params?: PublicCourseQueryParams
+): Promise<PaginatedCoursesData> {
+  const response = await axiosInstance.get(
+    `/api/v1/categories/${encodeURIComponent(slug)}/courses`,
+    { params }
+  );
+  return response.data.data;
+}
+
