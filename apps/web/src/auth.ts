@@ -14,7 +14,7 @@ export interface AuthUser {
 }
 
 export async function getCurrentUser(cookieHeader?: string): Promise<AuthUser | null> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
   try {
     const res = await fetch(`${apiUrl}/api/v1/auth/me`, {
