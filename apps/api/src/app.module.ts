@@ -9,6 +9,7 @@ import { IdentityModule } from './modules/identity/identity.module';
 import { OtpModule } from './modules/otp/otp.module';
 import { UsersModule } from './modules/users/users.module';
 import { QueueModule } from './modules/queue/queue.module';
+import { MediaModule } from './modules/media/media.module';
 
 import { HealthController } from './common/health/health.controller';
 import { CorrelationIdMiddleware } from './common/http/correlation-id.middleware';
@@ -30,6 +31,7 @@ import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
     OtpModule,
     UsersModule,
     QueueModule,
+    MediaModule,
   ],
   controllers: [HealthController],
   providers: [

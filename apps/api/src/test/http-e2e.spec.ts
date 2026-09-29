@@ -8,6 +8,7 @@ import { AppModule } from '../app.module';
 import { DatabaseService, DRIZZLE_DB } from '../database/drizzle.provider';
 import { createTestDatabase } from './test-helper';
 import { parseAllowedOrigins, buildCspDirectives } from '../common/security/csp.util';
+import { env } from '../config/env.config';
 
 describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
   let app: INestApplication;
@@ -18,6 +19,10 @@ describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
     const mem = await createTestDatabase();
     testDb = mem.db;
     testPool = mem.pool;
+
+    env.CLOUDINARY_CLOUD_NAME = 'test-cloud';
+    env.CLOUDINARY_API_KEY = 'test-api-key';
+    env.CLOUDINARY_API_SECRET = 'test-api-secret-12345';
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -71,7 +76,9 @@ describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
     const res = await request(app.getHttpServer()).get('/api/v1/health');
     const csp = res.headers['content-security-policy'];
     expect(csp).toBeDefined();
-    expect(csp).toContain("connect-src 'self' https://techsprout-frthqjqb8-tech-sprout.vercel.app https://techsprout-git-feat-p1-foundation-security-tech-sprout.vercel.app");
+    expect(csp).toContain(
+      "connect-src 'self' https://techsprout-frthqjqb8-tech-sprout.vercel.app https://techsprout-git-feat-p1-foundation-security-tech-sprout.vercel.app"
+    );
     const connectSrcPart = csp.split(';').find((p: string) => p.trim().startsWith('connect-src'));
     expect(connectSrcPart).toBeDefined();
     expect(connectSrcPart).not.toContain(',');
@@ -97,16 +104,14 @@ describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
   });
 
   it('5. POST /api/v1/auth/register with attempted role=admin grants only student role', async () => {
-    const res = await request(app.getHttpServer())
-      .post('/api/v1/auth/register')
-      .send({
-        name: 'Shakib Al Hasan',
-        username: 'shakib75',
-        email: 'shakib75@techsprout.edu',
-        phone: '01799112233',
-        password: 'StrongP@ssword123',
-        role: 'admin', // Attempted role escalation
-      });
+    const res = await request(app.getHttpServer()).post('/api/v1/auth/register').send({
+      name: 'Shakib Al Hasan',
+      username: 'shakib75',
+      email: 'shakib75@techsprout.edu',
+      phone: '01799112233',
+      password: 'StrongP@ssword123',
+      role: 'admin', // Attempted role escalation
+    });
 
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
@@ -115,12 +120,10 @@ describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
   });
 
   it('6. Student user cannot access /api/v1/admin/users (403 FORBIDDEN)', async () => {
-    const loginRes = await request(app.getHttpServer())
-      .post('/api/v1/auth/login')
-      .send({
-        email: 'student@techsprout.edu',
-        password: 'StudentPassword123!',
-      });
+    const loginRes = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
+      email: 'student@techsprout.edu',
+      password: 'StudentPassword123!',
+    });
 
     expect(loginRes.status).toBe(200);
     const cookies = loginRes.headers['set-cookie'];
@@ -136,12 +139,10 @@ describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
   });
 
   it('7. Admin user can access /api/v1/admin/users (200 OK)', async () => {
-    const loginRes = await request(app.getHttpServer())
-      .post('/api/v1/auth/login')
-      .send({
-        email: 'admin@techsprout.edu',
-        password: 'AdminPassword123!',
-      });
+    const loginRes = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
+      email: 'admin@techsprout.edu',
+      password: 'AdminPassword123!',
+    });
 
     expect(loginRes.status).toBe(200);
     const cookies = loginRes.headers['set-cookie'];
@@ -222,12 +223,10 @@ describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
   });
 
   it('11. Logout invalidates session cookie', async () => {
-    const loginRes = await request(app.getHttpServer())
-      .post('/api/v1/auth/login')
-      .send({
-        email: 'student@techsprout.edu',
-        password: 'StudentPassword123!',
-      });
+    const loginRes = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
+      email: 'student@techsprout.edu',
+      password: 'StudentPassword123!',
+    });
 
     const cookies = loginRes.headers['set-cookie'];
 
@@ -237,10 +236,94 @@ describe('P1 HTTP Controller & RBAC Guard E2E Test Suite', () => {
 
     expect(logoutRes.status).toBe(200);
 
-    const meRes = await request(app.getHttpServer())
-      .get('/api/v1/auth/me')
-      .set('Cookie', cookies);
+    const meRes = await request(app.getHttpServer()).get('/api/v1/auth/me').set('Cookie', cookies);
 
     expect(meRes.status).toBe(401);
+  });
+
+  it('12. POST /api/v1/media/upload/image without credentials returns 401 UNAUTHENTICATED', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/media/upload/image')
+      .attach('file', Buffer.from('fake image content'), 'test.png');
+
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('13. POST /api/v1/media/signature as student returns 403 FORBIDDEN', async () => {
+    const studentLogin = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
+      email: 'student@techsprout.edu',
+      password: 'StudentPassword123!',
+    });
+
+    const studentCookies = studentLogin.headers['set-cookie'];
+
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/media/signature')
+      .set('Cookie', studentCookies)
+      .send({
+        resourceType: 'video',
+        folder: 'techsprout/videos/lessons',
+      });
+
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.errorCode).toBe('FORBIDDEN');
+  });
+
+  it('14. POST /api/v1/media/signature as admin generates signed parameters for direct upload', async () => {
+    const adminLogin = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
+      email: 'admin@techsprout.edu',
+      password: 'AdminPassword123!',
+    });
+
+    const adminCookies = adminLogin.headers['set-cookie'];
+
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/media/signature')
+      .set('Cookie', adminCookies)
+      .send({
+        resourceType: 'video',
+        folder: 'techsprout/videos/lessons',
+        filename: 'lesson-01.mp4',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.signature).toBeDefined();
+    expect(res.body.timestamp).toBeDefined();
+    expect(res.body.apiKey).toBeDefined();
+    expect(res.body.cloudName).toBeDefined();
+    expect(res.body.folder).toBe('techsprout/videos/lessons');
+    expect(res.body.resourceType).toBe('video');
+    expect(res.body.uploadUrl).toContain('/video/upload');
+  });
+
+  it('15. DELETE /api/v1/media as student returns 403 FORBIDDEN', async () => {
+    const studentLogin = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
+      email: 'student@techsprout.edu',
+      password: 'StudentPassword123!',
+    });
+
+    const studentCookies = studentLogin.headers['set-cookie'];
+
+    const res = await request(app.getHttpServer())
+      .delete('/api/v1/media')
+      .set('Cookie', studentCookies)
+      .send({
+        publicId: 'techsprout/images/courses/test_thumb',
+      });
+
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('16. GET /api/v1/media/url/:publicId is publicly accessible without authentication', async () => {
+    const res = await request(app.getHttpServer()).get(
+      '/api/v1/media/url/techsprout/images/site/logo'
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.url).toBeDefined();
+    expect(res.body.publicId).toBe('techsprout/images/site/logo');
   });
 });

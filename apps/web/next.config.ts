@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
       {
         hostname: 'picsum.photos',
       },
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+        pathname: '/**',
+      },
     ],
   },
 };

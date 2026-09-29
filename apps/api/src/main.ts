@@ -62,6 +62,7 @@ async function bootstrap() {
     .addTag('OTP & Phone Verification')
     .addTag('Admin')
     .addTag('Health')
+    .addTag('Media')
     .addCookieAuth('techsprout_session')
     .addBearerAuth()
     .build();
