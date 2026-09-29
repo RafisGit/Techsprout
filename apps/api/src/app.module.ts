@@ -10,6 +10,10 @@ import { OtpModule } from './modules/otp/otp.module';
 import { UsersModule } from './modules/users/users.module';
 import { QueueModule } from './modules/queue/queue.module';
 import { MediaModule } from './modules/media/media.module';
+import { CategoriesModule } from './modules/categories/categories.module';
+import { CoursesModule } from './modules/courses/courses.module';
+import { ModulesModule } from './modules/modules/modules.module';
+import { LessonsModule } from './modules/lessons/lessons.module';
 
 import { HealthController } from './common/health/health.controller';
 import { CorrelationIdMiddleware } from './common/http/correlation-id.middleware';
@@ -32,6 +36,10 @@ import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
     UsersModule,
     QueueModule,
     MediaModule,
+    CategoriesModule,
+    CoursesModule,
+    ModulesModule,
+    LessonsModule,
   ],
   controllers: [HealthController],
   providers: [

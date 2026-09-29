@@ -1,6 +1,6 @@
 # TechSprout School LMS — P2 REST API Contracts & Endpoint Specification
 
-> **Phase Status:** P2.0 Architecture Freeze  
+> **Phase Status:** P2.2 Catalog API Foundation (Implemented)  
 > **Global Prefix:** `/api/v1`  
 > **Response Envelope:** Follows standard `ApiSuccessResponse<T>` and `ApiErrorResponse` structures.
 
@@ -325,15 +325,26 @@ Deletes a lesson.
 ### 3.5 Category Management
 
 #### `POST /api/v1/admin/categories`
+Creates a new category.
 - **Roles:** `@Roles('admin')`
 - **Body:** `{ "name": "Cybersecurity", "slug": "cybersecurity", "description": "Information security courses." }`
 
+#### `GET /api/v1/admin/categories`
+Lists all categories including inactive ones.
+- **Roles:** `@Roles('admin')`
+
+#### `GET /api/v1/admin/categories/:id`
+Retrieves a single category by ID.
+- **Roles:** `@Roles('admin')`
+
 #### `PATCH /api/v1/admin/categories/:id`
+Updates category name, slug, description, or active status.
 - **Roles:** `@Roles('admin')`
 
 #### `DELETE /api/v1/admin/categories/:id`
+Deletes a category.
 - **Roles:** `@Roles('admin')`
-- **Constraint:** Rejects with `409 Conflict` if courses are linked to the category.
+- **Constraint:** Rejects with `409 Conflict` (`CATEGORY_HAS_COURSES`) if courses are linked to the category.
 
 ---
 
