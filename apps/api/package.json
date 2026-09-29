@@ -9,12 +9,13 @@
     "dev": "tsx watch src/main.ts",
     "test": "vitest run",
     "test:security": "vitest run src/test/security.spec.ts",
-    "test:e2e": "vitest run src/test/e2e.spec.ts",
+    "test:e2e": "vitest run src/test/http-e2e.spec.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/database/migrate.ts",
     "db:migrate:prod": "node dist/database/migrate.js",
     "db:seed": "tsx src/database/seed/seed.ts",
-    "db:seed:prod": "node dist/database/seed/seed.js"
+    "db:seed:prod": "node dist/database/seed/seed.js",
+    "media:migrate": "tsx src/scripts/migrate-assets.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",

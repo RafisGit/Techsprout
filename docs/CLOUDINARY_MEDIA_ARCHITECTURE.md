@@ -234,3 +234,37 @@ When implementing Phase P2 (Course Catalog & Lesson Management):
 2. **Media Association**: Use `media.service.ts` to attach uploaded media public IDs and CDN URLs to catalog records.
 3. **Database Seeding**: Upload seed course thumbnails and demo videos to Cloudinary and populate database seed fixtures.
 4. **Mock Data Deprecation**: Transition frontend consumers from `@/lib/mockData` to API queries powered by React Query.
+
+---
+
+## 11. Pre-P2 Dynamic Media Migration Manifest (Verified)
+
+Physical asset migration executed via `apps/api/src/scripts/migrate-assets.ts`. All 18 dynamic content images and 4 video endpoints (representing the 2 unique mock videos referenced 26 times across courses/lessons) have been physically uploaded to Cloudinary, verified with live HTTP 200 checks, and recorded in `apps/api/src/modules/media/migration-manifest.json`.
+
+### Verified Asset Migration Table
+
+| Original Asset | Type | Cloudinary Public ID | Resource Type | Dimensions / Duration | Size | Secure URL | Verified |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `courses03.jpg` | image | `techsprout/images/courses/courses03` | image | 1400x959 | 96.5 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673961/techsprout/images/courses/courses03.jpg` | YES (200) |
+| `courses05.jpg` | image | `techsprout/images/courses/courses05` | image | 1400x931 | 85.9 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673963/techsprout/images/courses/courses05.jpg` | YES (200) |
+| `courses06.jpg` | image | `techsprout/images/courses/courses06` | image | 1400x936 | 100.3 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673964/techsprout/images/courses/courses06.jpg` | YES (200) |
+| `courses10.jpg` | image | `techsprout/images/courses/courses10` | image | 1400x930 | 122.7 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673965/techsprout/images/courses/courses10.jpg` | YES (200) |
+| `instructor01.png` | image | `techsprout/images/instructors/instructor01` | image | 250x250 | 61.8 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673966/techsprout/images/instructors/instructor01.png` | YES (200) |
+| `instructor02.png` | image | `techsprout/images/instructors/instructor02` | image | 250x250 | 66.9 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673967/techsprout/images/instructors/instructor02.png` | YES (200) |
+| `instructor03.png` | image | `techsprout/images/instructors/instructor03` | image | 251x250 | 57.5 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673968/techsprout/images/instructors/instructor03.png` | YES (200) |
+| `instructor04.png` | image | `techsprout/images/instructors/instructor04` | image | 251x250 | 51.5 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673970/techsprout/images/instructors/instructor04.png` | YES (200) |
+| `blog_standard01.jpg` | image | `techsprout/images/site/blog_standard01` | image | 869x420 | 62.7 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673971/techsprout/images/site/blog_standard01.jpg` | YES (200) |
+| `blog_standard02.jpg` | image | `techsprout/images/site/blog_standard02` | image | 869x420 | 47.7 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673972/techsprout/images/site/blog_standard02.jpg` | YES (200) |
+| `blog_standard03.jpg` | image | `techsprout/images/site/blog_standard03` | image | 869x420 | 88.4 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673973/techsprout/images/site/blog_standard03.jpg` | YES (200) |
+| `testimonial01.png` | image | `techsprout/images/site/testimonial01` | image | 700x700 | 753.0 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673974/techsprout/images/site/testimonial01.png` | YES (200) |
+| `testimonial02.png` | image | `techsprout/images/site/testimonial02` | image | 700x700 | 645.3 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673975/techsprout/images/site/testimonial02.png` | YES (200) |
+| `about_img01.png` | image | `techsprout/images/site/about_img01` | image | 389x484 | 74.8 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673976/techsprout/images/site/about_img01.png` | YES (200) |
+| `about_img02.png` | image | `techsprout/images/site/about_img02` | image | 260x263 | 65.1 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673977/techsprout/images/site/about_img02.png` | YES (200) |
+| `about_img03.jpg` | image | `techsprout/images/site/about_img03` | image | 315x411 | 66.6 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673979/techsprout/images/site/about_img03.jpg` | YES (200) |
+| `about_img04.jpg` | image | `techsprout/images/site/about_img04` | image | 265x274 | 88.7 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673980/techsprout/images/site/about_img04.jpg` | YES (200) |
+| `about_img05.jpg` | image | `techsprout/images/site/about_img05` | image | 265x201 | 77.9 KB | `https://res.cloudinary.com/h6udu3ze/image/upload/v1790673981/techsprout/images/site/about_img05.jpg` | YES (200) |
+| `mov_bbb.mp4` (Course) | video | `techsprout/videos/courses/mov_bbb` | video | 320x176 / 10.03s | 788.5 KB | `https://res.cloudinary.com/h6udu3ze/video/upload/v1790673982/techsprout/videos/courses/mov_bbb.mp4` | YES (200) |
+| `mov_bbb.mp4` (Lesson) | video | `techsprout/videos/lessons/mov_bbb` | video | 320x176 / 10.03s | 788.5 KB | `https://res.cloudinary.com/h6udu3ze/video/upload/v1790673983/techsprout/videos/lessons/mov_bbb.mp4` | YES (200) |
+| `movie.mp4` (Course) | video | `techsprout/videos/courses/movie` | video | 320x240 / 12.61s | 318.5 KB | `https://res.cloudinary.com/h6udu3ze/video/upload/v1790673985/techsprout/videos/courses/movie.mp4` | YES (200) |
+| `movie.mp4` (Lesson) | video | `techsprout/videos/lessons/movie` | video | 320x240 / 12.61s | 318.5 KB | `https://res.cloudinary.com/h6udu3ze/video/upload/v1790673987/techsprout/videos/lessons/movie.mp4` | YES (200) |
+
