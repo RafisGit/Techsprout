@@ -4,8 +4,10 @@ import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchPublicCourseBySlug } from '@/lib/api/catalog';
+import { useCurrentUser } from '@/lib/useCurrentUser';
+import { fetchCourseEnrollmentStatus, selfEnroll } from '@/lib/api/learning';
 import Title from '@/components/Title';
 import { Button } from '@/components/ui/button';
 import { TextBadge } from '@/components/ui/text-badge';
@@ -68,6 +70,33 @@ export default function CourseDetailPage() {
     enabled: !!slug,
     retry: 1,
   });
+
+  const queryClient = useQueryClient();
+  const { data: currentUser, isLoading: isAuthLoading } = useCurrentUser();
+
+  const { data: enrollmentStatus } = useQuery({
+    queryKey: ['courseEnrollmentStatus', course?.id],
+    queryFn: () => fetchCourseEnrollmentStatus(course!.id),
+    enabled: !!course?.id && !!currentUser,
+    staleTime: 30 * 1000,
+  });
+
+  const enrollMutation = useMutation({
+    mutationFn: () => selfEnroll(course!.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['courseEnrollmentStatus', course?.id] });
+      queryClient.invalidateQueries({ queryKey: ['userEnrollments'] });
+      if (course?.slug) {
+        router.push(`/learn/${course.slug}`);
+      }
+    },
+  });
+
+  const enrollErrorMsg = (enrollMutation.error as any)?.response?.data?.message;
+  const isEnrolled = enrollmentStatus?.isEnrolled === true;
+  const enrollment = enrollmentStatus?.enrollment;
+  const isCompleted = enrollment?.status === 'COMPLETED';
+  const isArchived = course?.status === 'ARCHIVED';
 
   if (isLoading) {
     return (
@@ -447,25 +476,68 @@ export default function CourseDetailPage() {
                 </div>
               </div>
 
-              {/* Action Button */}
-              <div className='pt-2'>
-                <Button
-                  className='w-full rounded-2xl py-6 text-sm font-bold bg-primary text-white hover:bg-primary/90 shadow-md'
-                  onClick={() => {
-                    const firstPreview = modules.flatMap((m) => m.lessons || []).find((l) => l.isPreview);
-                    if (firstPreview) {
-                      setActivePreviewLesson(firstPreview);
-                      window.scrollTo({ top: 400, behavior: 'smooth' });
-                    } else {
-                      window.scrollTo({ top: 600, behavior: 'smooth' });
-                    }
-                  }}
-                >
-                  Explore Course Curriculum
-                </Button>
-                <p className='text-[11px] text-gray-400 text-center mt-2'>
-                  Full course enrollment & progress tracking opens in upcoming academic cohort.
-                </p>
+              {/* Action Button & Enrollment CTA */}
+              <div className='pt-2 space-y-2'>
+                {!isAuthLoading && !currentUser ? (
+                  <>
+                    <Button
+                      className='w-full rounded-2xl py-6 text-sm font-bold bg-primary text-white hover:bg-primary/90 shadow-md'
+                      onClick={() => router.push(`/login?redirect=${encodeURIComponent(`/courses/${slug}`)}`)}
+                    >
+                      Log in to enroll
+                    </Button>
+                    <p className='text-[11px] text-gray-400 text-center'>
+                      Sign in with your TechSprout account to enroll and start learning.
+                    </p>
+                  </>
+                ) : isEnrolled ? (
+                  <>
+                    <Button
+                      className={`w-full rounded-2xl py-6 text-sm font-bold shadow-md transition ${
+                        isCompleted
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                          : 'bg-primary text-white hover:bg-primary/90'
+                      }`}
+                      onClick={() => router.push(`/learn/${course.slug}`)}
+                    >
+                      {isCompleted ? 'View Course' : 'Continue Learning'}
+                    </Button>
+                    <p className='text-[11px] text-gray-500 text-center font-medium'>
+                      You are enrolled • {enrollment?.progressPercentage ?? 0}% completed
+                    </p>
+                  </>
+                ) : isArchived ? (
+                  <>
+                    <Button
+                      disabled
+                      className='w-full rounded-2xl py-6 text-sm font-bold bg-gray-200 text-gray-500 cursor-not-allowed shadow-none'
+                    >
+                      Enrollment Closed (Archived)
+                    </Button>
+                    <p className='text-[11px] text-amber-600 text-center'>
+                      This course has been archived. New enrollments are closed.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      disabled={enrollMutation.isPending}
+                      className='w-full rounded-2xl py-6 text-sm font-bold bg-primary text-white hover:bg-primary/90 shadow-md transition'
+                      onClick={() => enrollMutation.mutate()}
+                    >
+                      {enrollMutation.isPending ? 'Enrolling...' : 'Enroll Now'}
+                    </Button>
+                    {enrollErrorMsg ? (
+                      <p className='text-[11px] text-red-500 text-center font-medium'>
+                        {enrollErrorMsg}
+                      </p>
+                    ) : (
+                      <p className='text-[11px] text-gray-400 text-center'>
+                        Instant enrollment • Lifetime access to study curriculum.
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </aside>

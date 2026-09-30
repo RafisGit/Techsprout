@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ChevronDown, Grid3X3, Menu, Search, ShoppingCart, User } from 'lucide-react';
+import { ChevronDown, Grid3X3, Menu, Search, ShoppingCart, User, BookOpen } from 'lucide-react';
 import Image from 'next/image';
 import logo from '@/assets/img/logo.png';
 
@@ -21,6 +21,7 @@ import { NavItemWithDropdown } from './nav-item-with-dropdown';
 import { DialogTitle } from '@radix-ui/react-dialog';
 import { useQuery } from '@tanstack/react-query';
 import { fetchPublicCategories } from '@/lib/api/catalog';
+import { useCurrentUser } from '@/lib/useCurrentUser';
 
 const navigationItems = [
   {
@@ -67,6 +68,8 @@ export function Header() {
     queryFn: fetchPublicCategories,
     staleTime: 5 * 60 * 1000,
   });
+
+  const { data: currentUser } = useCurrentUser();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,20 +195,32 @@ export function Header() {
             )}
           </Button>
 
-          {/* Log In */}
-          <Link
-            href='/login'
-            className='hover:text-accent hidden whitespace-nowrap text-gray-700 uppercase hover:underline sm:block'
-          >
-            LogIn
-          </Link>
+          {/* User Links / Log In */}
+          {currentUser ? (
+            <Link
+              href='/my-courses'
+              className='hover:text-primary hidden whitespace-nowrap text-sm font-semibold text-gray-700 sm:block'
+            >
+              My Courses
+            </Link>
+          ) : (
+            <>
+              {/* Log In */}
+              <Link
+                href='/login'
+                className='hover:text-accent hidden whitespace-nowrap text-gray-700 uppercase hover:underline sm:block'
+              >
+                LogIn
+              </Link>
 
-          {/* Register Button */}
-          <Link href={'/register'}>
-            <Button className='bg-primary hidden px-3 text-sm whitespace-nowrap sm:flex'>
-              Register
-            </Button>
-          </Link>
+              {/* Register Button */}
+              <Link href={'/register'}>
+                <Button className='bg-primary hidden px-3 text-sm whitespace-nowrap sm:flex'>
+                  Register
+                </Button>
+              </Link>
+            </>
+          )}
 
           {/* Mobile Menu Trigger (visible on screens smaller than lg) */}
           <Sheet>
@@ -306,13 +321,26 @@ export function Header() {
 
                 {/* Mobile Actions (inside sheet) */}
                 <div className='space-y-2 border-t pt-4'>
-                  <Link href='/login' className='block'>
-                    <Button variant='ghost' className='w-full justify-start'>
-                      <User className='mr-2 h-4 w-4' />
-                      Log In
-                    </Button>
-                  </Link>
-                  <Button className='bg-primary hover:bg-accent w-full'>Register</Button>
+                  {currentUser ? (
+                    <Link href='/my-courses' className='block'>
+                      <Button variant='outline' className='w-full justify-start'>
+                        <BookOpen className='mr-2 h-4 w-4' />
+                        My Courses
+                      </Button>
+                    </Link>
+                  ) : (
+                    <>
+                      <Link href='/login' className='block'>
+                        <Button variant='ghost' className='w-full justify-start'>
+                          <User className='mr-2 h-4 w-4' />
+                          Log In
+                        </Button>
+                      </Link>
+                      <Link href='/register' className='block'>
+                        <Button className='bg-primary hover:bg-accent w-full'>Register</Button>
+                      </Link>
+                    </>
+                  )}
                 </div>
               </div>
             </SheetContent>
