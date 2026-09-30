@@ -74,7 +74,7 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
       SELECT table_name FROM information_schema.tables 
       WHERE table_schema = 'public' AND table_name IN (
         'users', 'sessions', 'roles', 'user_roles', 'otps', 'audit_logs', 'accounts',
-        'categories', 'media', 'courses', 'modules', 'lessons'
+        'categories', 'media', 'courses', 'modules', 'lessons', 'enrollments', 'lesson_progress'
       );
     `);
 
@@ -91,6 +91,8 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
     expect(tableNames).toContain('courses');
     expect(tableNames).toContain('modules');
     expect(tableNames).toContain('lessons');
+    expect(tableNames).toContain('enrollments');
+    expect(tableNames).toContain('lesson_progress');
   });
 
   it('2. Real PostgreSQL: Enforces unique database constraints on users', async () => {

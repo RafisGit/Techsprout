@@ -15,6 +15,13 @@
       "when": 1790706794581,
       "tag": "0001_whole_living_tribunal",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790788929154,
+      "tag": "0002_small_talon",
+      "breakpoints": true
     }
   ]
 }

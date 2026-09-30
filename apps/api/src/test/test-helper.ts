@@ -149,6 +149,8 @@ export async function createTestDatabase() {
     CREATE TYPE course_status AS ENUM('DRAFT', 'PUBLISHED', 'ARCHIVED');
     CREATE TYPE course_visibility AS ENUM('PUBLIC', 'PRIVATE');
     CREATE TYPE lesson_type AS ENUM('VIDEO', 'TEXT', 'PDF');
+    CREATE TYPE enrollment_status AS ENUM('ACTIVE', 'COMPLETED', 'CANCELLED');
+    CREATE TYPE lesson_progress_status AS ENUM('IN_PROGRESS', 'COMPLETED');
 
     CREATE TABLE IF NOT EXISTS categories (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -220,6 +222,33 @@ export async function createTestDatabase() {
       created_at timestamp with time zone DEFAULT now() NOT NULL,
       updated_at timestamp with time zone DEFAULT now() NOT NULL,
       CONSTRAINT lessons_module_position_uq UNIQUE(module_id, position)
+    );
+
+    CREATE TABLE IF NOT EXISTS enrollments (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      student_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      course_id uuid NOT NULL REFERENCES courses(id) ON DELETE restrict,
+      status enrollment_status DEFAULT 'ACTIVE' NOT NULL,
+      enrolled_at timestamp with time zone DEFAULT now() NOT NULL,
+      started_at timestamp with time zone,
+      completed_at timestamp with time zone,
+      last_accessed_at timestamp with time zone,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT enrollments_student_course_uq UNIQUE(student_id, course_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS lesson_progress (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      enrollment_id uuid NOT NULL REFERENCES enrollments(id) ON DELETE cascade,
+      lesson_id uuid NOT NULL REFERENCES lessons(id) ON DELETE restrict,
+      status lesson_progress_status DEFAULT 'IN_PROGRESS' NOT NULL,
+      watch_position_seconds integer DEFAULT 0 NOT NULL,
+      completed_at timestamp with time zone,
+      last_accessed_at timestamp with time zone DEFAULT now() NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT lesson_progress_enrollment_lesson_uq UNIQUE(enrollment_id, lesson_id)
     );
   `);
 

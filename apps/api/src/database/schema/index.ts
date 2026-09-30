@@ -7,3 +7,5 @@ export * from './media';
 export * from './courses';
 export * from './modules';
 export * from './lessons';
+export * from './enrollments';
+export * from './progress';
