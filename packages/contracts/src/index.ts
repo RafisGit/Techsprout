@@ -257,3 +257,148 @@ export interface PaginatedCoursesData {
   pagination: PaginationMetadata;
 }
 
+// --- ENROLLMENT & LEARNING CONTRACTS ---
+
+export type EnrollmentStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+export type LessonProgressStatus = 'IN_PROGRESS' | 'COMPLETED';
+
+export interface EnrollmentDto {
+  id: string;
+  courseId: string;
+  studentId: string;
+  status: EnrollmentStatus;
+  enrolledAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  progressPercentage?: number;
+}
+
+export interface CreateEnrollmentRequest {
+  courseId: string;
+}
+
+export interface AdminAssignEnrollmentRequest {
+  studentId: string;
+}
+
+export interface EnrolledCourseProgressDto {
+  completedLessons: number;
+  totalLessons: number;
+  percentage: number;
+}
+
+export interface EnrolledCourseResumePointDto {
+  lessonId: string;
+  moduleId: string;
+  lessonTitle: string;
+  watchPositionSeconds: number;
+}
+
+export interface EnrolledCourseItemDto {
+  enrollmentId: string;
+  status: EnrollmentStatus;
+  enrolledAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  progress: EnrolledCourseProgressDto;
+  resumePoint?: EnrolledCourseResumePointDto | null;
+  course: {
+    id: string;
+    title: string;
+    slug: string;
+    status: CourseStatus;
+    thumbnailUrl?: string | null;
+    category?: {
+      id: string;
+      name: string;
+      slug: string;
+    };
+    instructor?: {
+      id: string;
+      name: string;
+    };
+  };
+}
+
+export interface PaginatedEnrollmentsData {
+  items: EnrolledCourseItemDto[];
+  pagination: PaginationMetadata;
+}
+
+export interface EnrollmentStatusResponse {
+  isEnrolled: boolean;
+  enrollment?: {
+    id: string;
+    status: EnrollmentStatus;
+    enrolledAt: string;
+    progressPercentage: number;
+  } | null;
+}
+
+export interface ResumePointDto {
+  lessonId: string | null;
+  moduleId: string | null;
+  lessonTitle: string;
+  lessonType: LessonType;
+  watchPositionSeconds: number;
+  progressPercentage: number;
+  isCourseCompleted: boolean;
+}
+
+export interface LessonProgressDto {
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+  watchPositionSeconds: number;
+  completedAt?: string | null;
+}
+
+export interface CurriculumLessonDto {
+  id: string;
+  title: string;
+  position: number;
+  lessonType: LessonType;
+  durationSeconds: number;
+  isPreview: boolean;
+  progress: LessonProgressDto;
+}
+
+export interface CurriculumModuleDto {
+  id: string;
+  title: string;
+  position: number;
+  lessons: CurriculumLessonDto[];
+}
+
+export interface LearningCurriculumDto {
+  courseId: string;
+  courseStatus: CourseStatus;
+  progressPercentage: number;
+  completedLessonsCount: number;
+  totalLessonsCount: number;
+  modules: CurriculumModuleDto[];
+}
+
+export interface LessonNavigationDto {
+  previousLessonId: string | null;
+  nextLessonId: string | null;
+}
+
+export interface LearningLessonContentDto {
+  id: string;
+  moduleId: string;
+  courseId: string;
+  title: string;
+  lessonType: LessonType;
+  durationSeconds: number;
+  mediaUrl?: string | null;
+  content?: string | null;
+  progress: LessonProgressDto;
+  navigation: LessonNavigationDto;
+}
+
+export interface UpdateProgressCheckpointRequest {
+  watchPositionSeconds: number;
+}
+
+export interface ToggleLessonCompleteRequest {
+  completed: boolean;
+}

@@ -1,7 +1,15 @@
 import { Injectable, Inject, HttpStatus } from '@nestjs/common';
-import { eq, and, not } from 'drizzle-orm';
+import { eq, and, not, sql } from 'drizzle-orm';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
-import { lessons, modules, courses, media, Lesson } from '../../database/schema';
+import {
+  lessons,
+  modules,
+  courses,
+  media,
+  enrollments,
+  lessonProgress,
+  Lesson,
+} from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { ModulesService } from '../modules/modules.service';
 import { UserContext } from '../courses/courses.service';
@@ -115,7 +123,27 @@ export class LessonsService {
       })
       .returning();
 
-    // 5. Audit
+    // 5. Curricular expansion invariant: if parent course has any COMPLETED enrollments,
+    // adding a new lesson reduces their progress below 100%, reverting status to ACTIVE
+    // and resetting completedAt to null until student completes new lesson(s).
+    const [mod] = await this.db
+      .select({ courseId: modules.courseId })
+      .from(modules)
+      .where(eq(modules.id, moduleId))
+      .limit(1);
+
+    if (mod) {
+      await this.db
+        .update(enrollments)
+        .set({
+          status: 'ACTIVE',
+          completedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(enrollments.courseId, mod.courseId), eq(enrollments.status, 'COMPLETED')));
+    }
+
+    // 6. Audit
     await this.auditService.record({
       actorId: user.id,
       action: 'LESSON_CREATED',
@@ -259,6 +287,22 @@ export class LessonsService {
     requestId?: string
   ): Promise<{ deleted: true; id: string }> {
     const { lesson: existing } = await this.resolveLessonOwnership(id, user);
+
+    // Pre-check: cannot delete lesson if students have recorded progress
+    const [progressCountResult] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(lessonProgress)
+      .where(eq(lessonProgress.lessonId, id));
+
+    const progressCount = Number(progressCountResult?.count || 0);
+    if (progressCount > 0) {
+      throw new ApiException(
+        `Cannot delete lesson: ${progressCount} student(s) have recorded learning progress on this lesson. To retire this lesson without disrupting student history, remove it from the curriculum or mark it inactive.`,
+        HttpStatus.CONFLICT,
+        'LESSON_HAS_STUDENT_PROGRESS',
+        { progressCount }
+      );
+    }
 
     await this.db.delete(lessons).where(eq(lessons.id, id));
 
