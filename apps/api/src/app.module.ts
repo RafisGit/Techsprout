@@ -16,6 +16,7 @@ import { ModulesModule } from './modules/modules/modules.module';
 import { LessonsModule } from './modules/lessons/lessons.module';
 import { EnrollmentsModule } from './modules/enrollments/enrollments.module';
 import { LearningModule } from './modules/learning/learning.module';
+import { QuizzesModule } from './modules/quizzes/quizzes.module';
 
 import { HealthController } from './common/health/health.controller';
 import { CorrelationIdMiddleware } from './common/http/correlation-id.middleware';
@@ -44,6 +45,7 @@ import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
     LessonsModule,
     EnrollmentsModule,
     LearningModule,
+    QuizzesModule,
   ],
   controllers: [HealthController],
   providers: [

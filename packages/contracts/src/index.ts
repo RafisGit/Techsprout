@@ -402,3 +402,124 @@ export interface UpdateProgressCheckpointRequest {
 export interface ToggleLessonCompleteRequest {
   completed: boolean;
 }
+
+// --- QUIZ & ASSESSMENT AUTHORING CONTRACTS (P4.2) ---
+
+export type QuizStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+export type QuizType = 'KNOWLEDGE_CHECK' | 'FINAL_EXAM';
+export type QuestionType = 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'TRUE_FALSE';
+
+export interface QuizOptionDto {
+  id: string;
+  questionId: string;
+  optionText: string;
+  position: number;
+  isCorrect?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface QuizQuestionDto {
+  id: string;
+  quizId: string;
+  questionText: string;
+  questionType: QuestionType;
+  position: number;
+  points: number;
+  explanation?: string | null;
+  options?: QuizOptionDto[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface QuizDto {
+  id: string;
+  moduleId: string;
+  title: string;
+  description?: string | null;
+  position: number;
+  quizType: QuizType;
+  passingScorePercentage: number;
+  maxAttempts?: number | null;
+  timeLimitMinutes?: number | null;
+  status: QuizStatus;
+  module?: {
+    id: string;
+    title: string;
+    courseId: string;
+  };
+  course?: {
+    id: string;
+    title: string;
+  };
+  totalPoints?: number;
+  questionsCount?: number;
+  questions?: QuizQuestionDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateQuizRequest {
+  title: string;
+  description?: string | null;
+  quizType?: QuizType;
+  position: number;
+  passingScorePercentage?: number;
+  maxAttempts?: number | null;
+  timeLimitMinutes?: number | null;
+}
+
+export interface UpdateQuizRequest {
+  title?: string;
+  description?: string | null;
+  quizType?: QuizType;
+  position?: number;
+  passingScorePercentage?: number;
+  maxAttempts?: number | null;
+  timeLimitMinutes?: number | null;
+}
+
+export interface CreateQuestionOptionInput {
+  optionText: string;
+  position: number;
+  isCorrect?: boolean;
+}
+
+export interface CreateQuestionRequest {
+  questionText: string;
+  questionType: QuestionType;
+  position: number;
+  points?: number;
+  explanation?: string | null;
+  options?: CreateQuestionOptionInput[];
+}
+
+export interface UpdateQuestionRequest {
+  questionText?: string;
+  questionType?: QuestionType;
+  position?: number;
+  points?: number;
+  explanation?: string | null;
+}
+
+export interface CreateOptionRequest {
+  optionText: string;
+  position: number;
+  isCorrect?: boolean;
+}
+
+export interface UpdateOptionRequest {
+  optionText?: string;
+  position?: number;
+  isCorrect?: boolean;
+}
+
+export interface ReorderItem {
+  id: string;
+  position: number;
+}
+
+export interface ReorderRequest {
+  items: ReorderItem[];
+}
+

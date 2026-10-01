@@ -148,10 +148,135 @@ Deletes a quiz.
 {
   "success": false,
   "message": "Cannot delete quiz: 8 student attempt(s) have been recorded. Archive the quiz to retire it without invalidating student academic records.",
-  "errorCode": "QUIZ_HAS_STUDENT_ATTEMPTS",
+  "errorCode": "QUIZ_HAS_ATTEMPTS",
   "statusCode": 409
 }
 ```
+
+---
+
+### `GET /api/v1/admin/modules/:id/quizzes`
+Lists all quizzes positioned inside a course module.
+- **Authorization:** `ADMIN` or course `INSTRUCTOR`.
+- **Response (`200 OK`):** Ordered list of quiz summaries.
+
+---
+
+### `GET /api/v1/admin/quizzes/:id`
+Retrieves comprehensive authoring quiz detail including module, course, ordered questions, ordered options, and correct-answer metadata.
+- **Authorization:** `ADMIN` or course `INSTRUCTOR`.
+- **Response (`200 OK`):**
+```json
+{
+  "success": true,
+  "message": "Quiz retrieved successfully",
+  "data": {
+    "id": "quiz-uuid-001",
+    "moduleId": "mod-uuid-001",
+    "title": "Module 1 Assessment: TypeScript Foundations",
+    "description": "Test your understanding of types, interfaces, and generics.",
+    "quizType": "KNOWLEDGE_CHECK",
+    "position": 1,
+    "passingScorePercentage": 70,
+    "maxAttempts": 3,
+    "timeLimitMinutes": 30,
+    "status": "DRAFT",
+    "module": {
+      "id": "mod-uuid-001",
+      "title": "Module 1: Foundations",
+      "courseId": "course-uuid-001"
+    },
+    "course": {
+      "id": "course-uuid-001",
+      "title": "Fullstack TypeScript Architecture"
+    },
+    "questionsCount": 1,
+    "totalPoints": 1,
+    "questions": [
+      {
+        "id": "q-uuid-001",
+        "quizId": "quiz-uuid-001",
+        "questionText": "Which TypeScript utility type constructs a type with all properties of T set to optional?",
+        "questionType": "SINGLE_CHOICE",
+        "position": 1,
+        "points": 1,
+        "explanation": "Partial<T> makes all properties in T optional.",
+        "options": [
+          { "id": "opt-1", "questionId": "q-uuid-001", "optionText": "Required<T>", "position": 1, "isCorrect": false },
+          { "id": "opt-2", "questionId": "q-uuid-001", "optionText": "Partial<T>", "position": 2, "isCorrect": true }
+        ]
+      }
+    ]
+  }
+}
+```
+
+---
+
+### `PATCH /api/v1/admin/quizzes/:id`
+Updates quiz metadata and configuration fields (`title`, `description`, `quizType`, `position`, `passingScorePercentage`, `maxAttempts`, `timeLimitMinutes`).
+- **Authorization:** `ADMIN` or course `INSTRUCTOR`.
+- **Immutability:** Direct mutation of `status` is rejected; lifecycle transitions require `/publish` or `/archive`.
+- **Conflict Guard:** Rejects `quizType = 'FINAL_EXAM'` if another final exam is already designated in the parent course.
+
+---
+
+### `POST /api/v1/admin/modules/:id/quizzes/reorder`
+Reorders quizzes within a module.
+- **Request Body (`ReorderDto`):** `{ "items": [{ "id": "uuid", "position": 1 }, ...] }`
+- **Response (`200 OK`):** `{ "success": true, "message": "Quizzes reordered successfully", "data": { "success": true, "count": 2 } }`
+
+---
+
+### `GET /api/v1/admin/questions/:id`
+Retrieves question details along with all associated options and correct answers.
+- **Authorization:** `ADMIN` or course `INSTRUCTOR`.
+
+---
+
+### `PATCH /api/v1/admin/questions/:id`
+Updates question text, type, position, points, or explanation.
+- **Protection:** Blocked with `409 Conflict` if recorded student attempts exist on the parent quiz.
+
+---
+
+### `DELETE /api/v1/admin/questions/:id`
+Deletes a question from a quiz.
+- **Protection:** Blocked with `409 Conflict` if recorded student attempts exist. Blocked with `422` if deleting would leave a published quiz with zero questions.
+
+---
+
+### `POST /api/v1/admin/quizzes/:quizId/questions/reorder`
+Reorders questions within a quiz.
+- **Request Body (`ReorderDto`):** `{ "items": [{ "id": "uuid", "position": 1 }, ...] }`
+- **Response (`200 OK`):** Reorder confirmation.
+
+---
+
+### `POST /api/v1/admin/questions/:questionId/options`
+Adds an individual option to an existing question.
+- **Request Body (`CreateOptionDto`):** `{ "optionText": "True", "position": 1, "isCorrect": true }`
+- **Constraints:** For `TRUE_FALSE`, option text must be "True" or "False", and at most two options are allowed.
+
+---
+
+### `PATCH /api/v1/admin/options/:id`
+Updates an option's text, position, or correctness flag.
+- **Protection:** Blocked with `409 Conflict` if recorded student attempts exist on the parent quiz.
+
+---
+
+### `DELETE /api/v1/admin/options/:id`
+Deletes an option.
+- **Protection:** Blocked with `409 Conflict` if recorded student attempts exist. Blocked if deleting would violate minimum required options on a published quiz.
+
+---
+
+### `POST /api/v1/admin/questions/:questionId/options/reorder`
+Reorders options within a question.
+- **Request Body (`ReorderDto`):** `{ "items": [{ "id": "uuid", "position": 1 }, ...] }`
+- **Response (`200 OK`):** Reorder confirmation.
+
 
 ---
 
