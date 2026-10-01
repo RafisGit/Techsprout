@@ -6,6 +6,7 @@ import * as schema from '../schema';
 import { SEED_ROLES, SEED_USERS } from './fixtures';
 import { CryptoUtil } from '../../common/auth/crypto.util';
 import { seedCatalog } from './catalog.seeder';
+import { seedQuizzes } from './quiz.seeder';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
@@ -66,6 +67,9 @@ async function runSeed() {
 
     // 4. Seed Catalog (Categories, Courses, Modules, Lessons)
     await seedCatalog(db);
+
+    // 5. Seed Quizzes & Questions
+    await seedQuizzes(db);
 
     console.log('Seeding completed successfully.');
   } catch (error) {

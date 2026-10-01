@@ -151,6 +151,11 @@ export async function createTestDatabase() {
     CREATE TYPE lesson_type AS ENUM('VIDEO', 'TEXT', 'PDF');
     CREATE TYPE enrollment_status AS ENUM('ACTIVE', 'COMPLETED', 'CANCELLED');
     CREATE TYPE lesson_progress_status AS ENUM('IN_PROGRESS', 'COMPLETED');
+    CREATE TYPE question_type AS ENUM('SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'TRUE_FALSE');
+    CREATE TYPE quiz_status AS ENUM('DRAFT', 'PUBLISHED', 'ARCHIVED');
+    CREATE TYPE quiz_type AS ENUM('KNOWLEDGE_CHECK', 'FINAL_EXAM');
+    CREATE TYPE attempt_status AS ENUM('IN_PROGRESS', 'SUBMITTED', 'ABANDONED');
+    CREATE TYPE certificate_status AS ENUM('ACTIVE', 'REVOKED');
 
     CREATE TABLE IF NOT EXISTS categories (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -249,6 +254,111 @@ export async function createTestDatabase() {
       created_at timestamp with time zone DEFAULT now() NOT NULL,
       updated_at timestamp with time zone DEFAULT now() NOT NULL,
       CONSTRAINT lesson_progress_enrollment_lesson_uq UNIQUE(enrollment_id, lesson_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS quizzes (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      module_id uuid NOT NULL REFERENCES modules(id) ON DELETE cascade,
+      title varchar(200) NOT NULL,
+      description text,
+      position integer NOT NULL,
+      quiz_type quiz_type DEFAULT 'KNOWLEDGE_CHECK' NOT NULL,
+      passing_score_percentage integer DEFAULT 70 NOT NULL,
+      max_attempts integer DEFAULT 3,
+      time_limit_minutes integer,
+      status quiz_status DEFAULT 'DRAFT' NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT quizzes_module_position_uq UNIQUE(module_id, position),
+      CONSTRAINT quizzes_position_positive CHECK (position > 0),
+      CONSTRAINT quizzes_passing_score_range CHECK (passing_score_percentage >= 1 AND passing_score_percentage <= 100),
+      CONSTRAINT quizzes_max_attempts_positive CHECK (max_attempts IS NULL OR max_attempts > 0),
+      CONSTRAINT quizzes_time_limit_positive CHECK (time_limit_minutes IS NULL OR time_limit_minutes > 0)
+    );
+
+    CREATE TABLE IF NOT EXISTS quiz_questions (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      quiz_id uuid NOT NULL REFERENCES quizzes(id) ON DELETE cascade,
+      question_text text NOT NULL,
+      question_type question_type DEFAULT 'SINGLE_CHOICE' NOT NULL,
+      position integer NOT NULL,
+      points integer DEFAULT 1 NOT NULL,
+      explanation text,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT quiz_questions_quiz_position_uq UNIQUE(quiz_id, position),
+      CONSTRAINT quiz_questions_position_positive CHECK (position > 0),
+      CONSTRAINT quiz_questions_points_positive CHECK (points > 0)
+    );
+
+    CREATE TABLE IF NOT EXISTS quiz_question_options (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      question_id uuid NOT NULL REFERENCES quiz_questions(id) ON DELETE cascade,
+      option_text text NOT NULL,
+      position integer NOT NULL,
+      is_correct boolean DEFAULT false NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT quiz_question_options_q_pos_uq UNIQUE(question_id, position),
+      CONSTRAINT quiz_question_options_position_positive CHECK (position > 0)
+    );
+
+    CREATE TABLE IF NOT EXISTS quiz_attempts (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      quiz_id uuid NOT NULL REFERENCES quizzes(id) ON DELETE restrict,
+      enrollment_id uuid NOT NULL REFERENCES enrollments(id) ON DELETE cascade,
+      student_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      attempt_number integer NOT NULL,
+      status attempt_status DEFAULT 'IN_PROGRESS' NOT NULL,
+      score integer DEFAULT 0 NOT NULL,
+      total_points integer DEFAULT 0 NOT NULL,
+      percentage numeric(5, 2) DEFAULT 0.00 NOT NULL,
+      is_passed boolean DEFAULT false NOT NULL,
+      started_at timestamp with time zone DEFAULT now() NOT NULL,
+      submitted_at timestamp with time zone,
+      last_saved_at timestamp with time zone DEFAULT now() NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT quiz_attempts_enrollment_quiz_num_uq UNIQUE(enrollment_id, quiz_id, attempt_number),
+      CONSTRAINT quiz_attempts_attempt_number_positive CHECK (attempt_number > 0),
+      CONSTRAINT quiz_attempts_score_non_negative CHECK (score >= 0),
+      CONSTRAINT quiz_attempts_total_points_non_negative CHECK (total_points >= 0),
+      CONSTRAINT quiz_attempts_percentage_range CHECK (percentage >= 0 AND percentage <= 100)
+    );
+
+    CREATE TABLE IF NOT EXISTS quiz_attempt_answers (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      attempt_id uuid NOT NULL REFERENCES quiz_attempts(id) ON DELETE cascade,
+      question_id uuid NOT NULL REFERENCES quiz_questions(id) ON DELETE restrict,
+      selected_option_ids text[] NOT NULL,
+      is_correct boolean DEFAULT false NOT NULL,
+      points_awarded integer DEFAULT 0 NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT quiz_attempt_answers_attempt_q_uq UNIQUE(attempt_id, question_id),
+      CONSTRAINT quiz_attempt_answers_points_awarded_non_negative CHECK (points_awarded >= 0)
+    );
+
+    CREATE TABLE IF NOT EXISTS certificates (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      certificate_number varchar(50) NOT NULL UNIQUE,
+      enrollment_id uuid NOT NULL UNIQUE REFERENCES enrollments(id) ON DELETE restrict,
+      course_id uuid NOT NULL REFERENCES courses(id) ON DELETE restrict,
+      student_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      student_name varchar(200) NOT NULL,
+      course_title varchar(250) NOT NULL,
+      instructor_name varchar(200) NOT NULL,
+      completed_at timestamp with time zone NOT NULL,
+      issued_at timestamp with time zone DEFAULT now() NOT NULL,
+      final_score_percentage integer,
+      status certificate_status DEFAULT 'ACTIVE' NOT NULL,
+      revoked_at timestamp with time zone,
+      revocation_reason text,
+      pdf_media_id uuid REFERENCES media(id) ON DELETE set null,
+      pdf_url text,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT certificates_score_range CHECK (final_score_percentage IS NULL OR (final_score_percentage >= 0 AND final_score_percentage <= 100))
     );
   `);
 

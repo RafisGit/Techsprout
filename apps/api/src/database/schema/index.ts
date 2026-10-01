@@ -9,3 +9,6 @@ export * from './modules';
 export * from './lessons';
 export * from './enrollments';
 export * from './progress';
+export * from './quizzes';
+export * from './attempts';
+export * from './certificates';

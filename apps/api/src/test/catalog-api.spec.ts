@@ -113,25 +113,25 @@ describe('P2.2 — Catalog API Foundation E2E Test Suite', () => {
       email: 'admin@techsprout.edu',
       password: 'AdminPassword123!',
     });
-    adminCookies = adminLogin.headers['set-cookie'];
+    adminCookies = adminLogin.headers['set-cookie'] as unknown as string[];
 
     const studentLogin = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
       email: 'student@techsprout.edu',
       password: 'StudentPassword123!',
     });
-    studentCookies = studentLogin.headers['set-cookie'];
+    studentCookies = studentLogin.headers['set-cookie'] as unknown as string[];
 
     const inst1Login = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
       email: 'instructor@techsprout.edu',
       password: 'InstructorPassword123!',
     });
-    instructor1Cookies = inst1Login.headers['set-cookie'];
+    instructor1Cookies = inst1Login.headers['set-cookie'] as unknown as string[];
 
     const inst2Login = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
       email: 'instructor2@techsprout.edu',
       password: 'Instructor2Password123!',
     });
-    instructor2Cookies = inst2Login.headers['set-cookie'];
+    instructor2Cookies = inst2Login.headers['set-cookie'] as unknown as string[];
   });
 
   afterAll(async () => {

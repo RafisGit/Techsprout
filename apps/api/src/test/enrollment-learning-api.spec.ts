@@ -263,25 +263,25 @@ describe('P3.2 — Enrollment & Learning REST API Integration Test Suite', () =>
       email: 'admin@techsprout.edu',
       password: 'AdminPassword123!',
     });
-    adminCookies = adminLogin.headers['set-cookie'];
+    adminCookies = adminLogin.headers['set-cookie'] as unknown as string[];
 
     const studentLogin = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
       email: 'student@techsprout.edu',
       password: 'StudentPassword123!',
     });
-    studentCookies = studentLogin.headers['set-cookie'];
+    studentCookies = studentLogin.headers['set-cookie'] as unknown as string[];
 
     const student2Login = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
       email: 'student2@techsprout.edu',
       password: 'Student2Password123!',
     });
-    student2Cookies = student2Login.headers['set-cookie'];
+    student2Cookies = student2Login.headers['set-cookie'] as unknown as string[];
 
     const instLogin = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
       email: 'instructor@techsprout.edu',
       password: 'InstructorPassword123!',
     });
-    instructorCookies = instLogin.headers['set-cookie'];
+    instructorCookies = instLogin.headers['set-cookie'] as unknown as string[];
   });
 
   afterAll(async () => {

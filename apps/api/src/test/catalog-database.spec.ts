@@ -523,7 +523,7 @@ describe('P2.1 — Catalog Database & Media Persistence Test Suite', () => {
       const [persisted] = await db
         .select()
         .from(media)
-        .where(eq(media.id, result.id));
+        .where(eq(media.id, result.id!));
 
       expect(persisted).toBeDefined();
       expect(persisted.storageKey).toBe(result.publicId);
@@ -540,7 +540,7 @@ describe('P2.1 — Catalog Database & Media Persistence Test Suite', () => {
       mockCloudinaryClient.uploader.upload_stream = vi.fn((opts, cb) => {
         const { Writable } = require('stream');
         const s = new Writable({
-          write(chunk, enc, next) {
+          write(chunk: any, enc: any, next: any) {
             next();
           },
         });
