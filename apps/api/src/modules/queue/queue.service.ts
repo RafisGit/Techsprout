@@ -77,6 +77,14 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
         { connection: this.redisConnection }
       );
 
+      this.queue.on('error', (err) => {
+        this.logger.warn(`Queue notice: ${err.message}. Operating in resilient standby.`);
+      });
+
+      this.worker.on('error', (err) => {
+        this.logger.warn(`Worker notice: ${err.message}. Operating in resilient standby.`);
+      });
+
       this.worker.on('completed', (job: Job) => {
         this.logger.log(`[QUEUE_WORKER] Job completed successfully: id=${job.id}`);
       });

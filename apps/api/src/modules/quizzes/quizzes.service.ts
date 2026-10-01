@@ -8,12 +8,14 @@ import {
   quizQuestions,
   quizQuestionOptions,
   quizAttempts,
+  enrollments,
   Quiz,
   QuizQuestion,
   QuizQuestionOption,
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { ModulesService } from '../modules/modules.service';
+import { StudentQuizzesService } from './student-quizzes.service';
 import { UserContext } from '../courses/courses.service';
 import { ApiException } from '../../common/errors/api-error';
 import { CreateQuizDto } from './dto/create-quiz.dto';
@@ -26,7 +28,8 @@ export class QuizzesService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     @Inject(AuditService) private readonly auditService: AuditService,
-    @Inject(ModulesService) private readonly modulesService: ModulesService
+    @Inject(ModulesService) private readonly modulesService: ModulesService,
+    @Inject(StudentQuizzesService) private readonly studentQuizzesService: StudentQuizzesService
   ) {}
 
   /**
@@ -484,6 +487,31 @@ export class QuizzesService {
       .where(eq(quizzes.id, id))
       .returning();
 
+    // Curricular expansion invariant: if parent course has any COMPLETED enrollments,
+    // publishing a new quiz reduces their progress below 100%, reverting status to ACTIVE
+    // and resetting completedAt to null until student passes the new quiz.
+    const [modRecord] = await this.db
+      .select({ courseId: modules.courseId })
+      .from(modules)
+      .where(eq(modules.id, existing.moduleId))
+      .limit(1);
+
+    if (modRecord) {
+      await this.db
+        .update(enrollments)
+        .set({
+          status: 'ACTIVE',
+          completedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(enrollments.courseId, modRecord.courseId),
+            eq(enrollments.status, 'COMPLETED')
+          )
+        );
+    }
+
     await this.auditService.record({
       actorId: user.id,
       action: 'QUIZ_PUBLISHED',
@@ -526,6 +554,7 @@ export class QuizzesService {
       );
     }
 
+    const wasPublished = existing.status === 'PUBLISHED';
     const [archived] = await this.db
       .update(quizzes)
       .set({
@@ -534,6 +563,35 @@ export class QuizzesService {
       })
       .where(eq(quizzes.id, id))
       .returning();
+
+    // If published quiz is archived and all remaining items are complete, active enrollments can complete
+    if (wasPublished) {
+      const [modRecord] = await this.db
+        .select({ courseId: modules.courseId })
+        .from(modules)
+        .where(eq(modules.id, existing.moduleId))
+        .limit(1);
+
+      if (modRecord) {
+        const activeEnrollments = await this.db
+          .select()
+          .from(enrollments)
+          .where(
+            and(
+              eq(enrollments.courseId, modRecord.courseId),
+              eq(enrollments.status, 'ACTIVE')
+            )
+          );
+
+        for (const enr of activeEnrollments) {
+          await this.studentQuizzesService.recalculateProgressAndCompletion(
+            modRecord.courseId,
+            enr.id,
+            enr.studentId
+          );
+        }
+      }
+    }
 
     await this.auditService.record({
       actorId: user.id,

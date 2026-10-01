@@ -9,10 +9,18 @@ import { QuizzesService } from './quizzes.service';
 import { QuestionsService } from './questions.service';
 import { OptionsService } from './options.service';
 
+import { StudentQuizzesController } from './student-quizzes.controller';
+import { StudentQuizzesService } from './student-quizzes.service';
+
 @Module({
   imports: [AuditModule, CoursesModule, ModulesModule],
-  controllers: [QuizzesController, QuestionsController, OptionsController],
-  providers: [QuizzesService, QuestionsService, OptionsService],
-  exports: [QuizzesService, QuestionsService, OptionsService],
+  controllers: [
+    QuizzesController,
+    QuestionsController,
+    OptionsController,
+    StudentQuizzesController,
+  ],
+  providers: [QuizzesService, QuestionsService, OptionsService, StudentQuizzesService],
+  exports: [QuizzesService, QuestionsService, OptionsService, StudentQuizzesService],
 })
 export class QuizzesModule {}

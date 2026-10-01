@@ -523,3 +523,113 @@ export interface ReorderRequest {
   items: ReorderItem[];
 }
 
+// --- STUDENT QUIZ & ATTEMPT CONTRACTS (P4.3) ---
+
+export type AttemptStatus = 'IN_PROGRESS' | 'SUBMITTED' | 'ABANDONED';
+
+export interface StudentQuizOptionDto {
+  id: string;
+  optionText: string;
+  position: number;
+}
+
+export interface StudentQuizQuestionDto {
+  id: string;
+  questionText: string;
+  questionType: QuestionType;
+  position: number;
+  points: number;
+  options: StudentQuizOptionDto[];
+}
+
+export interface StudentQuizDto {
+  id: string;
+  moduleId: string;
+  courseId: string;
+  title: string;
+  description?: string | null;
+  quizType: QuizType;
+  passingScorePercentage: number;
+  maxAttempts?: number | null;
+  timeLimitMinutes?: number | null;
+  totalPoints: number;
+  questionsCount: number;
+  userAttemptsCount: number;
+  bestScorePercentage: number | null;
+  isPassed: boolean;
+  questions: StudentQuizQuestionDto[];
+}
+
+export interface StudentAnswerItem {
+  questionId: string;
+  selectedOptionIds: string[];
+}
+
+export interface SaveAnswersRequest {
+  answers: StudentAnswerItem[];
+}
+
+export interface SubmitAttemptRequest {
+  answers?: StudentAnswerItem[];
+}
+
+export interface StudentActiveAttemptDto {
+  id: string;
+  quizId: string;
+  attemptNumber: number;
+  status: 'IN_PROGRESS';
+  startedAt: string;
+  lastSavedAt: string;
+  expiresAt?: string | null;
+  timeLimitMinutes?: number | null;
+  questions: StudentQuizQuestionDto[];
+  savedAnswers: StudentAnswerItem[];
+}
+
+export interface StudentQuizResultDto {
+  attemptId: string;
+  quizId: string;
+  attemptNumber: number;
+  status: 'SUBMITTED';
+  score: number;
+  totalPoints: number;
+  percentage: number;
+  isPassed: boolean;
+  submittedAt: string;
+  courseProgressPercentage: number;
+  isCourseCompleted: boolean;
+}
+
+export interface QuestionReviewOptionDto {
+  id: string;
+  optionText: string;
+  position: number;
+  isCorrect: boolean;
+}
+
+export interface QuestionReviewDto {
+  questionId: string;
+  questionText: string;
+  questionType: QuestionType;
+  points: number;
+  pointsAwarded: number;
+  isCorrect: boolean;
+  selectedOptionIds: string[];
+  correctOptionIds: string[];
+  explanation?: string | null;
+  options: QuestionReviewOptionDto[];
+}
+
+export interface StudentQuizReviewDto {
+  attemptId: string;
+  quizId: string;
+  attemptNumber: number;
+  status: 'SUBMITTED';
+  score: number;
+  totalPoints: number;
+  percentage: number;
+  isPassed: boolean;
+  submittedAt: string;
+  questions: QuestionReviewDto[];
+}
+

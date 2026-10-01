@@ -349,6 +349,34 @@ Initiates a new quiz attempt.
 
 ---
 
+### `GET /api/v1/learn/quizzes/:quizId/attempts/:attemptId`
+Retrieves attempt details.
+- For `IN_PROGRESS` attempts: restores active attempt state, questions (without answer keys or explanations), and previously autosaved answers.
+- For `SUBMITTED` attempts: returns final score summary (without exposing review answers; full review is on `/review`).
+- **Response (`200 OK` for IN_PROGRESS):**
+```json
+{
+  "success": true,
+  "message": "Attempt details retrieved",
+  "data": {
+    "id": "att-uuid-001",
+    "quizId": "quiz-uuid-001",
+    "attemptNumber": 2,
+    "status": "IN_PROGRESS",
+    "startedAt": "2026-10-01T12:05:00.000Z",
+    "lastSavedAt": "2026-10-01T12:10:00.000Z",
+    "expiresAt": "2026-10-01T12:35:00.000Z",
+    "timeLimitMinutes": 30,
+    "questions": [...],
+    "savedAnswers": [
+      { "questionId": "q-uuid-001", "selectedOptionIds": ["opt-2"] }
+    ]
+  }
+}
+```
+
+---
+
 ### `PATCH /api/v1/learn/quizzes/:quizId/attempts/:attemptId/answers`
 Auto-saves student answer selections as the student progresses.
 - **Request Body:**

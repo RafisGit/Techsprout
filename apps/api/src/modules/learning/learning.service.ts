@@ -8,6 +8,8 @@ import {
   lessons,
   lessonProgress,
   media,
+  quizzes,
+  quizAttempts,
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { ApiException } from '../../common/errors/api-error';
@@ -112,10 +114,56 @@ export class LearningService {
       );
 
     const completedLessons = Number(completedLessonsResult?.count || 0);
-    const progressPercentage =
-      totalLessons === 0 ? 0 : Math.round((completedLessons / totalLessons) * 100);
 
-    return { totalLessons, completedLessons, progressPercentage };
+    // Published quizzes in course
+    const [publishedQuizzesResult] = await this.db
+      .select({ count: count(quizzes.id) })
+      .from(quizzes)
+      .innerJoin(modules, eq(quizzes.moduleId, modules.id))
+      .where(
+        and(
+          eq(modules.courseId, courseId),
+          eq(quizzes.status, 'PUBLISHED')
+        )
+      );
+
+    const publishedQuizzes = Number(publishedQuizzesResult?.count || 0);
+
+    // Distinct passed published quizzes
+    const passedQuizzesRes = await this.db
+      .select({ quizId: quizAttempts.quizId })
+      .from(quizAttempts)
+      .innerJoin(quizzes, eq(quizAttempts.quizId, quizzes.id))
+      .innerJoin(modules, eq(quizzes.moduleId, modules.id))
+      .where(
+        and(
+          eq(quizAttempts.enrollmentId, enrollmentId),
+          eq(modules.courseId, courseId),
+          eq(quizzes.status, 'PUBLISHED'),
+          eq(quizAttempts.status, 'SUBMITTED'),
+          eq(quizAttempts.isPassed, true)
+        )
+      )
+      .groupBy(quizAttempts.quizId);
+
+    const passedQuizzes = passedQuizzesRes.length;
+
+    const totalItems = totalLessons + publishedQuizzes;
+    const completedItems = completedLessons + passedQuizzes;
+    const progressPercentage =
+      totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100);
+    const isCourseCompleted = totalItems > 0 && completedItems === totalItems;
+
+    return {
+      totalLessons,
+      completedLessons,
+      publishedQuizzes,
+      passedQuizzes,
+      totalItems,
+      completedItems,
+      progressPercentage,
+      isCourseCompleted,
+    };
   }
 
   /**
@@ -158,18 +206,17 @@ export class LearningService {
       }
 
       completedLessonsCount = progressRecords.filter((p) => p.status === 'COMPLETED').length;
-      progressPercentage =
-        totalLessonsCount === 0 ? 0 : Math.round((completedLessonsCount / totalLessonsCount) * 100);
+      const progress = await this.calculateProgress(courseId, enrollment.id);
+      progressPercentage = progress.progressPercentage;
 
       // Invariant sync
-      if (enrollment.status === 'COMPLETED' && completedLessonsCount < totalLessonsCount) {
+      if (enrollment.status === 'COMPLETED' && !progress.isCourseCompleted) {
         await this.db
           .update(enrollments)
           .set({ status: 'ACTIVE', completedAt: null, updatedAt: new Date() })
           .where(eq(enrollments.id, enrollment.id));
       } else if (
-        totalLessonsCount > 0 &&
-        completedLessonsCount === totalLessonsCount &&
+        progress.isCourseCompleted &&
         enrollment.status !== 'COMPLETED'
       ) {
         const [updated] = await this.db
@@ -602,14 +649,11 @@ export class LearningService {
     }
 
     // Calculate dynamic progress & course completion
-    const { totalLessons, completedLessons, progressPercentage } = await this.calculateProgress(
-      courseId,
-      enrollment.id
-    );
+    const { totalLessons, completedLessons, progressPercentage, isCourseCompleted } =
+      await this.calculateProgress(courseId, enrollment.id);
 
     if (
-      totalLessons > 0 &&
-      completedLessons === totalLessons &&
+      isCourseCompleted &&
       enrollment.status !== 'COMPLETED'
     ) {
       const [updatedEnrollment] = await this.db
@@ -726,12 +770,8 @@ export class LearningService {
       }
 
       // Check course completion
-      const { totalLessons, completedLessons, progressPercentage } = await this.calculateProgress(
-        courseId,
-        enrollment.id
-      );
-
-      const isCourseCompleted = completedLessons === totalLessons && totalLessons > 0;
+      const { totalLessons, completedLessons, progressPercentage, isCourseCompleted } =
+        await this.calculateProgress(courseId, enrollment.id);
 
       if (isCourseCompleted && enrollment.status !== 'COMPLETED') {
         const [updatedEnrollment] = await this.db
