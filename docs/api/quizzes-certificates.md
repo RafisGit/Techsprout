@@ -284,6 +284,84 @@ Reorders options within a question.
 
 ---
 
+### `GET /api/v1/learn/courses/:courseId/curriculum`
+Fetches course curriculum, lesson progress, and published quiz assessments with authoritative mixed curriculum ordering.
+- **Security Invariant:** Answer keys (`isCorrect`), option sets, and question details are **strictly excluded** from the curriculum payload. Only `status = 'PUBLISHED'` quizzes appear. Draft and archived quizzes are excluded.
+- **Authoritative Ordering:** The backend unifies lessons and published quizzes per module into a single ordered `items` collection (`type: 'LESSON' | 'QUIZ'`). Separate lesson/quiz namespace collisions are deterministically resolved on the server (`rawPosition ASC`, then `LESSON` precedes `QUIZ`, then `createdAt ASC` / ID) and indexed sequentially `1..N`.
+- **Backward Compatibility:** `module.lessons` is preserved for legacy P3 consumers, while P4.4 frontend must consume `module.items` for complete curriculum visualization and navigation.
+- **Authorization:** `ACTIVE` or `COMPLETED` enrollment, course instructor, or platform admin.
+- **Response (`200 OK`):**
+```json
+{
+  "success": true,
+  "message": "Curriculum loaded successfully",
+  "data": {
+    "courseId": "course-uuid-001",
+    "courseStatus": "PUBLISHED",
+    "progressPercentage": 33,
+    "completedLessonsCount": 1,
+    "totalLessonsCount": 2,
+    "publishedQuizzesCount": 1,
+    "passedQuizzesCount": 0,
+    "modules": [
+      {
+        "id": "module-uuid-001",
+        "title": "Module 1: Foundations",
+        "position": 1,
+        "lessons": [
+          {
+            "id": "lesson-uuid-001",
+            "title": "Introduction to Architecture",
+            "position": 1,
+            "lessonType": "VIDEO",
+            "durationSeconds": 300,
+            "isPreview": true,
+            "progress": {
+              "status": "COMPLETED",
+              "watchPositionSeconds": 300,
+              "completedAt": "2026-10-01T12:00:00.000Z"
+            }
+          }
+        ],
+        "items": [
+          {
+            "type": "LESSON",
+            "id": "lesson-uuid-001",
+            "title": "Introduction to Architecture",
+            "position": 1,
+            "lessonType": "VIDEO",
+            "durationSeconds": 300,
+            "isPreview": true,
+            "progress": {
+              "status": "COMPLETED",
+              "watchPositionSeconds": 300,
+              "completedAt": "2026-10-01T12:00:00.000Z"
+            }
+          },
+          {
+            "type": "QUIZ",
+            "id": "quiz-uuid-001",
+            "title": "Module 1 Assessment: TypeScript Foundations",
+            "position": 2,
+            "quizType": "KNOWLEDGE_CHECK",
+            "passingScorePercentage": 70,
+            "timeLimitMinutes": 30,
+            "totalPoints": 20,
+            "questionsCount": 5,
+            "maxAttempts": 3,
+            "isPassed": false,
+            "userAttemptsCount": 1,
+            "bestScorePercentage": 60
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+---
+
 ### `GET /api/v1/learn/quizzes/:quizId`
 Fetches quiz overview and questions for an enrolled student.
 - **Security Invariant:** Correct answers (`isCorrect`) and `explanation` are **strictly excluded** from the payload.

@@ -407,3 +407,25 @@ enrollments.completed_at = NOW()
      ▼
 Queue Certificate Issuance (Historical Snapshot Frozen)
 ```
+
+---
+
+## 7. Curriculum Ordering Contract & Student Discovery
+
+### 7.1 Authoritative Ordering Policy
+The backend curriculum endpoint (`GET /api/v1/learn/courses/:courseId/curriculum`) provides the authoritative mixed sequence of learning items (`module.items`) per module.
+
+Because `lessons` and `quizzes` maintain independent integer `position` columns (`UNIQUE(module_id, position)` exists separately on each table), the backend reconciles and normalizes the mixed order deterministically using the following rules:
+
+1. **Primary Sort:** Author-configured position ascending (`rawPosition ASC`).
+2. **Collision Tie-Breaker:** When `lesson.position === quiz.position`, `LESSON` strictly precedes `QUIZ` (pedagogical rule: instruction precedes assessment).
+3. **Deterministic Timestamp Ordering:** If positions and types match, sort by `createdAt ASC`.
+4. **Deterministic UUID Fallback:** If timestamps are identical, sort by ID (`id.localeCompare(b.id)`).
+5. **Sequential Normalization:** Re-index the resolved sequence to 1-based sequential integers (`items[].position: 1, 2, 3...`).
+
+### 7.2 Consumer Guarantees
+- **Authoritative Sequence:** `module.items` is the **only** authoritative mixed curriculum sequence for student discovery, navigation, and sidebar rendering.
+- **No Frontend Re-Ordering:** The P4.4 frontend **must never** independently sort, merge, or reconstruct lesson and quiz ordering. It must render `module.items` directly in the array order returned by the server.
+- **Legacy Compatibility:** `module.lessons[].position` preserves legacy lesson-only ordering for backward compatibility with P3 consumers.
+- **Unified Position:** `module.items[].position` represents the unified 1-based curriculum sequence.
+- **Security & Privacy:** Student curriculum payloads strictly omit answer keys (`isCorrect`), option sets, and explanations. Only quizzes with `status = 'PUBLISHED'` are exposed; `DRAFT` and `ARCHIVED` quizzes are strictly excluded.

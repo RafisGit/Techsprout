@@ -369,11 +369,13 @@ export default function LessonLearningWorkspacePage() {
               onProgressUpdate={handleProgressUpdate}
             />
 
-            {/* Previous / Next Lesson Navigation */}
+            {/* Previous / Next Curriculum Navigation */}
             <LessonNavigation
               courseSlug={courseSlug}
               navigation={lesson.navigation}
               isCourseCompleted={isCourseCompleted}
+              curriculum={curriculum}
+              currentLessonId={lessonId}
             />
           </div>
 

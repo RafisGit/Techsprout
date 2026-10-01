@@ -361,11 +361,34 @@ export interface CurriculumLessonDto {
   progress: LessonProgressDto;
 }
 
+export interface CurriculumLessonItemDto extends CurriculumLessonDto {
+  type: 'LESSON';
+}
+
+export interface CurriculumQuizItemDto {
+  type: 'QUIZ';
+  id: string;
+  title: string;
+  position: number;
+  quizType: QuizType;
+  passingScorePercentage: number;
+  timeLimitMinutes?: number | null;
+  totalPoints: number;
+  questionsCount: number;
+  maxAttempts?: number | null;
+  isPassed: boolean;
+  userAttemptsCount: number;
+  bestScorePercentage: number | null;
+}
+
+export type CurriculumItemDto = CurriculumLessonItemDto | CurriculumQuizItemDto;
+
 export interface CurriculumModuleDto {
   id: string;
   title: string;
   position: number;
   lessons: CurriculumLessonDto[];
+  items?: CurriculumItemDto[];
 }
 
 export interface LearningCurriculumDto {
@@ -374,6 +397,8 @@ export interface LearningCurriculumDto {
   progressPercentage: number;
   completedLessonsCount: number;
   totalLessonsCount: number;
+  publishedQuizzesCount?: number;
+  passedQuizzesCount?: number;
   modules: CurriculumModuleDto[];
 }
 

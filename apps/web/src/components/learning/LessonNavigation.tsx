@@ -3,20 +3,38 @@
 import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, CheckCircle2, Trophy } from 'lucide-react';
-import type { LessonNavigationDto } from '@techsprout/contracts';
+import { ArrowLeft, ArrowRight, Trophy } from 'lucide-react';
+import type { LessonNavigationDto, LearningCurriculumDto } from '@techsprout/contracts';
+import { CurriculumItemNavigation } from './CurriculumItemNavigation';
 
 interface LessonNavigationProps {
   courseSlug: string;
   navigation: LessonNavigationDto;
   isCourseCompleted?: boolean;
+  curriculum?: LearningCurriculumDto | null;
+  currentLessonId?: string;
 }
 
 export function LessonNavigation({
   courseSlug,
   navigation,
   isCourseCompleted = false,
+  curriculum,
+  currentLessonId,
 }: LessonNavigationProps) {
+  // If curriculum and currentLessonId are provided, use authoritative mixed curriculum ordering
+  if (curriculum && currentLessonId) {
+    return (
+      <CurriculumItemNavigation
+        courseSlug={courseSlug}
+        curriculum={curriculum}
+        currentItemId={currentLessonId}
+        isCourseCompleted={isCourseCompleted}
+      />
+    );
+  }
+
+  // Legacy fallback when curriculum is not provided
   const hasPrevious = !!navigation.previousLessonId;
   const hasNext = !!navigation.nextLessonId;
 

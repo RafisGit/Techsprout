@@ -1,5 +1,5 @@
 import { Injectable, Inject, HttpStatus } from '@nestjs/common';
-import { eq, and, sql, count } from 'drizzle-orm';
+import { eq, and, sql, count, inArray } from 'drizzle-orm';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import {
   enrollments,
@@ -10,10 +10,17 @@ import {
   media,
   quizzes,
   quizAttempts,
+  quizQuestions,
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { ApiException } from '../../common/errors/api-error';
 import { UserContext } from '../courses/courses.service';
+import {
+  CurriculumItemDto,
+  CurriculumLessonDto,
+  CurriculumLessonItemDto,
+  CurriculumQuizItemDto,
+} from './dto/curriculum.dto';
 
 @Injectable()
 export class LearningService {
@@ -190,10 +197,62 @@ export class LearningService {
       .where(eq(modules.courseId, courseId))
       .orderBy(modules.position, lessons.position);
 
+    // Fetch published quizzes ordered by module position and quiz position
+    const courseQuizzes = await this.db
+      .select({
+        quiz: quizzes,
+        moduleId: modules.id,
+      })
+      .from(quizzes)
+      .innerJoin(modules, eq(quizzes.moduleId, modules.id))
+      .where(
+        and(
+          eq(modules.courseId, courseId),
+          eq(quizzes.status, 'PUBLISHED')
+        )
+      )
+      .orderBy(modules.position, quizzes.position);
+
+    // Load question counts and points for published quizzes
+    const quizIds = courseQuizzes.map((q) => q.quiz.id);
+    const quizStatsMap = new Map<string, { questionsCount: number; totalPoints: number }>();
+    for (const q of courseQuizzes) {
+      quizStatsMap.set(q.quiz.id, { questionsCount: 0, totalPoints: 0 });
+    }
+
+    if (quizIds.length > 0) {
+      const qQuestions = await this.db
+        .select({
+          quizId: quizQuestions.quizId,
+          points: quizQuestions.points,
+        })
+        .from(quizQuestions)
+        .where(inArray(quizQuestions.quizId, quizIds));
+
+      for (const qq of qQuestions) {
+        const stats = quizStatsMap.get(qq.quizId);
+        if (stats) {
+          stats.questionsCount += 1;
+          stats.totalPoints += qq.points;
+        }
+      }
+    }
+
     let progressPercentage = 0;
     let completedLessonsCount = 0;
     const totalLessonsCount = courseLessons.length;
     const progressMap = new Map<string, typeof lessonProgress.$inferSelect>();
+    const quizAttemptStatsMap = new Map<
+      string,
+      { isPassed: boolean; userAttemptsCount: number; bestScorePercentage: number | null }
+    >();
+    for (const q of courseQuizzes) {
+      quizAttemptStatsMap.set(q.quiz.id, {
+        isPassed: false,
+        userAttemptsCount: 0,
+        bestScorePercentage: null,
+      });
+    }
 
     if (enrollment) {
       const progressRecords = await this.db
@@ -203,6 +262,45 @@ export class LearningService {
 
       for (const p of progressRecords) {
         progressMap.set(p.lessonId, p);
+      }
+
+      // Load student attempt evaluations on published quizzes
+      if (quizIds.length > 0) {
+        const attempts = await this.db
+          .select({
+            quizId: quizAttempts.quizId,
+            status: quizAttempts.status,
+            isPassed: quizAttempts.isPassed,
+            percentage: quizAttempts.percentage,
+          })
+          .from(quizAttempts)
+          .where(
+            and(
+              eq(quizAttempts.enrollmentId, enrollment.id),
+              inArray(quizAttempts.quizId, quizIds)
+            )
+          );
+
+        for (const att of attempts) {
+          const stats = quizAttemptStatsMap.get(att.quizId);
+          if (stats) {
+            if (att.status === 'SUBMITTED' || att.status === 'ABANDONED') {
+              stats.userAttemptsCount += 1;
+            }
+            if (att.status === 'SUBMITTED') {
+              if (att.isPassed) {
+                stats.isPassed = true;
+              }
+              if (att.percentage !== null && att.percentage !== undefined) {
+                const numericPercentage = Number(att.percentage);
+                stats.bestScorePercentage =
+                  stats.bestScorePercentage === null
+                    ? numericPercentage
+                    : Math.max(stats.bestScorePercentage, numericPercentage);
+              }
+            }
+          }
+        }
       }
 
       completedLessonsCount = progressRecords.filter((p) => p.status === 'COMPLETED').length;
@@ -241,7 +339,8 @@ export class LearningService {
     }
 
     const assembledModules = courseModules.map((mod) => {
-      const moduleLessons = courseLessons
+      // 1. Backward-compatible lessons array
+      const moduleLessons: CurriculumLessonDto[] = courseLessons
         .filter((l) => l.moduleId === mod.id)
         .map(({ lesson }) => {
           const lp = progressMap.get(lesson.id);
@@ -266,11 +365,101 @@ export class LearningService {
           };
         });
 
+      // 2. Raw lesson items for unified collection
+      const rawLessonItems: (CurriculumLessonItemDto & { rawPosition: number; createdAt: Date })[] =
+        courseLessons
+          .filter((l) => l.moduleId === mod.id)
+          .map(({ lesson }) => {
+            const lp = progressMap.get(lesson.id);
+            return {
+              type: 'LESSON' as const,
+              id: lesson.id,
+              title: lesson.title,
+              position: lesson.position,
+              rawPosition: lesson.position,
+              lessonType: lesson.lessonType,
+              durationSeconds: lesson.durationSeconds,
+              isPreview: lesson.isPreview,
+              createdAt: lesson.createdAt,
+              progress: lp
+                ? {
+                    status: lp.status,
+                    watchPositionSeconds: lp.watchPositionSeconds,
+                    completedAt: lp.completedAt ? lp.completedAt.toISOString() : null,
+                  }
+                : {
+                    status: 'NOT_STARTED' as const,
+                    watchPositionSeconds: 0,
+                    completedAt: null,
+                  },
+            };
+          });
+
+      // 3. Raw quiz items for unified collection
+      const rawQuizItems: (CurriculumQuizItemDto & { rawPosition: number; createdAt: Date })[] =
+        courseQuizzes
+          .filter((q) => q.moduleId === mod.id)
+          .map(({ quiz }) => {
+            const stats = quizStatsMap.get(quiz.id) || { questionsCount: 0, totalPoints: 0 };
+            const attemptStats = quizAttemptStatsMap.get(quiz.id) || {
+              isPassed: false,
+              userAttemptsCount: 0,
+              bestScorePercentage: null,
+            };
+            return {
+              type: 'QUIZ' as const,
+              id: quiz.id,
+              title: quiz.title,
+              position: quiz.position,
+              rawPosition: quiz.position,
+              quizType: quiz.quizType,
+              passingScorePercentage: quiz.passingScorePercentage,
+              timeLimitMinutes: quiz.timeLimitMinutes,
+              totalPoints: stats.totalPoints,
+              questionsCount: stats.questionsCount,
+              maxAttempts: quiz.maxAttempts,
+              isPassed: attemptStats.isPassed,
+              userAttemptsCount: attemptStats.userAttemptsCount,
+              bestScorePercentage: attemptStats.bestScorePercentage,
+              createdAt: quiz.createdAt,
+            };
+          });
+
+      // 4. Merge and deterministically sort items
+      const mergedCandidates = [...rawLessonItems, ...rawQuizItems];
+      mergedCandidates.sort((a, b) => {
+        // Primary: Author-configured integer position
+        if (a.rawPosition !== b.rawPosition) {
+          return a.rawPosition - b.rawPosition;
+        }
+        // Collision tie-breaker: LESSON precedes QUIZ (instruction before assessment)
+        if (a.type !== b.type) {
+          return a.type === 'LESSON' ? -1 : 1;
+        }
+        // Deterministic timestamp/ID fallback
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (timeA !== timeB) {
+          return timeA - timeB;
+        }
+        return a.id.localeCompare(b.id);
+      });
+
+      // 5. Normalize sequential 1-based position (1, 2, 3...)
+      const moduleItems: CurriculumItemDto[] = mergedCandidates.map((item, idx) => {
+        const { rawPosition, createdAt, ...cleanItem } = item;
+        return {
+          ...cleanItem,
+          position: idx + 1,
+        };
+      });
+
       return {
         id: mod.id,
         title: mod.title,
         position: mod.position,
         lessons: moduleLessons,
+        items: moduleItems,
       };
     });
 
@@ -280,6 +469,8 @@ export class LearningService {
       progressPercentage,
       completedLessonsCount,
       totalLessonsCount,
+      publishedQuizzesCount: courseQuizzes.length,
+      passedQuizzesCount: Array.from(quizAttemptStatsMap.values()).filter((s) => s.isPassed).length,
       modules: assembledModules,
     };
   }
