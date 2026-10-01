@@ -328,9 +328,12 @@ Fetches quiz overview and questions for an enrolled student.
 
 ### `POST /api/v1/learn/quizzes/:quizId/attempts`
 Initiates a new quiz attempt.
-- **Validation:**
-  - Validates `userAttemptsCount < maxAttempts` (or `maxAttempts === null`).
-  - Checks course enrollment is active.
+- **Validation & Enrollment Semantics:**
+  - **ACTIVE enrollment:** May access published quiz, start new attempts, and resume in-progress attempts.
+  - **COMPLETED enrollment:** May access quiz overview, view attempt history, and review submitted attempts; may not start new attempts unless curriculum expansion reverts enrollment to `ACTIVE`.
+  - **Max Attempts Guard:** Validates `userAttemptsCount < maxAttempts` (or `maxAttempts === null`). If attempt limit reached, returns `422 Unprocessable Entity` (`MAX_ATTEMPTS_REACHED`).
+  - **Timing & Resumption:** If an active unexpired attempt exists, resumes the attempt without creating duplicate rows. If an active attempt expired past the 30s grace window, transitions to `ABANDONED` and counts toward `maxAttempts`.
+  - Non-enrolled users return `403 Forbidden` (`ENROLLMENT_REQUIRED`).
 - **Response (`201 Created`):**
 ```json
 {
@@ -404,6 +407,8 @@ Auto-saves student answer selections as the student progresses.
 ### `POST /api/v1/learn/quizzes/:quizId/attempts/:attemptId/submit`
 Submits the attempt for final server-side grading.
 - **Double Submission Guard:** If `attempt.status === 'SUBMITTED'`, returns `409 Conflict` (`ATTEMPT_ALREADY_SUBMITTED`).
+- **Expiration Guard:** If submitted after expiration + 30s grace window, returns `409 Conflict` (`QUIZ_TIME_EXPIRED`).
+- **Zero Points Anomaly Guard:** If `totalPoints <= 0` or quiz has no questions, returns `422 Unprocessable Entity` (`QUIZ_INVALID_FOR_ATTEMPT`).
 - **Response (`200 OK`):**
 ```json
 {

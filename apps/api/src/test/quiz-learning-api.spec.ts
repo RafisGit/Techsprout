@@ -1405,6 +1405,56 @@ describe('P4.3 — Student Quiz-Taking & Grading API Integration Test Suite', ()
       expect(res.body.data.percentage).toBe(0);
       expect(res.body.data.isPassed).toBe(false);
     });
+
+    it('5.12 should reject submission with 422 QUIZ_INVALID_FOR_ATTEMPT if totalPoints <= 0 or quiz has no questions', async () => {
+      const [anomalyQuiz] = await testDb
+        .insert(schema.quizzes)
+        .values({
+          moduleId: module1.id,
+          title: 'Zero Points Anomaly Quiz',
+          position: 99,
+          quizType: 'KNOWLEDGE_CHECK',
+          passingScorePercentage: 70,
+          status: 'PUBLISHED',
+        })
+        .returning();
+
+      const [anomalyQ] = await testDb
+        .insert(schema.quizQuestions)
+        .values({
+          quizId: anomalyQuiz.id,
+          questionText: 'Temporary Question',
+          questionType: 'SINGLE_CHOICE',
+          position: 1,
+          points: 10,
+        })
+        .returning();
+
+      const [opt] = await testDb
+        .insert(schema.quizQuestionOptions)
+        .values([
+          { questionId: anomalyQ.id, optionText: 'Opt 1', position: 1, isCorrect: true },
+        ])
+        .returning();
+
+      const a = await request(app.getHttpServer())
+        .post(`/api/v1/learn/quizzes/${anomalyQuiz.id}/attempts`)
+        .set('Cookie', student1Cookies);
+
+      expect(a.status).toBe(201);
+      const attId = a.body.data.id;
+
+      // Delete question so quiz has 0 questions / 0 total points during submit
+      await testDb.delete(schema.quizQuestions).where(eq(schema.quizQuestions.id, anomalyQ.id));
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/learn/quizzes/${anomalyQuiz.id}/attempts/${attId}/submit`)
+        .set('Cookie', student1Cookies)
+        .send({ answers: [] });
+
+      expect(res.status).toBe(422);
+      expect(res.body.errorCode).toBe('QUIZ_INVALID_FOR_ATTEMPT');
+    });
   });
 
   // =========================================================================
