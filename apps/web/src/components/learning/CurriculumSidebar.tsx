@@ -274,6 +274,19 @@ export function CurriculumSidebar({
           </Accordion>
         )}
       </div>
+
+      {/* Sidebar Footer: Course Certificate Navigation */}
+      <div className='p-3 border-t border-gray-100 bg-gray-50/60'>
+        <Link
+          href={`/learn/${courseSlug}/certificate`}
+          className='w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-gray-700 hover:text-emerald-700 bg-white hover:bg-emerald-50/80 border border-gray-200 hover:border-emerald-200 transition shadow-2xs'
+          data-testid='sidebar-btn-certificate'
+          title='View official course certificate'
+        >
+          <Award className='w-3.5 h-3.5 text-amber-500' />
+          <span>Course Certificate</span>
+        </Link>
+      </div>
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Trophy, HelpCircle, BookOpen } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Trophy, HelpCircle, BookOpen, Award } from 'lucide-react';
 import type { LearningCurriculumDto } from '@techsprout/contracts';
 import {
   getAdjacentCurriculumItems,
@@ -75,12 +75,19 @@ export function CurriculumItemNavigation({
           </Button>
         </Link>
       ) : isCourseCompleted ? (
-        <Link href='/my-courses' data-testid='nav-completed-link'>
-          <Button className='rounded-xl text-xs font-bold px-5 py-2 bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs flex items-center gap-1.5'>
-            <Trophy className='w-4 h-4 text-amber-300' />
-            <span>Course Completed • Back to Dashboard</span>
-          </Button>
-        </Link>
+        <div className='flex items-center gap-2'>
+          <Link href={`/learn/${courseSlug}/certificate`} data-testid='nav-view-certificate-link'>
+            <Button className='rounded-xl text-xs font-bold px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs flex items-center gap-1.5'>
+              <Award className='w-4 h-4 text-amber-300' />
+              <span>View Certificate</span>
+            </Button>
+          </Link>
+          <Link href='/my-courses' data-testid='nav-completed-link'>
+            <Button variant='outline' className='rounded-xl text-xs font-semibold px-3 py-2'>
+              Dashboard
+            </Button>
+          </Link>
+        </div>
       ) : (
         <Button
           disabled

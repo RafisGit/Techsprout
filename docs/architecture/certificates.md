@@ -146,6 +146,22 @@ Once written to `certificates.final_score_percentage`, this value is permanent a
 - Adding new required lessons or quizzes to a course later **MUST NOT** automatically revoke or invalidate a previously issued certificate.
 - The learner's active enrollment may return to `ACTIVE` (with `completed_at = null`) and require completing the newly published content for renewed course completion, while the historical certificate remains fully valid (`status = 'ACTIVE'`) unless an administrator explicitly revokes it.
 
+### 3.4 Historical Certificate Access Precedence (Student Endpoint Contract)
+When a student requests their certificate via `GET /api/v1/courses/:courseId/certificate`, **certificate existence takes precedence over current enrollment status**:
+1. **Case 1: No Certificate Exists + Incomplete Enrollment:**
+   - The student has not yet satisfied all required lessons and assessments.
+   - Response: `403 Forbidden` (`COURSE_NOT_COMPLETED`).
+2. **Case 2: Certificate Exists + Currently COMPLETED Enrollment:**
+   - The student completed the course and enrollment remains `COMPLETED`.
+   - Response: `200 OK` with certificate DTO (`status = 'ACTIVE'`).
+3. **Case 3: Certificate Exists + Enrollment Reverted to ACTIVE (Curriculum Expansion):**
+   - New content was published after the student graduated, causing active enrollment progress to drop below 100% and enrollment status to revert to `ACTIVE`.
+   - **Crucial Rule:** The student **MUST** retain full access to their valid historical certificate. Current enrollment status does not invalidate or block an already-issued certificate.
+   - Response: `200 OK` with certificate DTO (`status = 'ACTIVE'`).
+4. **Case 4: Certificate Exists + Administratively REVOKED:**
+   - The certificate was revoked by an administrator for cause.
+   - Response: `200 OK` with certificate DTO (`status = 'REVOKED'`, `revokedAt`, `revocationReason`), or distinct student revocation notice, ensuring transparent visibility into credential status.
+
 ---
 
 ## 4. Human-Readable Certificate Identifier Generation
@@ -246,6 +262,33 @@ We reject headless Chrome / Puppeteer for certificate generation:
 
 1. **Authorization:** Only users with `ADMIN` role (`RolesGuard(['admin'])`) may revoke an issued certificate. Instructors cannot revoke certificates.
 2. **Revocation Endpoint:**
-   `POST /api/v1/admin/certificates/:id/revoke` with `{ reason: string }`.
+   `POST /api/v1/admin/certificates/:id/revoke` with `{ reason: string }` (required, trimmed, 5–1000 characters).
 3. **Audit Trail:**
    Every certificate issuance and revocation emits an audit log event (`CERTIFICATE_ISSUED`, `CERTIFICATE_REVOKED`) recording the administrative actor, target certificate, and revocation rationale.
+
+---
+
+## 8. Single Authoritative CertificateService Architecture
+
+To prevent duplicate eligibility checks or divergent score calculations across the codebase, a single centralized `CertificateService` manages all certificate issuance logic:
+
+```
+Lesson Completion (LearningService) ─────┐
+                                         ├──► CertificateService.issueCertificateIfEligible(...)
+Quiz Completion (StudentQuizzesService) ─┘
+```
+
+### 8.1 Responsibilities of `CertificateService`
+`CertificateService` is the sole authority for:
+1. **Eligibility Evaluation:** Verifying that the enrollment has satisfied 100% of required curriculum items (lessons and published quizzes).
+2. **Final Score Percentage Calculation:** Determining the authoritative score snapshot per Rule A (`FINAL_EXAM`), Rule B (unweighted mean across published quizzes), or Rule C (lessons-only = 100).
+3. **Certificate Snapshot Creation:** Freezing student name, course title, instructor of record, and completion timestamp.
+4. **Certificate Number Generation:** Generating unique, unambiguous `TSP-YYYY-CXXXXXXXXX` serials.
+5. **Idempotent Issuance:** Enforcing `UNIQUE(enrollment_id)` via atomic insert and conflict detection.
+6. **Existing-Certificate Detection:** Re-completion of courses with existing certificates safely leaves the original certificate intact.
+7. **Audit Logging:** Emitting `CERTIFICATE_ISSUED` and `CERTIFICATE_REVOKED` events via `AuditService`.
+
+### 8.2 Calling Services Responsibilities
+- `LearningService`: Manages lesson checkpoints and progress percentages; upon detecting that progress reached 100%, delegates to `CertificateService.issueCertificateIfEligible(enrollmentId)`.
+- `StudentQuizzesService`: Manages attempt grading and pass/fail thresholds; upon detecting that passing a quiz completed the course, delegates to `CertificateService.issueCertificateIfEligible(enrollmentId)`.
+- Neither calling service contains duplicate certificate eligibility, scoring, or issuance code.

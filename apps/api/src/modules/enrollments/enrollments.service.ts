@@ -10,6 +10,7 @@ import {
   lessons,
   lessonProgress,
   media,
+  certificates,
   Enrollment,
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
@@ -448,10 +449,20 @@ export class EnrollmentsService {
     const total = Number(countResult?.count || 0);
     const totalPages = Math.ceil(total / limit) || 1;
 
-    // Fetch paginated enrollments
+    // Fetch paginated enrollments with certificate existence via single left join
     const userEnrollments = await this.db
-      .select()
+      .select({
+        enrollment: enrollments,
+        hasCertificate: sql<boolean>`CASE WHEN ${certificates.id} IS NOT NULL THEN TRUE ELSE FALSE END`,
+      })
       .from(enrollments)
+      .leftJoin(
+        certificates,
+        and(
+          eq(certificates.enrollmentId, enrollments.id),
+          eq(certificates.studentId, studentId)
+        )
+      )
       .where(baseWhere)
       .orderBy(desc(enrollments.enrolledAt))
       .limit(limit)
@@ -459,7 +470,7 @@ export class EnrollmentsService {
 
     // Enrich each enrollment with course, progress, and resume point
     const items = await Promise.all(
-      userEnrollments.map(async (enrollment) => {
+      userEnrollments.map(async ({ enrollment, hasCertificate }) => {
         // Fetch course, category, instructor, thumbnail
         const [courseRecord] = await this.db
           .select({
@@ -573,6 +584,7 @@ export class EnrollmentsService {
         return {
           enrollmentId: syncedEnrollment.id,
           status: syncedEnrollment.status,
+          hasCertificate: Boolean(hasCertificate),
           enrolledAt: syncedEnrollment.enrolledAt.toISOString(),
           startedAt: syncedEnrollment.startedAt ? syncedEnrollment.startedAt.toISOString() : null,
           completedAt: syncedEnrollment.completedAt

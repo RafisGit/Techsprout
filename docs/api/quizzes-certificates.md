@@ -520,12 +520,32 @@ Provides complete post-submission review with questions, selected answers, corre
 
 ### `GET /api/v1/courses/:courseId/certificate`
 Retrieves the issued certificate for the authenticated student upon course completion.
-- **Historical Invariant:** If additional lessons or quizzes were published after initial course completion (causing the active enrollment to return to `ACTIVE`), the student can still retrieve their historical certificate, as an already-issued certificate is an immutable historical record.
+- **Authentication & Security:**
+  - Requires authenticated session cookie (`techsprout_session`) or Bearer token.
+  - Student identity is derived strictly from `req.user.id`. Client-supplied user/student IDs are never accepted.
+  - Secure tenant isolation: Student A can never access Student B's certificate.
+- **Side-Effect Boundary & Lazy-Issuance Exception:**
+  - While standard query endpoints (`GET /api/v1/learn/courses/:courseId/curriculum`, `GET /api/v1/learn/courses/:courseId/resume`) are strictly read-only and side-effect free, this student certificate endpoint contains an intentional, authorized lazy-issuance exception:
+  - If a student completed all course requirements and their enrollment status is `COMPLETED`, but no certificate record exists in the database, this endpoint invokes `CertificateService.issueCertificateIfEligible(...)` to atomically generate the certificate snapshot.
+- **Frozen Precedence Contract:**
+  1. **Case A (Unenrolled Student):**
+     - Returns `404 Not Found` (`ENROLLMENT_NOT_FOUND`).
+     - Does not leak whether another student holds a certificate for this course.
+  2. **Case B (Certificate Already Exists):**
+     - Certificate existence takes absolute precedence over current enrollment status.
+     - Returns `200 OK` with the existing historical certificate snapshot regardless of whether current enrollment is `COMPLETED`, reverted to `ACTIVE` due to curriculum expansion, or marked `REVOKED`.
+  3. **Case C (Enrollment COMPLETED + No Certificate Exists):**
+     - Invokes `CertificateService.issueCertificateIfEligible(...)`.
+     - Returns `200 OK` with the newly minted certificate DTO.
+     - If curriculum criteria are unsatisfied, returns `403 Forbidden` (`COURSE_NOT_COMPLETED`).
+  4. **Case D (Enrollment Not COMPLETED + No Certificate Exists):**
+     - Returns `403 Forbidden` (`COURSE_NOT_COMPLETED`, message: "You have not completed all requirements for this course. Complete all lessons and assessments to earn your certificate.").
+     - No certificate is created.
 - **Response (`200 OK`):**
 ```json
 {
   "success": true,
-  "message": "Certificate retrieved",
+  "message": "Certificate retrieved successfully",
   "data": {
     "id": "cert-uuid-001",
     "certificateNumber": "TSP-2026-CK7M9X2P",
@@ -536,18 +556,20 @@ Retrieves the issued certificate for the authenticated student upon course compl
     "issuedAt": "2026-10-01T12:20:02.000Z",
     "finalScorePercentage": 85,
     "status": "ACTIVE",
-    "pdfUrl": "https://res.cloudinary.com/h6udu3ze/raw/upload/certificates/TSP-2026-CK7M9X2P.pdf"
+    "pdfUrl": null
   }
 }
 ```
-*(If student has never completed the course and no certificate exists, returns `404 Not Found` with `CERTIFICATE_NOT_FOUND` or `403 Forbidden` with `COURSE_NOT_COMPLETED`).*
 
 ---
 
 ### `GET /api/v1/certificates/verify/:certificateNumber` (`@Public()`)
 Public verification route accessible to anyone with a certificate verification code.
-- **Security:** Zero private student data (no email, user ID, or database keys) is returned.
-- **Response (`200 OK`):**
+- **Side-Effect Boundary:** Strictly read-only and side-effect free.
+- **Session Policy:** Completely public (`@Public()`). No authentication cookies, sessions, or headers required.
+- **Rate Limiting:** Enforced via TechSprout's established NestJS Throttler infrastructure (`@Throttle({ default: { limit: 20, ttl: 60000 } })`). Rapid automated requests exceeding the threshold return `429 Too Many Requests`.
+- **Privacy Boundary:** Zero private student data is returned. Excludes internal UUIDs (`id`, `enrollmentId`, `courseId`, `studentId`, `userId`), emails, phone numbers, PDF media IDs, creation/update timestamps, and audit metadata.
+- **Active Response (`200 OK`):**
 ```json
 {
   "success": true,
@@ -565,16 +587,113 @@ Public verification route accessible to anyone with a certificate verification c
   }
 }
 ```
+- **Revoked Response (`200 OK`):**
+```json
+{
+  "success": true,
+  "message": "Certificate has been administratively revoked",
+  "data": {
+    "isValid": false,
+    "certificateNumber": "TSP-2026-CK7M9X2P",
+    "status": "REVOKED",
+    "studentName": "Jane Doe",
+    "courseTitle": "Fullstack Web Development with NestJS & Next.js",
+    "instructorName": "Prof. Alan Turing",
+    "revokedAt": "2026-10-15T08:00:00.000Z",
+    "revocationReason": "Academic dishonesty: unauthorized assessment assistance."
+  }
+}
+```
+- **Not Found Response (`404 Not Found`):**
+```json
+{
+  "success": false,
+  "message": "Certificate not found",
+  "errorCode": "CERTIFICATE_NOT_FOUND"
+}
+```
+
+---
+
+### `GET /api/v1/admin/certificates`
+Paginated administrative list of all issued certificates.
+- **Authorization:** `ADMIN` role only (`@UseGuards(RolesGuard)`, `@Roles('admin')`). Non-admin attempts return `403 Forbidden`.
+- **Side-Effect Boundary:** Strictly read-only and side-effect free.
+- **Query Parameters (Validated via `AdminQueryCertificatesDto`):**
+  - `page`: integer >= 1 (default 1)
+  - `limit`: integer 1-100 (default 20)
+  - `status`: `ACTIVE` | `REVOKED` (optional)
+  - `courseId`: UUID (optional)
+  - `search`: string up to 100 characters (matches student name or certificate number)
+- **Response (`200 OK`):**
+```json
+{
+  "success": true,
+  "message": "Certificates retrieved successfully",
+  "data": {
+    "items": [
+      {
+        "id": "c1111111-2222-3333-4444-555555555555",
+        "certificateNumber": "TSP-2026-CK7M9X2P",
+        "enrollmentId": "e1111111-2222-3333-4444-555555555555",
+        "courseId": "d1111111-2222-3333-4444-555555555555",
+        "studentId": "u1111111-2222-3333-4444-555555555555",
+        "studentName": "Jane Doe",
+        "courseTitle": "Fullstack Web Development with NestJS & Next.js",
+        "instructorName": "Prof. Alan Turing",
+        "completedAt": "2026-10-01T12:20:00.000Z",
+        "issuedAt": "2026-10-01T12:20:02.000Z",
+        "finalScorePercentage": 85,
+        "status": "ACTIVE",
+        "revokedAt": null,
+        "revocationReason": null,
+        "pdfMediaId": null,
+        "pdfUrl": null,
+        "createdAt": "2026-10-01T12:20:02.000Z",
+        "updatedAt": "2026-10-01T12:20:02.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 1,
+      "totalPages": 1,
+      "hasNextPage": false,
+      "hasPreviousPage": false
+    }
+  }
+}
+```
+
+---
+
+### `GET /api/v1/admin/certificates/:id`
+Retrieves detailed administrative certificate view by internal primary key UUID.
+- **Authorization:** `ADMIN` role only.
+- **Side-Effect Boundary:** Strictly read-only and side-effect free.
+- **Response (`200 OK`):** Single `AdminCertificateDto` with administrative IDs.
+- **Not Found (`404 Not Found`):** Returns `CERTIFICATE_NOT_FOUND` if certificate does not exist.
 
 ---
 
 ### `POST /api/v1/admin/certificates/:id/revoke`
 Administratively revokes an issued certificate.
-- **Authorization:** `ADMIN` role only.
-- **Request Body:**
+- **Authorization:** `ADMIN` role only (`@Roles('admin')`). Non-admin attempts return `403 Forbidden`.
+- **Request Body (Validated via `RevokeCertificateDto`):**
+  - `reason`: required string, 5–1000 characters (trimmed).
 ```json
 {
   "reason": "Academic dishonesty: unauthorized assessment assistance."
 }
 ```
-- **Response (`200 OK`):** Certificate status updated to `REVOKED`.
+- **Business Logic & Audit Delegation:**
+  - Revocation is delegated exclusively to `CertificateService.revokeCertificate(id, reason, context)`.
+  - The controller never directly mutates database certificate fields.
+  - `CertificateService` atomically updates `status = 'REVOKED'`, `revokedAt = NOW()`, `revocationReason = reason`, `updatedAt = NOW()`.
+  - Historical snapshot fields (`studentName`, `courseTitle`, `instructorName`, `completedAt`, `issuedAt`, `finalScorePercentage`, `certificateNumber`) remain strictly untouched and immutable.
+  - `CertificateService` emits exactly one `CERTIFICATE_REVOKED` event to `audit_logs` capturing actor, target, timestamp, and rationale.
+- **Response Codes:**
+  - `200 OK`: Successful revocation, returning the updated `AdminCertificateDto`.
+  - `400 Bad Request`: Validation failure on `reason` (`VALIDATION_ERROR`).
+  - `404 Not Found`: Certificate not found (`CERTIFICATE_NOT_FOUND`).
+  - `409 Conflict`: Certificate already revoked (`CERTIFICATE_ALREADY_REVOKED`).

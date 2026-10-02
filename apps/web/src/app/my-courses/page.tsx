@@ -22,8 +22,10 @@ import {
   Archive,
   GraduationCap,
   LogIn,
+  Award,
 } from 'lucide-react';
 import type { EnrolledCourseItemDto } from '@techsprout/contracts';
+import { EnrollmentCertificateCta } from '@/components/certificate/CertificateCta';
 
 type FilterTab = 'ALL' | 'ACTIVE' | 'COMPLETED';
 
@@ -290,19 +292,8 @@ export default function MyCoursesPage() {
                       </div>
 
                       {/* Card Action CTA */}
-                      <div className='pt-5 border-t border-gray-100 mt-4'>
-                        <Link href={`/learn/${item.course.slug}`} className='block w-full'>
-                          <Button
-                            className={`w-full rounded-xl py-2.5 text-xs font-bold transition shadow-xs ${
-                              isCompleted
-                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                                : 'bg-primary hover:bg-primary/90 text-white'
-                            }`}
-                          >
-                            {isCompleted ? 'Review Course' : 'Continue Learning'}
-                            <ArrowRight className='w-3.5 h-3.5 ml-1.5' />
-                          </Button>
-                        </Link>
+                      <div className='pt-5 border-t border-gray-100 mt-4 space-y-2'>
+                        <EnrollmentCertificateCta enrollment={item} />
                       </div>
                     </div>
                   );

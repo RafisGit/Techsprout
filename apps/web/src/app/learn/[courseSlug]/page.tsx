@@ -225,16 +225,22 @@ export default function CourseLearningEntryPoint() {
         </div>
 
         <div className='pt-2 flex flex-col sm:flex-row justify-center gap-3'>
+          <Link href={`/learn/${courseSlug}/certificate`} data-testid='btn-view-certificate'>
+            <Button className='w-full sm:w-auto rounded-xl text-xs font-bold px-6 py-2.5 bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs flex items-center justify-center gap-1.5'>
+              <Trophy className='w-4 h-4 text-amber-300' />
+              <span>View Certificate</span>
+            </Button>
+          </Link>
           {firstLessonId && (
             <Link href={`/learn/${courseSlug}/${firstLessonId}`}>
-              <Button className='w-full sm:w-auto rounded-xl text-xs font-bold px-6 py-2.5 bg-primary text-white hover:bg-primary/90'>
+              <Button variant='outline' className='w-full sm:w-auto rounded-xl text-xs font-bold px-5 py-2.5'>
                 <PlayCircle className='w-4 h-4 mr-1.5' />
                 Review From Beginning
               </Button>
             </Link>
           )}
           <Link href='/my-courses'>
-            <Button variant='outline' className='w-full sm:w-auto rounded-xl text-xs font-semibold px-5 py-2.5'>
+            <Button variant='ghost' className='w-full sm:w-auto rounded-xl text-xs font-semibold px-4 py-2.5'>
               Back to My Courses
             </Button>
           </Link>

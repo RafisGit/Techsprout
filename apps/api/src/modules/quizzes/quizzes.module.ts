@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module';
 import { CoursesModule } from '../courses/courses.module';
 import { ModulesModule } from '../modules/modules.module';
+import { CertificatesModule } from '../certificates/certificates.module';
 import { QuizzesController } from './quizzes.controller';
 import { QuestionsController } from './questions.controller';
 import { OptionsController } from './options.controller';
@@ -13,7 +14,7 @@ import { StudentQuizzesController } from './student-quizzes.controller';
 import { StudentQuizzesService } from './student-quizzes.service';
 
 @Module({
-  imports: [AuditModule, CoursesModule, ModulesModule],
+  imports: [AuditModule, CoursesModule, ModulesModule, CertificatesModule],
   controllers: [
     QuizzesController,
     QuestionsController,

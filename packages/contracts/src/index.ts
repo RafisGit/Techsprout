@@ -297,6 +297,7 @@ export interface EnrolledCourseResumePointDto {
 export interface EnrolledCourseItemDto {
   enrollmentId: string;
   status: EnrollmentStatus;
+  hasCertificate: boolean;
   enrolledAt: string;
   startedAt?: string | null;
   completedAt?: string | null;
@@ -657,4 +658,88 @@ export interface StudentQuizReviewDto {
   submittedAt: string;
   questions: QuestionReviewDto[];
 }
+
+// --- CERTIFICATES CONTRACTS (P4.5) ---
+
+export type CertificateStatus = 'ACTIVE' | 'REVOKED';
+
+export interface CertificateDto {
+  id: string;
+  certificateNumber: string;
+  studentName: string;
+  courseTitle: string;
+  instructorName: string;
+  completedAt: string;
+  issuedAt: string;
+  finalScorePercentage: number | null;
+  status: CertificateStatus;
+  pdfUrl?: string | null;
+  revokedAt?: string | null;
+  revocationReason?: string | null;
+}
+
+export interface PublicCertificateVerificationDto {
+  isValid: boolean;
+  certificateNumber: string;
+  status: CertificateStatus;
+  studentName: string;
+  courseTitle: string;
+  instructorName?: string;
+  completedAt?: string;
+  issuedAt?: string;
+  finalScorePercentage?: number | null;
+  revokedAt?: string | null;
+  revocationReason?: string | null;
+}
+
+export interface AdminCertificateDto {
+  id: string;
+  certificateNumber: string;
+  enrollmentId: string;
+  courseId: string;
+  studentId: string;
+  studentName: string;
+  courseTitle: string;
+  instructorName: string;
+  completedAt: string;
+  issuedAt: string;
+  finalScorePercentage: number | null;
+  status: CertificateStatus;
+  revokedAt?: string | null;
+  revocationReason?: string | null;
+  pdfMediaId?: string | null;
+  pdfUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const REVOCATION_REASON_MIN_LENGTH = 5;
+export const REVOCATION_REASON_MAX_LENGTH = 1000;
+
+export interface RevokeCertificateRequest {
+  /**
+   * Administrative revocation reason.
+   * Required, trimmed, minimum 5 characters, maximum 1000 characters.
+   */
+  reason: string;
+}
+
+export interface AdminCertificateQuery {
+  page?: number;
+  limit?: number;
+  status?: CertificateStatus;
+  courseId?: string;
+  search?: string;
+}
+
+export interface PaginatedCertificatesData {
+  items: AdminCertificateDto[];
+  pagination: PaginationMetadata;
+}
+
+export type CertificateErrorCode =
+  | 'ENROLLMENT_NOT_FOUND'
+  | 'COURSE_NOT_COMPLETED'
+  | 'CERTIFICATE_NOT_FOUND'
+  | 'CERTIFICATE_ALREADY_REVOKED';
 

@@ -230,3 +230,53 @@
     transform-origin: right;
   }
 }
+
+/* ==========================================
+   PRINT / PDF CERTIFICATE STYLING
+   ========================================== */
+@media print {
+  @page {
+    size: landscape;
+    margin: 8mm;
+  }
+
+  /* Hide navigation, global header, footer, action buttons, modals, and screen-only controls */
+  header,
+  footer,
+  nav,
+  aside,
+  .no-print,
+  button,
+  [data-testid='btn-print-certificate'],
+  [data-testid='btn-copy-verification-link'],
+  [data-testid='btn-back-to-course'],
+  [data-testid='btn-public-verify'] {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .certificate-wrapper {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+  }
+
+  .certificate-container {
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    border-color: #000000 !important;
+  }
+}

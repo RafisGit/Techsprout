@@ -13,6 +13,7 @@ import {
   quizQuestions,
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
+import { CertificateService } from '../certificates/certificates.service';
 import { ApiException } from '../../common/errors/api-error';
 import { UserContext } from '../courses/courses.service';
 import {
@@ -26,7 +27,8 @@ import {
 export class LearningService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
-    @Inject(AuditService) private readonly auditService: AuditService
+    @Inject(AuditService) private readonly auditService: AuditService,
+    @Inject(CertificateService) private readonly certificateService: CertificateService
   ) {}
 
   /**
@@ -869,6 +871,10 @@ export class LearningService {
           totalLessonsCount: totalLessons,
         },
       });
+
+      await this.certificateService.issueCertificateIfEligible(enrollment.id, {
+        actorId: user.id,
+      });
     }
 
     return {
@@ -986,6 +992,10 @@ export class LearningService {
             completedAt: updatedEnrollment.completedAt,
             totalLessonsCount: totalLessons,
           },
+        });
+
+        await this.certificateService.issueCertificateIfEligible(enrollment.id, {
+          actorId: user.id,
         });
       }
 

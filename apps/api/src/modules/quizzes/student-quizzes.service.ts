@@ -15,6 +15,7 @@ import {
   QuizQuestionOption,
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
+import { CertificateService } from '../certificates/certificates.service';
 import { UserContext } from '../courses/courses.service';
 import { ApiException } from '../../common/errors/api-error';
 import {
@@ -33,7 +34,8 @@ import {
 export class StudentQuizzesService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
-    @Inject(AuditService) private readonly auditService: AuditService
+    @Inject(AuditService) private readonly auditService: AuditService,
+    @Inject(CertificateService) private readonly certificateService: CertificateService
   ) {}
 
   /**
@@ -826,7 +828,8 @@ export class StudentQuizzesService {
     const progress = await this.recalculateProgressAndCompletion(
       modRecord.courseId,
       enrollment.id,
-      user.id
+      user.id,
+      { ipAddress, userAgent, requestId }
     );
 
     return {
@@ -943,7 +946,12 @@ export class StudentQuizzesService {
   async recalculateProgressAndCompletion(
     courseId: string,
     enrollmentId: string,
-    studentId: string
+    studentId: string,
+    context?: {
+      ipAddress?: string;
+      userAgent?: string;
+      requestId?: string;
+    }
   ): Promise<{
     totalLessons: number;
     completedLessons: number;
@@ -1045,6 +1053,13 @@ export class StudentQuizzesService {
             completedItems,
             completedAt: now,
           },
+        });
+
+        await this.certificateService.issueCertificateIfEligible(enrollmentId, {
+          actorId: studentId,
+          ipAddress: context?.ipAddress,
+          userAgent: context?.userAgent,
+          requestId: context?.requestId,
         });
       } else if (!isCourseCompleted && enr.status === 'COMPLETED') {
         // Curriculum mutation: New requirements added, revert to ACTIVE
