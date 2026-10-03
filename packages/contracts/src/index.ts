@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 export type UserRole = 'admin' | 'student' | 'instructor';
 
 export interface UserDto {
@@ -743,3 +745,683 @@ export type CertificateErrorCode =
   | 'CERTIFICATE_NOT_FOUND'
   | 'CERTIFICATE_ALREADY_REVOKED';
 
+// ==========================================
+// --- P5: PAYMENTS & ADMIN CONTRACTS ---
+// ==========================================
+
+// --- P5 ENUMS ---
+
+export type OrderStatus =
+  | 'PENDING'
+  | 'PAYMENT_PROCESSING'
+  | 'PAID'
+  | 'FAILED'
+  | 'CANCELLED'
+  | 'REFUNDED';
+
+export type PaymentStatus = 'INITIATED' | 'VALIDATED' | 'FAILED' | 'CANCELLED';
+
+export type CouponDiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';
+
+export type CouponRedemptionStatus = 'RESERVED' | 'CONSUMED' | 'RELEASED';
+
+export type InvoiceStatus = 'PAID' | 'REFUNDED' | 'VOID';
+
+export type RefundStatus = 'PENDING' | 'PROCESSED' | 'FAILED';
+
+export type Currency = 'BDT';
+
+// --- P5 CONSTANTS ---
+
+export const COUPON_CODE_MIN_LENGTH = 3;
+export const COUPON_CODE_MAX_LENGTH = 30;
+export const REFUND_REASON_MIN_LENGTH = 5;
+export const REFUND_REASON_MAX_LENGTH = 1000;
+
+// --- ORDER CONTRACTS ---
+
+export interface CreateOrderRequest {
+  courseId: string;
+  couponCode?: string;
+}
+
+export interface OrderItemDto {
+  id: string;
+  orderId: string;
+  courseId: string;
+  courseTitle: string;
+  unitPriceCents: number;
+  discountCents: number;
+  payableCents: number;
+  createdAt: string;
+}
+
+export interface OrderDto {
+  id: string;
+  orderNumber: string;
+  studentId: string;
+  studentName?: string;
+  studentEmail?: string;
+  status: OrderStatus;
+  subtotalCents: number;
+  discountCents: number;
+  payableCents: number;
+  currency: Currency;
+  couponId?: string | null;
+  couponCode?: string | null;
+  items: OrderItemDto[];
+  expiresAt: string;
+  paidAt?: string | null;
+  cancelledAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderListItemDto {
+  id: string;
+  orderNumber: string;
+  studentId: string;
+  studentName?: string;
+  studentEmail?: string;
+  status: OrderStatus;
+  payableCents: number;
+  currency: Currency;
+  courseTitle: string;
+  createdAt: string;
+  paidAt?: string | null;
+}
+
+export interface OrderListQuery {
+  page?: number;
+  limit?: number;
+  status?: OrderStatus;
+  search?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface PaginatedOrdersData {
+  items: OrderListItemDto[];
+  pagination: PaginationMetadata;
+}
+
+export type OrderListResponse = PaginatedOrdersData;
+
+// --- PAYMENT CONTRACTS ---
+
+export interface InitiatePaymentRequest {
+  orderId: string;
+}
+
+export interface InitiatePaymentResponse {
+  paymentId: string;
+  merchantTranId: string;
+  gatewayUrl: string;
+  provider: 'SSLCOMMERZ';
+}
+
+export interface PaymentDto {
+  id: string;
+  orderId: string;
+  merchantTranId: string;
+  provider: string;
+  valId?: string | null;
+  bankTranId?: string | null;
+  amountCents: number;
+  currency: Currency;
+  status: PaymentStatus;
+  cardType?: string | null;
+  cardBrand?: string | null;
+  gatewayFeeCents?: number | null;
+  initiatedAt: string;
+  validatedAt?: string | null;
+  createdAt: string;
+}
+
+export interface PaymentListItemDto {
+  id: string;
+  orderId: string;
+  orderNumber?: string;
+  merchantTranId: string;
+  valId?: string | null;
+  bankTranId?: string | null;
+  amountCents: number;
+  currency: Currency;
+  status: PaymentStatus;
+  cardType?: string | null;
+  initiatedAt: string;
+  validatedAt?: string | null;
+}
+
+export interface PaymentListQuery {
+  page?: number;
+  limit?: number;
+  status?: PaymentStatus;
+  orderId?: string;
+  search?: string;
+}
+
+export interface PaginatedPaymentsData {
+  items: PaymentListItemDto[];
+  pagination: PaginationMetadata;
+}
+
+// --- SSLCommerz CALLBACK CONTRACTS (External input representations) ---
+
+export interface SSLCommerzSuccessCallback {
+  tran_id: string;
+  val_id: string;
+  amount: string;
+  currency: string;
+  bank_tran_id?: string;
+  card_type?: string;
+  card_brand?: string;
+  card_issuer?: string;
+  card_sub_brand?: string;
+  card_issuer_country?: string;
+  store_amount?: string;
+  tran_date?: string;
+  status: string;
+  verify_sign?: string;
+  verify_key?: string;
+  risk_level?: string;
+  risk_title?: string;
+  value_a?: string;
+  value_b?: string;
+  value_c?: string;
+  value_d?: string;
+}
+
+export interface SSLCommerzFailCallback {
+  tran_id: string;
+  status: string;
+  error?: string;
+  failedreason?: string;
+  bank_tran_id?: string;
+  currency?: string;
+  amount?: string;
+}
+
+export interface SSLCommerzCancelCallback {
+  tran_id: string;
+  status: string;
+}
+
+export type SSLCommerzIpnCallback = SSLCommerzSuccessCallback;
+
+// --- COUPON CONTRACTS ---
+
+export interface ValidateCouponRequest {
+  code: string;
+  courseId: string;
+}
+
+export interface CouponPreviewDto {
+  code: string;
+  discountType: CouponDiscountType;
+  discountValue: number;
+  originalPriceCents: number;
+  discountCents: number;
+  payableCents: number;
+  isValid: boolean;
+  message?: string;
+}
+
+export interface CouponDto {
+  id: string;
+  code: string;
+  discountType: CouponDiscountType;
+  discountValue: number;
+  minOrderAmountCents: number;
+  maxDiscountAmountCents?: number | null;
+  courseId?: string | null;
+  courseTitle?: string | null;
+  usageLimit?: number | null;
+  redemptionCount: number;
+  perUserLimit: number;
+  startsAt: string;
+  expiresAt?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCouponRequest {
+  code: string;
+  discountType: CouponDiscountType;
+  discountValue: number;
+  minOrderAmountCents?: number;
+  maxDiscountAmountCents?: number | null;
+  courseId?: string | null;
+  usageLimit?: number | null;
+  perUserLimit?: number;
+  startsAt: string;
+  expiresAt?: string | null;
+  isActive?: boolean;
+}
+
+export interface UpdateCouponRequest {
+  maxDiscountAmountCents?: number | null;
+  usageLimit?: number | null;
+  perUserLimit?: number;
+  expiresAt?: string | null;
+  isActive?: boolean;
+}
+
+export interface CouponListQuery {
+  page?: number;
+  limit?: number;
+  isActive?: boolean;
+  search?: string;
+}
+
+export interface PaginatedCouponsData {
+  items: CouponDto[];
+  pagination: PaginationMetadata;
+}
+
+export type CouponListResponse = PaginatedCouponsData;
+
+// --- COUPON REDEMPTION CONTRACT ---
+
+export interface CouponRedemptionDto {
+  id: string;
+  couponId: string;
+  couponCode?: string;
+  userId?: string;
+  orderId: string;
+  status: CouponRedemptionStatus;
+  discountCents: number;
+  reservedAt: string;
+  consumedAt?: string | null;
+  releasedAt?: string | null;
+}
+
+// --- INVOICE CONTRACTS ---
+
+export interface InvoiceDto {
+  id: string;
+  invoiceNumber: string;
+  orderId: string;
+  studentId?: string;
+  studentName: string;
+  studentEmail: string;
+  studentPhone?: string | null;
+  courseTitle: string;
+  subtotalCents: number;
+  discountCents: number;
+  payableCents: number;
+  currency: Currency;
+  paymentMethod: string;
+  bankTranId: string;
+  status: InvoiceStatus;
+  issuedAt: string;
+  createdAt: string;
+}
+
+export interface InvoiceListItemDto {
+  id: string;
+  invoiceNumber: string;
+  orderId: string;
+  studentName: string;
+  studentEmail: string;
+  courseTitle: string;
+  payableCents: number;
+  currency: Currency;
+  status: InvoiceStatus;
+  issuedAt: string;
+}
+
+export interface InvoiceListQuery {
+  page?: number;
+  limit?: number;
+  status?: InvoiceStatus;
+  search?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface PaginatedInvoicesData {
+  items: InvoiceListItemDto[];
+  pagination: PaginationMetadata;
+}
+
+export type InvoiceListResponse = PaginatedInvoicesData;
+
+// --- REFUND CONTRACTS ---
+
+export interface AdminRefundOrderRequest {
+  reason: string;
+}
+
+export interface RefundDto {
+  id: string;
+  refundNumber: string;
+  orderId: string;
+  orderNumber?: string;
+  paymentId: string;
+  amountCents: number;
+  currency: Currency;
+  reason: string;
+  status: RefundStatus;
+  processedBy?: string;
+  providerRefundRef?: string | null;
+  processedAt?: string | null;
+  createdAt: string;
+}
+
+export interface RefundListQuery {
+  page?: number;
+  limit?: number;
+  status?: RefundStatus;
+  orderId?: string;
+}
+
+export interface PaginatedRefundsData {
+  items: RefundDto[];
+  pagination: PaginationMetadata;
+}
+
+// --- FINANCE & RECONCILIATION CONTRACTS ---
+
+export interface FinanceSummaryDto {
+  totalGrossVolumeCents: number;
+  totalDiscountCents: number;
+  totalNetRevenueCents: number;
+  totalRefundCents: number;
+  totalPaidOrdersCount: number;
+  totalRefundedOrdersCount: number;
+  totalPendingOrdersCount: number;
+  currency: Currency;
+}
+
+export type ReconciliationDiscrepancyType =
+  | 'PAID_WITHOUT_ENROLLMENT'
+  | 'GATEWAY_VALIDATED_INTERNAL_PENDING'
+  | 'AMOUNT_MISMATCH'
+  | 'CURRENCY_MISMATCH'
+  | 'ABANDONED_SESSION';
+
+export interface ReconciliationDiscrepancyDto {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  discrepancyType: ReconciliationDiscrepancyType;
+  description: string;
+  internalPayableCents: number;
+  gatewayAmountCents?: number | null;
+  detectedAt: string;
+  autoResolvable: boolean;
+}
+
+export interface ReconciliationResultDto {
+  totalOrdersScanned: number;
+  discrepanciesFoundCount: number;
+  autoResolvedCount: number;
+  discrepancies: ReconciliationDiscrepancyDto[];
+  executedAt: string;
+}
+
+export interface ReconciliationQuery {
+  limit?: number;
+  dryRun?: boolean;
+}
+
+// --- P5 ERROR CODES ---
+
+export type PaymentErrorCode =
+  | 'PAYMENT_REQUIRED'
+  | 'ORDER_NOT_FOUND'
+  | 'ORDER_ACCESS_DENIED'
+  | 'INVALID_ORDER_STATE_TRANSITION'
+  | 'PAYMENT_NOT_FOUND'
+  | 'PAYMENT_VALIDATION_FAILED'
+  | 'PAYMENT_AMOUNT_MISMATCH'
+  | 'PAYMENT_CURRENCY_MISMATCH'
+  | 'PAYMENT_REPLAY_DETECTED'
+  | 'COUPON_NOT_FOUND'
+  | 'COUPON_INVALID'
+  | 'COUPON_EXPIRED'
+  | 'COUPON_USAGE_LIMIT_REACHED'
+  | 'COUPON_USER_LIMIT_REACHED'
+  | 'INVOICE_NOT_FOUND'
+  | 'INVOICE_ACCESS_DENIED'
+  | 'REFUND_NOT_ALLOWED'
+  | 'REFUND_ALREADY_PROCESSED'
+  | 'PARTIAL_REFUNDS_NOT_SUPPORTED'
+  | 'RECONCILIATION_FAILED';
+
+// ==========================================
+// --- P5: SHARED ZOD VALIDATION SCHEMAS ---
+// ==========================================
+
+export const moneyCentsSchema = z
+  .number({ invalid_type_error: 'Amount must be an integer number of cents/poisha' })
+  .int('Amount must be an integer minor unit (no decimals)')
+  .nonnegative('Amount cannot be negative');
+
+export const currencySchema = z.literal('BDT');
+
+export const orderStatusSchema = z.enum([
+  'PENDING',
+  'PAYMENT_PROCESSING',
+  'PAID',
+  'FAILED',
+  'CANCELLED',
+  'REFUNDED',
+]);
+
+export const paymentStatusSchema = z.enum(['INITIATED', 'VALIDATED', 'FAILED', 'CANCELLED']);
+
+export const couponDiscountTypeSchema = z.enum(['PERCENTAGE', 'FIXED_AMOUNT']);
+
+export const couponRedemptionStatusSchema = z.enum(['RESERVED', 'CONSUMED', 'RELEASED']);
+
+export const invoiceStatusSchema = z.enum(['PAID', 'REFUNDED', 'VOID']);
+
+export const refundStatusSchema = z.enum(['PENDING', 'PROCESSED', 'FAILED']);
+
+export const reconciliationDiscrepancyTypeSchema = z.enum([
+  'PAID_WITHOUT_ENROLLMENT',
+  'GATEWAY_VALIDATED_INTERNAL_PENDING',
+  'AMOUNT_MISMATCH',
+  'CURRENCY_MISMATCH',
+  'ABANDONED_SESSION',
+]);
+
+export const paginationQuerySchema = z.object({
+  page: z.coerce.number().int().min(1, 'Page must be at least 1').optional().default(1),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1, 'Limit must be at least 1')
+    .max(100, 'Limit cannot exceed 100')
+    .optional()
+    .default(20),
+});
+
+export const createOrderSchema = z
+  .object({
+    courseId: z.string().uuid('Invalid course ID format'),
+    couponCode: z
+      .string()
+      .trim()
+      .min(
+        COUPON_CODE_MIN_LENGTH,
+        `Coupon code must be at least ${COUPON_CODE_MIN_LENGTH} characters`
+      )
+      .max(COUPON_CODE_MAX_LENGTH, `Coupon code cannot exceed ${COUPON_CODE_MAX_LENGTH} characters`)
+      .transform((val) => val.toUpperCase())
+      .optional(),
+  })
+  .strict('Client-submitted pricing, discount, or payment fields are strictly prohibited');
+
+export const orderListQuerySchema = paginationQuerySchema.extend({
+  status: orderStatusSchema.optional(),
+  search: z.string().trim().max(100).optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+});
+
+export const initiatePaymentSchema = z
+  .object({
+    orderId: z.string().uuid('Invalid order ID format'),
+  })
+  .strict('Payment amount and currency must be derived server-side');
+
+export const paymentListQuerySchema = paginationQuerySchema.extend({
+  status: paymentStatusSchema.optional(),
+  orderId: z.string().uuid().optional(),
+  search: z.string().trim().max(100).optional(),
+});
+
+export const sslcommerzSuccessCallbackSchema = z.object({
+  tran_id: z.string().min(1, 'Transaction ID is required'),
+  val_id: z.string().min(1, 'Validation ID is required'),
+  amount: z.string().min(1, 'Amount is required'),
+  currency: z.string().min(1, 'Currency is required'),
+  bank_tran_id: z.string().optional(),
+  card_type: z.string().optional(),
+  card_brand: z.string().optional(),
+  card_issuer: z.string().optional(),
+  card_sub_brand: z.string().optional(),
+  card_issuer_country: z.string().optional(),
+  store_amount: z.string().optional(),
+  tran_date: z.string().optional(),
+  status: z.string().min(1, 'Status is required'),
+  verify_sign: z.string().optional(),
+  verify_key: z.string().optional(),
+  risk_level: z.string().optional(),
+  risk_title: z.string().optional(),
+  value_a: z.string().optional(),
+  value_b: z.string().optional(),
+  value_c: z.string().optional(),
+  value_d: z.string().optional(),
+});
+
+export const sslcommerzFailCallbackSchema = z.object({
+  tran_id: z.string().min(1, 'Transaction ID is required'),
+  status: z.string().min(1, 'Status is required'),
+  error: z.string().optional(),
+  failedreason: z.string().optional(),
+  bank_tran_id: z.string().optional(),
+  currency: z.string().optional(),
+  amount: z.string().optional(),
+});
+
+export const sslcommerzCancelCallbackSchema = z.object({
+  tran_id: z.string().min(1, 'Transaction ID is required'),
+  status: z.string().min(1, 'Status is required'),
+});
+
+export const sslcommerzIpnCallbackSchema = sslcommerzSuccessCallbackSchema;
+
+export const validateCouponSchema = z.object({
+  code: z
+    .string({ required_error: 'Coupon code is required' })
+    .trim()
+    .min(
+      COUPON_CODE_MIN_LENGTH,
+      `Coupon code must be at least ${COUPON_CODE_MIN_LENGTH} characters`
+    )
+    .max(COUPON_CODE_MAX_LENGTH, `Coupon code cannot exceed ${COUPON_CODE_MAX_LENGTH} characters`)
+    .transform((val) => val.toUpperCase()),
+  courseId: z.string().uuid('Invalid course ID format'),
+});
+
+export const createCouponSchema = z
+  .object({
+    code: z
+      .string({ required_error: 'Coupon code is required' })
+      .trim()
+      .min(
+        COUPON_CODE_MIN_LENGTH,
+        `Coupon code must be at least ${COUPON_CODE_MIN_LENGTH} characters`
+      )
+      .max(COUPON_CODE_MAX_LENGTH, `Coupon code cannot exceed ${COUPON_CODE_MAX_LENGTH} characters`)
+      .transform((val) => val.toUpperCase()),
+    discountType: couponDiscountTypeSchema,
+    discountValue: z
+      .number({ required_error: 'Discount value is required' })
+      .int('Discount value must be an integer')
+      .positive('Discount value must be greater than zero'),
+    minOrderAmountCents: moneyCentsSchema.optional().default(0),
+    maxDiscountAmountCents: moneyCentsSchema.nullable().optional(),
+    courseId: z.string().uuid('Invalid course ID format').nullable().optional(),
+    usageLimit: z.number().int().positive('Usage limit must be at least 1').nullable().optional(),
+    perUserLimit: z
+      .number()
+      .int()
+      .positive('Per-user limit must be at least 1')
+      .optional()
+      .default(1),
+    startsAt: z.string().datetime({ message: 'Invalid start date format' }),
+    expiresAt: z
+      .string()
+      .datetime({ message: 'Invalid expiration date format' })
+      .nullable()
+      .optional(),
+    isActive: z.boolean().optional().default(true),
+  })
+  .refine(
+    (data) => {
+      if (data.discountType === 'PERCENTAGE') {
+        return data.discountValue >= 1 && data.discountValue <= 100;
+      }
+      return true;
+    },
+    {
+      message: 'Percentage discount must be between 1 and 100',
+      path: ['discountValue'],
+    }
+  );
+
+export const updateCouponSchema = z.object({
+  maxDiscountAmountCents: moneyCentsSchema.nullable().optional(),
+  usageLimit: z.number().int().positive('Usage limit must be at least 1').nullable().optional(),
+  perUserLimit: z.number().int().positive('Per-user limit must be at least 1').optional(),
+  expiresAt: z
+    .string()
+    .datetime({ message: 'Invalid expiration date format' })
+    .nullable()
+    .optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const couponListQuerySchema = paginationQuerySchema.extend({
+  isActive: z.boolean().optional(),
+  search: z.string().trim().max(100).optional(),
+});
+
+export const adminRefundOrderSchema = z
+  .object({
+    reason: z
+      .string({ required_error: 'Refund reason is required' })
+      .trim()
+      .min(
+        REFUND_REASON_MIN_LENGTH,
+        `Refund reason must be at least ${REFUND_REASON_MIN_LENGTH} characters`
+      )
+      .max(
+        REFUND_REASON_MAX_LENGTH,
+        `Refund reason cannot exceed ${REFUND_REASON_MAX_LENGTH} characters`
+      ),
+  })
+  .strict('Arbitrary refund amounts are rejected; P5 is full-refund only');
+
+export const refundListQuerySchema = paginationQuerySchema.extend({
+  status: refundStatusSchema.optional(),
+  orderId: z.string().uuid().optional(),
+});
+
+export const invoiceListQuerySchema = paginationQuerySchema.extend({
+  status: invoiceStatusSchema.optional(),
+  search: z.string().trim().max(100).optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+});
+
+export const reconciliationQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(500).optional().default(50),
+  dryRun: z.boolean().optional().default(false),
+});
