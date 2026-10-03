@@ -17,10 +17,7 @@ import { users } from './users';
 import { media } from './media';
 
 // --- ENUMS ---
-export const certificateStatusEnum = pgEnum('certificate_status', [
-  'ACTIVE',
-  'REVOKED',
-]);
+export const certificateStatusEnum = pgEnum('certificate_status', ['ACTIVE', 'REVOKED']);
 
 // --- CERTIFICATES TABLE ---
 export const certificates = pgTable(
@@ -52,7 +49,9 @@ export const certificates = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    uniqueIndex('certificates_enrollment_id_uq').on(table.enrollmentId),
+    uniqueIndex('certificates_active_enrollment_uq')
+      .on(table.enrollmentId)
+      .where(sql`"status" = 'ACTIVE'`),
     uniqueIndex('certificates_number_uq').on(table.certificateNumber),
     index('certificates_student_id_idx').on(table.studentId),
     index('certificates_course_id_idx').on(table.courseId),

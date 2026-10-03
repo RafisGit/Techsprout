@@ -14,7 +14,8 @@ import { SEED_ROLES, SEED_USERS } from '../database/seed/fixtures';
 
 describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
   const dbUrl =
-    process.env.DATABASE_URL || 'postgresql://postgres:postgrespassword@localhost:5432/techsprout_test';
+    process.env.DATABASE_URL ||
+    'postgresql://postgres:postgrespassword@localhost:5432/techsprout_test';
 
   let pool: Pool;
   let db: any;
@@ -75,7 +76,8 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
       WHERE table_schema = 'public' AND table_name IN (
         'users', 'sessions', 'roles', 'user_roles', 'otps', 'audit_logs', 'accounts',
         'categories', 'media', 'courses', 'modules', 'lessons', 'enrollments', 'lesson_progress',
-        'quizzes', 'quiz_questions', 'quiz_question_options', 'quiz_attempts', 'quiz_attempt_answers', 'certificates'
+        'quizzes', 'quiz_questions', 'quiz_question_options', 'quiz_attempts', 'quiz_attempt_answers', 'certificates',
+        'coupons', 'orders', 'order_items', 'payments', 'coupon_redemptions', 'invoices', 'refunds'
       );
     `);
 
@@ -100,6 +102,13 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
     expect(tableNames).toContain('quiz_attempts');
     expect(tableNames).toContain('quiz_attempt_answers');
     expect(tableNames).toContain('certificates');
+    expect(tableNames).toContain('coupons');
+    expect(tableNames).toContain('orders');
+    expect(tableNames).toContain('order_items');
+    expect(tableNames).toContain('payments');
+    expect(tableNames).toContain('coupon_redemptions');
+    expect(tableNames).toContain('invoices');
+    expect(tableNames).toContain('refunds');
   });
 
   it('2. Real PostgreSQL: Enforces unique database constraints on users', async () => {

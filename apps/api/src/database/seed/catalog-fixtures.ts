@@ -62,7 +62,8 @@ export const SEED_CATEGORIES: SeedCategory[] = [
   {
     name: 'Web Development',
     slug: 'web-development',
-    description: 'Learn full-stack web engineering with modern frameworks and robust backend architectures.',
+    description:
+      'Learn full-stack web engineering with modern frameworks and robust backend architectures.',
   },
   {
     name: 'Web Design',
@@ -76,12 +77,14 @@ export const SEED_COURSES: SeedCourse[] = [
     title: 'Unity Game Development',
     slug: 'unity-game-development',
     categorySlug: 'game-development',
-    shortDescription: 'Learn how to build interactive 2D and 3D games using Unity from installation to your first playable level.',
-    description: "Learn how to build interactive 2D and 3D games using Unity. This beginner-friendly course takes you from installation to creating your first playable level. You'll learn about scenes, physics, assets, and scripting with C#. By the end, you’ll have built your own game and gained the skills to continue exploring advanced Unity features.",
+    shortDescription:
+      'Learn how to build interactive 2D and 3D games using Unity from installation to your first playable level.',
+    description:
+      "Learn how to build interactive 2D and 3D games using Unity. This beginner-friendly course takes you from installation to creating your first playable level. You'll learn about scenes, physics, assets, and scripting with C#. By the end, you’ll have built your own game and gained the skills to continue exploring advanced Unity features.",
     status: 'PUBLISHED',
     visibility: 'PUBLIC',
     price: '1000.00',
-    currency: 'USD',
+    currency: 'BDT',
     level: 'BEGINNER',
     language: 'English',
     durationMinutes: 720,
@@ -102,23 +105,27 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'GameObjects, Components & Physics',
-            description: 'Deep dive into Unity GameObject architecture, rigidbodies, and collision detection.',
+            description:
+              'Deep dive into Unity GameObject architecture, rigidbodies, and collision detection.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 450,
             isPreview: false,
-            content: 'GameObjects represent all entities in Unity. Learn how transform, mesh renderer, and colliders interact.',
+            content:
+              'GameObjects represent all entities in Unity. Learn how transform, mesh renderer, and colliders interact.',
           },
         ],
       },
       {
         title: 'Gameplay Programming with C#',
-        description: 'Implement character movement, gameplay loops, and interactive game mechanics.',
+        description:
+          'Implement character movement, gameplay loops, and interactive game mechanics.',
         position: 2,
         lessons: [
           {
             title: 'Player Controller Scripting',
-            description: 'Write C# scripts to handle keyboard and controller input for fluid character motion.',
+            description:
+              'Write C# scripts to handle keyboard and controller input for fluid character motion.',
             lessonType: 'VIDEO',
             position: 1,
             durationSeconds: 840,
@@ -126,12 +133,14 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'Game Loop & Level Export',
-            description: 'Finalize your playable game level, build executable binaries, and optimize performance.',
+            description:
+              'Finalize your playable game level, build executable binaries, and optimize performance.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 500,
             isPreview: false,
-            content: 'Exporting your Unity project for desktop platforms: quality settings, resolution scaling, and asset bundle packaging.',
+            content:
+              'Exporting your Unity project for desktop platforms: quality settings, resolution scaling, and asset bundle packaging.',
           },
         ],
       },
@@ -141,12 +150,14 @@ export const SEED_COURSES: SeedCourse[] = [
     title: 'AI with Python: Building Smart Applications',
     slug: 'ai-with-python-building-smart-applications',
     categorySlug: 'ai-development',
-    shortDescription: 'Step into the world of artificial intelligence with Python, machine learning, and neural networks.',
-    description: 'Step into the world of artificial intelligence with this Python-based course. You’ll learn the fundamentals of machine learning, neural networks, and natural language processing. Through projects, you’ll train models, analyze data, and build AI-driven applications. By the end, you’ll have the skills to start building real-world AI solutions.',
+    shortDescription:
+      'Step into the world of artificial intelligence with Python, machine learning, and neural networks.',
+    description:
+      'Step into the world of artificial intelligence with this Python-based course. You’ll learn the fundamentals of machine learning, neural networks, and natural language processing. Through projects, you’ll train models, analyze data, and build AI-driven applications. By the end, you’ll have the skills to start building real-world AI solutions.',
     status: 'PUBLISHED',
     visibility: 'PUBLIC',
     price: '1000.00',
-    currency: 'USD',
+    currency: 'BDT',
     level: 'INTERMEDIATE',
     language: 'English',
     durationMinutes: 1200,
@@ -154,12 +165,14 @@ export const SEED_COURSES: SeedCourse[] = [
     modules: [
       {
         title: 'Mathematical Foundations & Data Preprocessing',
-        description: 'Prepare tabular datasets and implement core linear algebra routines in NumPy and pandas.',
+        description:
+          'Prepare tabular datasets and implement core linear algebra routines in NumPy and pandas.',
         position: 1,
         lessons: [
           {
             title: 'NumPy Vectorization & Data Cleaning',
-            description: 'Vectorized mathematical operations, missing value imputation, and feature engineering.',
+            description:
+              'Vectorized mathematical operations, missing value imputation, and feature engineering.',
             lessonType: 'VIDEO',
             position: 1,
             durationSeconds: 720,
@@ -167,23 +180,27 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'Supervised Learning Fundamentals',
-            description: 'Mathematical intuition behind linear regression, logistic classification, and decision trees.',
+            description:
+              'Mathematical intuition behind linear regression, logistic classification, and decision trees.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 500,
             isPreview: false,
-            content: 'Supervised learning overview: loss functions, gradient descent optimization, and cross-validation techniques.',
+            content:
+              'Supervised learning overview: loss functions, gradient descent optimization, and cross-validation techniques.',
           },
         ],
       },
       {
         title: 'Neural Networks & Deep Learning',
-        description: 'Construct multi-layer perceptrons and train computer vision models with PyTorch.',
+        description:
+          'Construct multi-layer perceptrons and train computer vision models with PyTorch.',
         position: 2,
         lessons: [
           {
             title: 'PyTorch Model Training Pipeline',
-            description: 'Building custom nn.Module architectures, dataloaders, and backpropagation loops.',
+            description:
+              'Building custom nn.Module architectures, dataloaders, and backpropagation loops.',
             lessonType: 'VIDEO',
             position: 1,
             durationSeconds: 960,
@@ -191,12 +208,14 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'Model Evaluation & Inference APIs',
-            description: 'Exporting trained PyTorch models to ONNX and deploying inference endpoints.',
+            description:
+              'Exporting trained PyTorch models to ONNX and deploying inference endpoints.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 600,
             isPreview: false,
-            content: 'Production inference best practices: batching, quantization, and REST API deployment with FastAPI.',
+            content:
+              'Production inference best practices: batching, quantization, and REST API deployment with FastAPI.',
           },
         ],
       },
@@ -206,12 +225,14 @@ export const SEED_COURSES: SeedCourse[] = [
     title: 'Arduino Robotics for Beginners',
     slug: 'arduino-robotics-for-beginners',
     categorySlug: 'robotics',
-    shortDescription: 'Hands-on robotics with Arduino: control motors, sensors, and servos to build your first robots.',
-    description: "Dive into robotics with this hands-on course using Arduino. Learn how to control motors, sensors, and servos to bring your robots to life. You'll build small robotic projects and gain the knowledge to create more advanced robots in the future. A perfect entry point for robotics enthusiasts and students.",
+    shortDescription:
+      'Hands-on robotics with Arduino: control motors, sensors, and servos to build your first robots.',
+    description:
+      "Dive into robotics with this hands-on course using Arduino. Learn how to control motors, sensors, and servos to bring your robots to life. You'll build small robotic projects and gain the knowledge to create more advanced robots in the future. A perfect entry point for robotics enthusiasts and students.",
     status: 'PUBLISHED',
     visibility: 'PUBLIC',
     price: '1000.00',
-    currency: 'USD',
+    currency: 'BDT',
     level: 'BEGINNER',
     language: 'English',
     durationMinutes: 900,
@@ -219,12 +240,14 @@ export const SEED_COURSES: SeedCourse[] = [
     modules: [
       {
         title: 'Microcontroller Architecture & Circuit Basics',
-        description: 'Introduction to breadboards, circuit schematics, and Arduino microcontroller programming.',
+        description:
+          'Introduction to breadboards, circuit schematics, and Arduino microcontroller programming.',
         position: 1,
         lessons: [
           {
             title: 'Arduino Hardware & IDE Overview',
-            description: 'Connecting Arduino Uno, digital and analog I/O pins, and flashing your first sketch.',
+            description:
+              'Connecting Arduino Uno, digital and analog I/O pins, and flashing your first sketch.',
             lessonType: 'VIDEO',
             position: 1,
             durationSeconds: 540,
@@ -232,12 +255,14 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'Sensor Interfacing & Pulse Width Modulation',
-            description: 'Reading ultrasonic distance sensors, analog potentiometers, and controlling PWM signals.',
+            description:
+              'Reading ultrasonic distance sensors, analog potentiometers, and controlling PWM signals.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 420,
             isPreview: false,
-            content: 'Pulse Width Modulation (PWM) basics for controlling LED intensity and DC motor speeds safely.',
+            content:
+              'Pulse Width Modulation (PWM) basics for controlling LED intensity and DC motor speeds safely.',
           },
         ],
       },
@@ -248,7 +273,8 @@ export const SEED_COURSES: SeedCourse[] = [
         lessons: [
           {
             title: 'H-Bridge Motor Driver Wiring & Control',
-            description: 'Wire an L298N H-bridge driver and program directional steering algorithms.',
+            description:
+              'Wire an L298N H-bridge driver and program directional steering algorithms.',
             lessonType: 'VIDEO',
             position: 1,
             durationSeconds: 780,
@@ -256,12 +282,14 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'Obstacle Avoidance Firmware Architecture',
-            description: 'State machine implementation for scanning surroundings and avoiding obstacles in real-time.',
+            description:
+              'State machine implementation for scanning surroundings and avoiding obstacles in real-time.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 480,
             isPreview: false,
-            content: 'Writing non-blocking Arduino code using millis() timers instead of delay() for real-time responsiveness.',
+            content:
+              'Writing non-blocking Arduino code using millis() timers instead of delay() for real-time responsiveness.',
           },
         ],
       },
@@ -271,12 +299,14 @@ export const SEED_COURSES: SeedCourse[] = [
     title: 'Flutter App Development',
     slug: 'flutter-app-development',
     categorySlug: 'mobile-app-development',
-    shortDescription: 'Build beautiful, cross-platform iOS and Android mobile apps from a single Dart codebase.',
-    description: 'Master cross-platform mobile development with Google Flutter. Learn Dart programming, reactive UI composition with widgets, state management architectures, and hardware integration. Build polished, production-ready apps for iOS and Android.',
+    shortDescription:
+      'Build beautiful, cross-platform iOS and Android mobile apps from a single Dart codebase.',
+    description:
+      'Master cross-platform mobile development with Google Flutter. Learn Dart programming, reactive UI composition with widgets, state management architectures, and hardware integration. Build polished, production-ready apps for iOS and Android.',
     status: 'PUBLISHED',
     visibility: 'PUBLIC',
     price: '1000.00',
-    currency: 'USD',
+    currency: 'BDT',
     level: 'BEGINNER',
     language: 'English',
     durationMinutes: 1080,
@@ -302,7 +332,8 @@ export const SEED_COURSES: SeedCourse[] = [
             position: 2,
             durationSeconds: 420,
             isPreview: false,
-            content: 'Designing responsive mobile viewports using LayoutBuilder and MediaQuery across device sizes.',
+            content:
+              'Designing responsive mobile viewports using LayoutBuilder and MediaQuery across device sizes.',
           },
         ],
       },
@@ -313,7 +344,8 @@ export const SEED_COURSES: SeedCourse[] = [
         lessons: [
           {
             title: 'Riverpod State Management',
-            description: 'Decoupling business logic with providers, state notifiers, and async value handling.',
+            description:
+              'Decoupling business logic with providers, state notifiers, and async value handling.',
             lessonType: 'VIDEO',
             position: 1,
             durationSeconds: 840,
@@ -321,12 +353,14 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'Secure Local Storage & App Publishing',
-            description: 'Persisting offline data with SQLite/Hive and compiling release APKs and IPAs.',
+            description:
+              'Persisting offline data with SQLite/Hive and compiling release APKs and IPAs.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 520,
             isPreview: false,
-            content: 'Step-by-step checklist for signing certificates, ProGuard rules, and submitting to Apple App Store and Google Play.',
+            content:
+              'Step-by-step checklist for signing certificates, ProGuard rules, and submitting to Apple App Store and Google Play.',
           },
         ],
       },
@@ -336,12 +370,14 @@ export const SEED_COURSES: SeedCourse[] = [
     title: 'Full-Stack Web Development',
     slug: 'full-stack-web-development',
     categorySlug: 'web-development',
-    shortDescription: 'Master full-stack engineering with modern JavaScript, Node.js, relational databases, and React.',
-    description: 'Comprehensive full-stack development curriculum spanning frontend user interfaces, backend REST APIs, relational database modeling, and automated cloud deployments.',
+    shortDescription:
+      'Master full-stack engineering with modern JavaScript, Node.js, relational databases, and React.',
+    description:
+      'Comprehensive full-stack development curriculum spanning frontend user interfaces, backend REST APIs, relational database modeling, and automated cloud deployments.',
     status: 'PUBLISHED',
     visibility: 'PUBLIC',
     price: '1000.00',
-    currency: 'USD',
+    currency: 'BDT',
     level: 'ALL_LEVELS',
     language: 'English',
     durationMinutes: 1800,
@@ -354,7 +390,8 @@ export const SEED_COURSES: SeedCourse[] = [
         lessons: [
           {
             title: 'REST Architecture & Middleware Pipeline',
-            description: 'Designing clean route handlers, input validation schemas, and error filters.',
+            description:
+              'Designing clean route handlers, input validation schemas, and error filters.',
             lessonType: 'VIDEO',
             position: 1,
             durationSeconds: 780,
@@ -362,18 +399,21 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'Database Normalization & Indexing',
-            description: 'PostgreSQL relational schemas, foreign key constraints, and query plan optimization.',
+            description:
+              'PostgreSQL relational schemas, foreign key constraints, and query plan optimization.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 480,
             isPreview: false,
-            content: 'Third normal form (3NF) relational design, B-Tree indexing, and transaction isolation levels.',
+            content:
+              'Third normal form (3NF) relational design, B-Tree indexing, and transaction isolation levels.',
           },
         ],
       },
       {
         title: 'Frontend React Architecture & Full-Stack Integration',
-        description: 'Build performant, typed user interfaces with React, TypeScript, and stateful hooks.',
+        description:
+          'Build performant, typed user interfaces with React, TypeScript, and stateful hooks.',
         position: 2,
         lessons: [
           {
@@ -386,12 +426,14 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'Authentication & Session Security',
-            description: 'Securing web applications with HttpOnly cookies, CSRF tokens, and role-based guards.',
+            description:
+              'Securing web applications with HttpOnly cookies, CSRF tokens, and role-based guards.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 560,
             isPreview: false,
-            content: 'Defense-in-depth security best practices: HttpOnly flags, SameSite strict cookie attributes, and CSP headers.',
+            content:
+              'Defense-in-depth security best practices: HttpOnly flags, SameSite strict cookie attributes, and CSP headers.',
           },
         ],
       },
@@ -401,12 +443,14 @@ export const SEED_COURSES: SeedCourse[] = [
     title: 'Unreal Engine Game Design',
     slug: 'unreal-engine-game-design',
     categorySlug: 'game-development',
-    shortDescription: 'Create AAA-quality game environments and gameplay mechanics using Unreal Engine 5 and Blueprints.',
-    description: 'Learn the cutting-edge capabilities of Unreal Engine 5. Discover Nanite virtualized geometry, Lumen real-time global illumination, and visual scripting with Blueprints.',
+    shortDescription:
+      'Create AAA-quality game environments and gameplay mechanics using Unreal Engine 5 and Blueprints.',
+    description:
+      'Learn the cutting-edge capabilities of Unreal Engine 5. Discover Nanite virtualized geometry, Lumen real-time global illumination, and visual scripting with Blueprints.',
     status: 'PUBLISHED',
     visibility: 'PUBLIC',
     price: '1000.00',
-    currency: 'USD',
+    currency: 'BDT',
     level: 'INTERMEDIATE',
     language: 'English',
     durationMinutes: 1500,
@@ -414,12 +458,14 @@ export const SEED_COURSES: SeedCourse[] = [
     modules: [
       {
         title: 'UE5 Lighting, Nanite & Level Dressing',
-        description: 'Harness Lumen dynamic lighting and Nanite mesh streaming for photorealistic scenes.',
+        description:
+          'Harness Lumen dynamic lighting and Nanite mesh streaming for photorealistic scenes.',
         position: 1,
         lessons: [
           {
             title: 'Nanite Geometry & Lumen Setup',
-            description: 'Importing high-poly meshes, adjusting skylights, and configuring dynamic reflections.',
+            description:
+              'Importing high-poly meshes, adjusting skylights, and configuring dynamic reflections.',
             lessonType: 'VIDEO',
             position: 1,
             durationSeconds: 720,
@@ -427,12 +473,14 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'Landscape Sculpting & Material Layering',
-            description: 'Creating layered terrain materials with landscape coords and height blending.',
+            description:
+              'Creating layered terrain materials with landscape coords and height blending.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 460,
             isPreview: false,
-            content: 'Mastering PBR landscape materials, layer weight blends, and procedural vegetation scattering.',
+            content:
+              'Mastering PBR landscape materials, layer weight blends, and procedural vegetation scattering.',
           },
         ],
       },
@@ -451,12 +499,14 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'Game Mode, HUD & Audio Integration',
-            description: 'Implementing score systems, health displays via UMG, and spatial audio cues.',
+            description:
+              'Implementing score systems, health displays via UMG, and spatial audio cues.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 510,
             isPreview: false,
-            content: 'Blueprints communication patterns: Event dispatchers, interfaces, and direct casting strategies.',
+            content:
+              'Blueprints communication patterns: Event dispatchers, interfaces, and direct casting strategies.',
           },
         ],
       },
@@ -466,12 +516,14 @@ export const SEED_COURSES: SeedCourse[] = [
     title: 'AI-Powered Chatbot Development',
     slug: 'ai-powered-chatbot-development',
     categorySlug: 'ai-development',
-    shortDescription: 'Design, train, and deploy enterprise conversational AI agents using modern LLM APIs and RAG pipelines.',
-    description: 'Learn how to architect modern intelligent conversational agents. This course covers Retrieval-Augmented Generation (RAG), vector embeddings, semantic vector search, and conversational memory.',
+    shortDescription:
+      'Design, train, and deploy enterprise conversational AI agents using modern LLM APIs and RAG pipelines.',
+    description:
+      'Learn how to architect modern intelligent conversational agents. This course covers Retrieval-Augmented Generation (RAG), vector embeddings, semantic vector search, and conversational memory.',
     status: 'PUBLISHED',
     visibility: 'PUBLIC',
     price: '1000.00',
-    currency: 'USD',
+    currency: 'BDT',
     level: 'INTERMEDIATE',
     language: 'English',
     durationMinutes: 960,
@@ -479,12 +531,14 @@ export const SEED_COURSES: SeedCourse[] = [
     modules: [
       {
         title: 'Embeddings & Vector Databases',
-        description: 'Generate semantic embeddings and store high-dimensional vectors for fast similarity search.',
+        description:
+          'Generate semantic embeddings and store high-dimensional vectors for fast similarity search.',
         position: 1,
         lessons: [
           {
             title: 'Vector Embeddings & Cosine Similarity',
-            description: 'Understanding semantic vector spaces, embedding models, and indexing strategies.',
+            description:
+              'Understanding semantic vector spaces, embedding models, and indexing strategies.',
             lessonType: 'VIDEO',
             position: 1,
             durationSeconds: 600,
@@ -492,18 +546,21 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'PostgreSQL pgvector Setup & Queries',
-            description: 'Configuring HNSW and IVFFlat indexes in PostgreSQL for high-speed nearest-neighbor retrieval.',
+            description:
+              'Configuring HNSW and IVFFlat indexes in PostgreSQL for high-speed nearest-neighbor retrieval.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 440,
             isPreview: false,
-            content: 'Using PostgreSQL pgvector extension: Euclidean distance vs cosine similarity and index trade-offs.',
+            content:
+              'Using PostgreSQL pgvector extension: Euclidean distance vs cosine similarity and index trade-offs.',
           },
         ],
       },
       {
         title: 'Retrieval-Augmented Generation (RAG) Architecture',
-        description: 'Build production-ready context injection pipelines with grounding and evaluation.',
+        description:
+          'Build production-ready context injection pipelines with grounding and evaluation.',
         position: 2,
         lessons: [
           {
@@ -516,12 +573,14 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'Hallucination Mitigation & Output Guardrails',
-            description: 'Implementing deterministic validation, schema enforcement, and confidence scoring.',
+            description:
+              'Implementing deterministic validation, schema enforcement, and confidence scoring.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 520,
             isPreview: false,
-            content: 'Best practices for evaluating RAG response fidelity, citation generation, and security prompt injection defenses.',
+            content:
+              'Best practices for evaluating RAG response fidelity, citation generation, and security prompt injection defenses.',
           },
         ],
       },
@@ -531,12 +590,14 @@ export const SEED_COURSES: SeedCourse[] = [
     title: 'Robotics with Raspberry Pi',
     slug: 'robotics-with-raspberry-pi',
     categorySlug: 'robotics',
-    shortDescription: 'Develop intelligent robotic systems with computer vision and Linux hardware on Raspberry Pi.',
-    description: 'Harness the processing power of single-board computers for advanced robotics. Interface hardware sensors with GPIO, perform real-time computer vision with OpenCV, and run autonomous navigation routines.',
+    shortDescription:
+      'Develop intelligent robotic systems with computer vision and Linux hardware on Raspberry Pi.',
+    description:
+      'Harness the processing power of single-board computers for advanced robotics. Interface hardware sensors with GPIO, perform real-time computer vision with OpenCV, and run autonomous navigation routines.',
     status: 'PUBLISHED',
     visibility: 'PUBLIC',
     price: '1000.00',
-    currency: 'USD',
+    currency: 'BDT',
     level: 'ADVANCED',
     language: 'English',
     durationMinutes: 1320,
@@ -544,12 +605,14 @@ export const SEED_COURSES: SeedCourse[] = [
     modules: [
       {
         title: 'Raspberry Pi OS & GPIO Interfacing',
-        description: 'Headless Linux configuration and low-level hardware control using Python gpiozero.',
+        description:
+          'Headless Linux configuration and low-level hardware control using Python gpiozero.',
         position: 1,
         lessons: [
           {
             title: 'Headless Setup & GPIO Programming',
-            description: 'SSH remote management, I2C and SPI protocol enabling, and sensor reading.',
+            description:
+              'SSH remote management, I2C and SPI protocol enabling, and sensor reading.',
             lessonType: 'VIDEO',
             position: 1,
             durationSeconds: 660,
@@ -557,12 +620,14 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'Linux Real-Time Kernel Concepts',
-            description: 'Understanding process priorities, thread synchronization, and deterministic hardware polling.',
+            description:
+              'Understanding process priorities, thread synchronization, and deterministic hardware polling.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 450,
             isPreview: false,
-            content: 'Managing jitter in user space Linux: using POSIX timers and dedicated daemon threads for sensor loops.',
+            content:
+              'Managing jitter in user space Linux: using POSIX timers and dedicated daemon threads for sensor loops.',
           },
         ],
       },
@@ -573,7 +638,8 @@ export const SEED_COURSES: SeedCourse[] = [
         lessons: [
           {
             title: 'OpenCV Color Tracking & Contour Detection',
-            description: 'Processing camera frames, HSV color filtering, and calculating object centroid coordinates.',
+            description:
+              'Processing camera frames, HSV color filtering, and calculating object centroid coordinates.',
             lessonType: 'VIDEO',
             position: 1,
             durationSeconds: 900,
@@ -581,12 +647,14 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'PID Controller Implementation for Steering',
-            description: 'Tuning proportional, integral, and derivative coefficients for smooth motorized target tracking.',
+            description:
+              'Tuning proportional, integral, and derivative coefficients for smooth motorized target tracking.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 540,
             isPreview: false,
-            content: 'Mathematical formulation of PID loops for closed-loop differential drive robot steering control.',
+            content:
+              'Mathematical formulation of PID loops for closed-loop differential drive robot steering control.',
           },
         ],
       },
@@ -596,12 +664,14 @@ export const SEED_COURSES: SeedCourse[] = [
     title: 'iOS App Development with Swift',
     slug: 'ios-app-development-with-swift',
     categorySlug: 'mobile-app-development',
-    shortDescription: 'Build native iOS applications with Swift, SwiftUI, Combine, and modern Apple platform SDKs.',
-    description: 'Learn native Apple software engineering from the ground up. This course covers Swift modern syntax, declarative SwiftUI view hierarchies, state binding, and App Store submission workflows.',
+    shortDescription:
+      'Build native iOS applications with Swift, SwiftUI, Combine, and modern Apple platform SDKs.',
+    description:
+      'Learn native Apple software engineering from the ground up. This course covers Swift modern syntax, declarative SwiftUI view hierarchies, state binding, and App Store submission workflows.',
     status: 'PUBLISHED',
     visibility: 'PUBLIC',
     price: '1000.00',
-    currency: 'USD',
+    currency: 'BDT',
     level: 'INTERMEDIATE',
     language: 'English',
     durationMinutes: 1200,
@@ -609,12 +679,14 @@ export const SEED_COURSES: SeedCourse[] = [
     modules: [
       {
         title: 'SwiftUI Architecture & State Management',
-        description: 'Declarative user interfaces using SwiftUI View protocols and property wrappers.',
+        description:
+          'Declarative user interfaces using SwiftUI View protocols and property wrappers.',
         position: 1,
         lessons: [
           {
             title: 'SwiftUI Views, Modifiers & Previews',
-            description: 'Composing stacks, text fields, lists, and real-time Xcode Canvas previews.',
+            description:
+              'Composing stacks, text fields, lists, and real-time Xcode Canvas previews.',
             lessonType: 'VIDEO',
             position: 1,
             durationSeconds: 600,
@@ -622,23 +694,27 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: '@State, @Binding & @Observable',
-            description: 'Understanding value semantics and reactive data flow in iOS 17+ applications.',
+            description:
+              'Understanding value semantics and reactive data flow in iOS 17+ applications.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 460,
             isPreview: false,
-            content: 'Data flow in SwiftUI: Single source of truth patterns using @Observable macro and environment objects.',
+            content:
+              'Data flow in SwiftUI: Single source of truth patterns using @Observable macro and environment objects.',
           },
         ],
       },
       {
         title: 'Networking, SwiftData & Release',
-        description: 'Persistent local storage with SwiftData and asynchronous networking with async/await.',
+        description:
+          'Persistent local storage with SwiftData and asynchronous networking with async/await.',
         position: 2,
         lessons: [
           {
             title: 'Async/Await Networking & JSON Parsing',
-            description: 'Fetching remote APIs using URLSession with modern structured concurrency.',
+            description:
+              'Fetching remote APIs using URLSession with modern structured concurrency.',
             lessonType: 'VIDEO',
             position: 1,
             durationSeconds: 840,
@@ -646,12 +722,14 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'SwiftData Models & App Store Preparation',
-            description: 'Defining @Model classes, handling schema migrations, and configuring App Store Connect.',
+            description:
+              'Defining @Model classes, handling schema migrations, and configuring App Store Connect.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 520,
             isPreview: false,
-            content: 'Configuring App Store metadata, privacy manifests, signing certificates, and TestFlight beta distribution.',
+            content:
+              'Configuring App Store metadata, privacy manifests, signing certificates, and TestFlight beta distribution.',
           },
         ],
       },
@@ -661,12 +739,14 @@ export const SEED_COURSES: SeedCourse[] = [
     title: 'Next.js Web Development',
     slug: 'nextjs-web-development',
     categorySlug: 'web-development',
-    shortDescription: 'Master modern full-stack web development with the Next.js App Router, Server Components, and SSR.',
-    description: 'Master modern web development with Next.js. This course covers server-side rendering, static site generation, server actions, route handlers, and full-stack architecture. With real projects, you’ll build scalable, SEO-friendly applications and deploy them with ease.',
+    shortDescription:
+      'Master modern full-stack web development with the Next.js App Router, Server Components, and SSR.',
+    description:
+      'Master modern web development with Next.js. This course covers server-side rendering, static site generation, server actions, route handlers, and full-stack architecture. With real projects, you’ll build scalable, SEO-friendly applications and deploy them with ease.',
     status: 'PUBLISHED',
     visibility: 'PUBLIC',
     price: '1000.00',
-    currency: 'USD',
+    currency: 'BDT',
     level: 'INTERMEDIATE',
     language: 'English',
     durationMinutes: 1680,
@@ -674,12 +754,14 @@ export const SEED_COURSES: SeedCourse[] = [
     modules: [
       {
         title: 'Next.js App Router & Server Components',
-        description: 'Understand React Server Components (RSC), nested layouts, and streaming with Suspense.',
+        description:
+          'Understand React Server Components (RSC), nested layouts, and streaming with Suspense.',
         position: 1,
         lessons: [
           {
             title: 'App Router Architecture & Server Rendering',
-            description: 'File-system based routing, layout nesting, and Server Components vs Client Components.',
+            description:
+              'File-system based routing, layout nesting, and Server Components vs Client Components.',
             lessonType: 'VIDEO',
             position: 1,
             durationSeconds: 720,
@@ -687,23 +769,27 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'Data Fetching, Caching & Revalidation',
-            description: 'Fetch requests with automatic memoization, time-based ISR, and on-demand tag revalidation.',
+            description:
+              'Fetch requests with automatic memoization, time-based ISR, and on-demand tag revalidation.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 480,
             isPreview: false,
-            content: 'Mastering Next.js data cache layers: Request memoization, Data Cache, Full Route Cache, and Router Cache.',
+            content:
+              'Mastering Next.js data cache layers: Request memoization, Data Cache, Full Route Cache, and Router Cache.',
           },
         ],
       },
       {
         title: 'Server Actions, Route Handlers & Production',
-        description: 'Mutate data with Server Actions, handle Webhooks, and deploy to Vercel/Node runtimes.',
+        description:
+          'Mutate data with Server Actions, handle Webhooks, and deploy to Vercel/Node runtimes.',
         position: 2,
         lessons: [
           {
             title: 'Server Actions & Form Validation',
-            description: 'Mutating database state directly from components using Server Actions and Zod validation.',
+            description:
+              'Mutating database state directly from components using Server Actions and Zod validation.',
             lessonType: 'VIDEO',
             position: 1,
             durationSeconds: 880,
@@ -711,12 +797,14 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'Route Handlers, Middleware & Deployment',
-            description: 'Configuring edge middleware, security headers, and automated CI/CD deployment.',
+            description:
+              'Configuring edge middleware, security headers, and automated CI/CD deployment.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 550,
             isPreview: false,
-            content: 'Production checklist: Content Security Policy, metadata generation for SEO, and Core Web Vitals optimization.',
+            content:
+              'Production checklist: Content Security Policy, metadata generation for SEO, and Core Web Vitals optimization.',
           },
         ],
       },
@@ -726,12 +814,14 @@ export const SEED_COURSES: SeedCourse[] = [
     title: 'Modern Web Design',
     slug: 'modern-web-design',
     categorySlug: 'web-design',
-    shortDescription: 'Learn the art and science of modern web design: layout principles, typography, Figma, and responsive UI.',
-    description: 'Learn the art and science of modern web design. This course teaches layout principles, typography, color theory, and responsive design. You’ll practice creating visually appealing, user-friendly, and mobile-first websites with real-world projects.',
+    shortDescription:
+      'Learn the art and science of modern web design: layout principles, typography, Figma, and responsive UI.',
+    description:
+      'Learn the art and science of modern web design. This course teaches layout principles, typography, color theory, and responsive design. You’ll practice creating visually appealing, user-friendly, and mobile-first websites with real-world projects.',
     status: 'PUBLISHED',
     visibility: 'PUBLIC',
     price: '1000.00',
-    currency: 'USD',
+    currency: 'BDT',
     level: 'BEGINNER',
     language: 'English',
     durationMinutes: 1440,
@@ -739,12 +829,14 @@ export const SEED_COURSES: SeedCourse[] = [
     modules: [
       {
         title: 'Visual Design Principles & Design Systems',
-        description: 'Master grid systems, typographic hierarchy, color contrast ratios, and design tokens.',
+        description:
+          'Master grid systems, typographic hierarchy, color contrast ratios, and design tokens.',
         position: 1,
         lessons: [
           {
             title: 'Layout Grids & Spatial Composition',
-            description: '8pt spatial grid systems, visual weight balance, and responsive breakpoints.',
+            description:
+              '8pt spatial grid systems, visual weight balance, and responsive breakpoints.',
             lessonType: 'VIDEO',
             position: 1,
             durationSeconds: 600,
@@ -752,23 +844,27 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'Typography & Accessible Color Palettes',
-            description: 'Selecting font pairings, WCAG 2.1 AA/AAA contrast guidelines, and dark mode tokens.',
+            description:
+              'Selecting font pairings, WCAG 2.1 AA/AAA contrast guidelines, and dark mode tokens.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 440,
             isPreview: false,
-            content: 'Color contrast guidelines: minimum 4.5:1 ratio for normal text and 3:1 for large text per WCAG AA.',
+            content:
+              'Color contrast guidelines: minimum 4.5:1 ratio for normal text and 3:1 for large text per WCAG AA.',
           },
         ],
       },
       {
         title: 'Figma Prototyping & Developer Handoff',
-        description: 'Construct interactive component libraries with Auto Layout and component variants.',
+        description:
+          'Construct interactive component libraries with Auto Layout and component variants.',
         position: 2,
         lessons: [
           {
             title: 'Auto Layout & Interactive Components',
-            description: 'Building responsive buttons, navigation bars, and modal dialogs with smart animate.',
+            description:
+              'Building responsive buttons, navigation bars, and modal dialogs with smart animate.',
             lessonType: 'VIDEO',
             position: 1,
             durationSeconds: 840,
@@ -776,12 +872,14 @@ export const SEED_COURSES: SeedCourse[] = [
           },
           {
             title: 'Design Specs & Developer Handoff Checklist',
-            description: 'Documenting design token variables, responsive behaviors, and micro-interaction states.',
+            description:
+              'Documenting design token variables, responsive behaviors, and micro-interaction states.',
             lessonType: 'TEXT',
             position: 2,
             durationSeconds: 500,
             isPreview: false,
-            content: 'Developer handoff checklist: naming conventions, exportable SVG assets, responsive constraints, and accessibility annotations.',
+            content:
+              'Developer handoff checklist: naming conventions, exportable SVG assets, responsive constraints, and accessibility annotations.',
           },
         ],
       },

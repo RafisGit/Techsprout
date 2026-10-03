@@ -16,6 +16,22 @@ export async function createTestDatabase() {
     impure: true,
   });
 
+  // Register trim function for text normalization
+  memDb.public.registerFunction({
+    name: 'trim',
+    args: [(memDb.public as any).getType('text')],
+    returns: (memDb.public as any).getType('text'),
+    implementation: (val: string) => (typeof val === 'string' ? val.trim() : val),
+  });
+
+  // Register length function for string length constraints
+  memDb.public.registerFunction({
+    name: 'length',
+    args: [(memDb.public as any).getType('text')],
+    returns: (memDb.public as any).getType('integer'),
+    implementation: (val: string) => (typeof val === 'string' ? val.length : 0),
+  });
+
   const { Pool } = memDb.adapters.createPg();
   const pool = new Pool();
 
@@ -31,9 +47,12 @@ export async function createTestDatabase() {
 
         const transformResult = (res: any) => {
           if (res && res.rows && wantArray) {
-            const fields = (res.fields && res.fields.length > 0)
-              ? res.fields.map((f: any) => f.name)
-              : (res.rows.length > 0 ? Object.keys(res.rows[0]) : []);
+            const fields =
+              res.fields && res.fields.length > 0
+                ? res.fields.map((f: any) => f.name)
+                : res.rows.length > 0
+                  ? Object.keys(res.rows[0])
+                  : [];
 
             res.rows = res.rows.map((row: any) => {
               if (Array.isArray(row)) return row;
@@ -156,6 +175,12 @@ export async function createTestDatabase() {
     CREATE TYPE quiz_type AS ENUM('KNOWLEDGE_CHECK', 'FINAL_EXAM');
     CREATE TYPE attempt_status AS ENUM('IN_PROGRESS', 'SUBMITTED', 'ABANDONED');
     CREATE TYPE certificate_status AS ENUM('ACTIVE', 'REVOKED');
+    CREATE TYPE order_status AS ENUM('PENDING', 'PAYMENT_PROCESSING', 'PAID', 'FAILED', 'CANCELLED', 'REFUNDED');
+    CREATE TYPE payment_status AS ENUM('INITIATED', 'VALIDATED', 'FAILED', 'CANCELLED');
+    CREATE TYPE coupon_discount_type AS ENUM('PERCENTAGE', 'FIXED_AMOUNT');
+    CREATE TYPE coupon_redemption_status AS ENUM('RESERVED', 'CONSUMED', 'RELEASED');
+    CREATE TYPE invoice_status AS ENUM('PAID', 'REFUNDED', 'VOID');
+    CREATE TYPE refund_status AS ENUM('PENDING', 'PROCESSED', 'FAILED');
 
     CREATE TABLE IF NOT EXISTS categories (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -192,7 +217,7 @@ export async function createTestDatabase() {
       status course_status DEFAULT 'DRAFT' NOT NULL,
       visibility course_visibility DEFAULT 'PUBLIC' NOT NULL,
       price numeric(10, 2) DEFAULT '0.00' NOT NULL,
-      currency varchar(3) DEFAULT 'USD' NOT NULL,
+      currency varchar(3) DEFAULT 'BDT' NOT NULL,
       level course_level DEFAULT 'BEGINNER' NOT NULL,
       language varchar(50) DEFAULT 'English' NOT NULL,
       duration_minutes integer DEFAULT 0 NOT NULL,
@@ -342,7 +367,7 @@ export async function createTestDatabase() {
     CREATE TABLE IF NOT EXISTS certificates (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       certificate_number varchar(50) NOT NULL UNIQUE,
-      enrollment_id uuid NOT NULL UNIQUE REFERENCES enrollments(id) ON DELETE restrict,
+      enrollment_id uuid NOT NULL REFERENCES enrollments(id) ON DELETE restrict,
       course_id uuid NOT NULL REFERENCES courses(id) ON DELETE restrict,
       student_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
       student_name varchar(200) NOT NULL,
@@ -359,6 +384,155 @@ export async function createTestDatabase() {
       created_at timestamp with time zone DEFAULT now() NOT NULL,
       updated_at timestamp with time zone DEFAULT now() NOT NULL,
       CONSTRAINT certificates_score_range CHECK (final_score_percentage IS NULL OR (final_score_percentage >= 0 AND final_score_percentage <= 100))
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS certificates_active_enrollment_uq ON certificates (enrollment_id) WHERE status = 'ACTIVE';
+
+    CREATE TABLE IF NOT EXISTS coupons (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      code varchar(50) NOT NULL UNIQUE,
+      discount_type coupon_discount_type NOT NULL,
+      discount_value integer NOT NULL,
+      min_order_amount_cents integer DEFAULT 0 NOT NULL,
+      max_discount_amount_cents integer,
+      course_id uuid REFERENCES courses(id) ON DELETE set null,
+      usage_limit integer,
+      redemption_count integer DEFAULT 0 NOT NULL,
+      per_user_limit integer DEFAULT 1 NOT NULL,
+      starts_at timestamp with time zone NOT NULL,
+      expires_at timestamp with time zone,
+      is_active boolean DEFAULT true NOT NULL,
+      created_by uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT coupons_discount_value_positive CHECK (discount_value > 0),
+      CONSTRAINT coupons_min_order_amount_non_negative CHECK (min_order_amount_cents >= 0),
+      CONSTRAINT coupons_max_discount_amount_positive CHECK (max_discount_amount_cents IS NULL OR max_discount_amount_cents > 0),
+      CONSTRAINT coupons_usage_limit_positive CHECK (usage_limit IS NULL OR usage_limit > 0),
+      CONSTRAINT coupons_redemption_count_non_negative CHECK (redemption_count >= 0),
+      CONSTRAINT coupons_per_user_limit_positive CHECK (per_user_limit > 0)
+    );
+
+    CREATE TABLE IF NOT EXISTS orders (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      order_number varchar(50) NOT NULL UNIQUE,
+      student_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      status order_status DEFAULT 'PENDING' NOT NULL,
+      subtotal_cents integer NOT NULL,
+      discount_cents integer DEFAULT 0 NOT NULL,
+      payable_cents integer NOT NULL,
+      currency varchar(3) DEFAULT 'BDT' NOT NULL,
+      coupon_id uuid REFERENCES coupons(id) ON DELETE set null,
+      coupon_code varchar(50),
+      expires_at timestamp with time zone NOT NULL,
+      paid_at timestamp with time zone,
+      cancelled_at timestamp with time zone,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT orders_subtotal_cents_non_negative CHECK (subtotal_cents >= 0),
+      CONSTRAINT orders_discount_cents_non_negative CHECK (discount_cents >= 0),
+      CONSTRAINT orders_payable_cents_non_negative CHECK (payable_cents >= 0),
+      CONSTRAINT orders_payable_lte_subtotal CHECK (payable_cents <= subtotal_cents)
+    );
+
+    CREATE TABLE IF NOT EXISTS order_items (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      order_id uuid NOT NULL REFERENCES orders(id) ON DELETE cascade,
+      course_id uuid NOT NULL REFERENCES courses(id) ON DELETE restrict,
+      course_title varchar(250) NOT NULL,
+      unit_price_cents integer NOT NULL,
+      discount_cents integer DEFAULT 0 NOT NULL,
+      payable_cents integer NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT order_items_order_course_uq UNIQUE(order_id, course_id),
+      CONSTRAINT order_items_unit_price_cents_non_negative CHECK (unit_price_cents >= 0),
+      CONSTRAINT order_items_discount_cents_non_negative CHECK (discount_cents >= 0),
+      CONSTRAINT order_items_payable_cents_non_negative CHECK (payable_cents >= 0),
+      CONSTRAINT order_items_payable_lte_unit_price CHECK (payable_cents <= unit_price_cents)
+    );
+
+    CREATE TABLE IF NOT EXISTS payments (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      order_id uuid NOT NULL REFERENCES orders(id) ON DELETE restrict,
+      merchant_tran_id varchar(100) NOT NULL UNIQUE,
+      provider varchar(50) DEFAULT 'SSLCOMMERZ' NOT NULL,
+      provider_session_key varchar(255),
+      val_id varchar(100),
+      bank_tran_id varchar(100),
+      amount_cents integer NOT NULL,
+      currency varchar(3) DEFAULT 'BDT' NOT NULL,
+      status payment_status DEFAULT 'INITIATED' NOT NULL,
+      card_type varchar(50),
+      card_brand varchar(50),
+      gateway_fee_cents integer,
+      initiated_at timestamp with time zone DEFAULT now() NOT NULL,
+      validated_at timestamp with time zone,
+      raw_response text,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT payments_amount_cents_non_negative CHECK (amount_cents >= 0),
+      CONSTRAINT payments_gateway_fee_cents_non_negative CHECK (gateway_fee_cents IS NULL OR gateway_fee_cents >= 0)
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS payments_val_id_uq ON payments (val_id) WHERE val_id IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS coupon_redemptions (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      coupon_id uuid NOT NULL REFERENCES coupons(id) ON DELETE restrict,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      order_id uuid NOT NULL UNIQUE REFERENCES orders(id) ON DELETE restrict,
+      status coupon_redemption_status DEFAULT 'RESERVED' NOT NULL,
+      discount_cents integer NOT NULL,
+      reserved_at timestamp with time zone DEFAULT now() NOT NULL,
+      consumed_at timestamp with time zone,
+      released_at timestamp with time zone,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT coupon_redemptions_discount_cents_non_negative CHECK (discount_cents >= 0)
+    );
+
+    CREATE TABLE IF NOT EXISTS invoices (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      invoice_number varchar(50) NOT NULL UNIQUE,
+      order_id uuid NOT NULL UNIQUE REFERENCES orders(id) ON DELETE restrict,
+      student_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      student_name varchar(150) NOT NULL,
+      student_email varchar(255) NOT NULL,
+      student_phone varchar(50),
+      course_title varchar(250) NOT NULL,
+      subtotal_cents integer NOT NULL,
+      discount_cents integer DEFAULT 0 NOT NULL,
+      payable_cents integer NOT NULL,
+      currency varchar(3) DEFAULT 'BDT' NOT NULL,
+      payment_method varchar(50) NOT NULL,
+      bank_tran_id varchar(100) NOT NULL,
+      status invoice_status NOT NULL,
+      issued_at timestamp with time zone DEFAULT now() NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT invoices_subtotal_cents_non_negative CHECK (subtotal_cents >= 0),
+      CONSTRAINT invoices_discount_cents_non_negative CHECK (discount_cents >= 0),
+      CONSTRAINT invoices_payable_cents_non_negative CHECK (payable_cents >= 0),
+      CONSTRAINT invoices_payable_lte_subtotal CHECK (payable_cents <= subtotal_cents)
+    );
+
+    CREATE TABLE IF NOT EXISTS refunds (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      refund_number varchar(50) NOT NULL UNIQUE,
+      order_id uuid NOT NULL UNIQUE REFERENCES orders(id) ON DELETE restrict,
+      payment_id uuid NOT NULL REFERENCES payments(id) ON DELETE restrict,
+      amount_cents integer NOT NULL,
+      currency varchar(3) DEFAULT 'BDT' NOT NULL,
+      reason text NOT NULL,
+      status refund_status DEFAULT 'PENDING' NOT NULL,
+      processed_by uuid REFERENCES users(id) ON DELETE restrict,
+      provider_refund_ref varchar(100),
+      processed_at timestamp with time zone,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT refunds_amount_cents_non_negative CHECK (amount_cents >= 0),
+      CONSTRAINT refunds_currency_bdt CHECK (currency = 'BDT'),
+      CONSTRAINT refunds_reason_non_empty CHECK (length(trim(reason)) >= 5)
     );
   `);
 

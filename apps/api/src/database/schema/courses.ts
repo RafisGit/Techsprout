@@ -40,7 +40,7 @@ export const courses = pgTable(
     status: courseStatusEnum('status').default('DRAFT').notNull(),
     visibility: courseVisibilityEnum('visibility').default('PUBLIC').notNull(),
     price: numeric('price', { precision: 10, scale: 2 }).default('0.00').notNull(),
-    currency: varchar('currency', { length: 3 }).default('USD').notNull(),
+    currency: varchar('currency', { length: 3 }).default('BDT').notNull(),
     level: courseLevelEnum('level').default('BEGINNER').notNull(),
     language: varchar('language', { length: 50 }).default('English').notNull(),
     durationMinutes: integer('duration_minutes').default(0).notNull(),
