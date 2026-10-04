@@ -809,6 +809,7 @@ export interface OrderDto {
   currency: Currency;
   couponId?: string | null;
   couponCode?: string | null;
+  invoiceId?: string | null;
   items: OrderItemDto[];
   expiresAt: string;
   paidAt?: string | null;
@@ -824,6 +825,8 @@ export interface OrderListItemDto {
   studentName?: string;
   studentEmail?: string;
   status: OrderStatus;
+  subtotalCents?: number;
+  discountCents?: number;
   payableCents: number;
   currency: Currency;
   courseTitle: string;
@@ -958,8 +961,10 @@ export interface ValidateCouponRequest {
 
 export interface CouponPreviewDto {
   code: string;
+  courseId: string;
   discountType: CouponDiscountType;
   discountValue: number;
+  subtotalCents: number;
   originalPriceCents: number;
   discountCents: number;
   payableCents: number;
@@ -1001,9 +1006,11 @@ export interface CreateCouponRequest {
 }
 
 export interface UpdateCouponRequest {
+  minOrderAmountCents?: number;
   maxDiscountAmountCents?: number | null;
   usageLimit?: number | null;
   perUserLimit?: number;
+  startsAt?: string;
   expiresAt?: string | null;
   isActive?: boolean;
 }
@@ -1013,6 +1020,7 @@ export interface CouponListQuery {
   limit?: number;
   isActive?: boolean;
   search?: string;
+  courseId?: string;
 }
 
 export interface PaginatedCouponsData {
@@ -1021,6 +1029,24 @@ export interface PaginatedCouponsData {
 }
 
 export type CouponListResponse = PaginatedCouponsData;
+
+export interface CouponDetailResponse {
+  success: boolean;
+  message: string;
+  data: CouponDto;
+}
+
+export interface ValidateCouponResponse {
+  success: boolean;
+  message: string;
+  data: CouponPreviewDto;
+}
+
+export interface PaginatedCouponsResponse {
+  success: boolean;
+  message: string;
+  data: PaginatedCouponsData;
+}
 
 // --- COUPON REDEMPTION CONTRACT ---
 
@@ -1057,12 +1083,14 @@ export interface InvoiceDto {
   status: InvoiceStatus;
   issuedAt: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface InvoiceListItemDto {
   id: string;
   invoiceNumber: string;
   orderId: string;
+  studentId?: string;
   studentName: string;
   studentEmail: string;
   courseTitle: string;
@@ -1076,6 +1104,7 @@ export interface InvoiceListQuery {
   page?: number;
   limit?: number;
   status?: InvoiceStatus;
+  orderId?: string;
   search?: string;
   startDate?: string;
   endDate?: string;
@@ -1087,6 +1116,9 @@ export interface PaginatedInvoicesData {
 }
 
 export type InvoiceListResponse = PaginatedInvoicesData;
+export type InvoiceDetailResponse = ApiSuccessResponse<InvoiceDto>;
+export type PaginatedInvoicesResponse = ApiSuccessResponse<PaginatedInvoicesData>;
+
 
 // --- REFUND CONTRACTS ---
 
@@ -1104,10 +1136,11 @@ export interface RefundDto {
   currency: Currency;
   reason: string;
   status: RefundStatus;
-  processedBy?: string;
+  processedBy?: string | null;
   providerRefundRef?: string | null;
   processedAt?: string | null;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface RefundListQuery {
@@ -1122,6 +1155,9 @@ export interface PaginatedRefundsData {
   pagination: PaginationMetadata;
 }
 
+export type RefundDetailResponse = ApiSuccessResponse<RefundDto>;
+export type PaginatedRefundsResponse = ApiSuccessResponse<PaginatedRefundsData>;
+
 // --- FINANCE & RECONCILIATION CONTRACTS ---
 
 export interface FinanceSummaryDto {
@@ -1132,6 +1168,7 @@ export interface FinanceSummaryDto {
   totalPaidOrdersCount: number;
   totalRefundedOrdersCount: number;
   totalPendingOrdersCount: number;
+  totalCancelledOrdersCount?: number;
   currency: Currency;
 }
 
@@ -1167,6 +1204,10 @@ export interface ReconciliationQuery {
   dryRun?: boolean;
 }
 
+// --- P5 CONSTANTS & LIMITS ---
+export const GATEWAY_MIN_AMOUNT_CENTS = 1000; // 10.00 BDT (Official SSLCommerz V4 minimum)
+export const GATEWAY_MAX_AMOUNT_CENTS = 50_000_000; // 500,000.00 BDT (Official SSLCommerz V4 maximum)
+
 // --- P5 ERROR CODES ---
 
 export type PaymentErrorCode =
@@ -1177,17 +1218,34 @@ export type PaymentErrorCode =
   | 'PAYMENT_NOT_FOUND'
   | 'PAYMENT_VALIDATION_FAILED'
   | 'PAYMENT_AMOUNT_MISMATCH'
+  | 'PAYMENT_AMOUNT_BELOW_GATEWAY_MINIMUM'
+  | 'PAYMENT_AMOUNT_ABOVE_GATEWAY_MAXIMUM'
   | 'PAYMENT_CURRENCY_MISMATCH'
   | 'PAYMENT_REPLAY_DETECTED'
   | 'COUPON_NOT_FOUND'
   | 'COUPON_INVALID'
   | 'COUPON_EXPIRED'
+  | 'COUPON_DISABLED'
+  | 'COUPON_NOT_YET_ACTIVE'
+  | 'COUPON_COURSE_MISMATCH'
+  | 'COUPON_MIN_ORDER_NOT_MET'
+  | 'COUPON_INVALID_DISCOUNT'
+  | 'COUPON_CODE_ALREADY_EXISTS'
   | 'COUPON_USAGE_LIMIT_REACHED'
   | 'COUPON_USER_LIMIT_REACHED'
   | 'INVOICE_NOT_FOUND'
   | 'INVOICE_ACCESS_DENIED'
   | 'REFUND_NOT_ALLOWED'
   | 'REFUND_ALREADY_PROCESSED'
+  | 'REFUND_ALREADY_PENDING'
+  | 'REFUND_MANUAL_REVIEW_REQUIRED'
+  | 'ORDER_NOT_REFUNDABLE'
+  | 'PAYMENT_MISSING_BANK_TRAN_ID'
+  | 'REFUND_PROVIDER_FAILED'
+  | 'REFUND_PROVIDER_UNAVAILABLE'
+  | 'REFUND_STATUS_QUERY_FAILED'
+  | 'REFUND_NOT_FOUND'
+  | 'REFUND_FINALIZATION_CONFLICT'
   | 'PARTIAL_REFUNDS_NOT_SUPPORTED'
   | 'RECONCILIATION_FAILED';
 
@@ -1377,9 +1435,11 @@ export const createCouponSchema = z
   );
 
 export const updateCouponSchema = z.object({
+  minOrderAmountCents: moneyCentsSchema.optional(),
   maxDiscountAmountCents: moneyCentsSchema.nullable().optional(),
   usageLimit: z.number().int().positive('Usage limit must be at least 1').nullable().optional(),
   perUserLimit: z.number().int().positive('Per-user limit must be at least 1').optional(),
+  startsAt: z.string().datetime({ message: 'Invalid start date format' }).optional(),
   expiresAt: z
     .string()
     .datetime({ message: 'Invalid expiration date format' })
@@ -1389,8 +1449,13 @@ export const updateCouponSchema = z.object({
 });
 
 export const couponListQuerySchema = paginationQuerySchema.extend({
-  isActive: z.boolean().optional(),
+  isActive: z.preprocess((val) => {
+    if (val === 'true' || val === true) return true;
+    if (val === 'false' || val === false) return false;
+    return val;
+  }, z.boolean().optional()),
   search: z.string().trim().max(100).optional(),
+  courseId: z.string().uuid('Invalid course ID format').optional(),
 });
 
 export const adminRefundOrderSchema = z
@@ -1408,6 +1473,33 @@ export const adminRefundOrderSchema = z
       ),
   })
   .strict('Arbitrary refund amounts are rejected; P5 is full-refund only');
+
+export const adminReconcileRefundSchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('LINK_PROVIDER_REFERENCE'),
+    providerRefundRef: z
+      .string({ required_error: 'Provider refund reference is required' })
+      .trim()
+      .min(1, 'Provider refund reference cannot be empty')
+      .max(100, 'Provider refund reference cannot exceed 100 characters'),
+  }),
+  z.object({
+    action: z.literal('MARK_FAILED'),
+    reason: z
+      .string({ required_error: 'Failure reason is required' })
+      .trim()
+      .min(
+        REFUND_REASON_MIN_LENGTH,
+        `Failure reason must be at least ${REFUND_REASON_MIN_LENGTH} characters`
+      )
+      .max(
+        REFUND_REASON_MAX_LENGTH,
+        `Failure reason cannot exceed ${REFUND_REASON_MAX_LENGTH} characters`
+      ),
+  }),
+]);
+
+export type AdminReconcileRefundRequest = z.infer<typeof adminReconcileRefundSchema>;
 
 export const refundListQuerySchema = paginationQuerySchema.extend({
   status: refundStatusSchema.optional(),

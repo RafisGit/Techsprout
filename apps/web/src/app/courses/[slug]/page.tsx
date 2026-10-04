@@ -163,9 +163,10 @@ export default function CourseDetailPage() {
   }
 
   const isFree = Number(course.price) === 0 || course.price === '0.00';
+  const currency = course.currency || 'BDT';
   const formattedPrice = isFree
     ? 'Free'
-    : `$${Number(course.price).toFixed(2)} ${course.currency || 'USD'}`;
+    : `${Number(course.price).toLocaleString()} ${currency}`;
 
   const modules = (course.modules || []).slice().sort((a, b) => a.position - b.position);
   const totalLessons = modules.reduce((acc, m) => acc + (m.lessons?.length || 0), 0);
@@ -482,12 +483,20 @@ export default function CourseDetailPage() {
                   <>
                     <Button
                       className='w-full rounded-2xl py-6 text-sm font-bold bg-primary text-white hover:bg-primary/90 shadow-md'
-                      onClick={() => router.push(`/login?redirect=${encodeURIComponent(`/courses/${slug}`)}`)}
+                      onClick={() =>
+                        router.push(
+                          `/login?redirect=${encodeURIComponent(
+                            isFree ? `/courses/${slug}` : `/checkout/${course.slug}`
+                          )}`
+                        )
+                      }
                     >
-                      Log in to enroll
+                      {isFree ? 'Log in to enroll' : 'Log in to purchase'}
                     </Button>
                     <p className='text-[11px] text-gray-400 text-center'>
-                      Sign in with your TechSprout account to enroll and start learning.
+                      {isFree
+                        ? 'Sign in with your TechSprout account to enroll and start learning.'
+                        : 'Sign in with your TechSprout account to proceed to checkout.'}
                     </p>
                   </>
                 ) : isEnrolled ? (
@@ -516,6 +525,18 @@ export default function CourseDetailPage() {
                     </Button>
                     <p className='text-[11px] text-amber-600 text-center'>
                       This course has been archived. New enrollments are closed.
+                    </p>
+                  </>
+                ) : !isFree ? (
+                  <>
+                    <Button
+                      className='w-full rounded-2xl py-6 text-sm font-bold bg-primary text-white hover:bg-primary/90 shadow-md transition'
+                      onClick={() => router.push(`/checkout/${course.slug}`)}
+                    >
+                      Buy Now
+                    </Button>
+                    <p className='text-[11px] text-gray-400 text-center'>
+                      Secure checkout • Instant lifetime course access.
                     </p>
                   </>
                 ) : (

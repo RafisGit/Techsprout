@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, FolderTree, LayoutDashboard, UserCheck } from 'lucide-react';
+import { BookOpen, FolderTree, LayoutDashboard, UserCheck, Banknote, Ticket } from 'lucide-react';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 
 export function AdminNav() {
@@ -29,6 +29,18 @@ export function AdminNav() {
       title: 'Categories',
       href: '/admin/categories',
       icon: FolderTree,
+      show: isAdmin,
+    },
+    {
+      title: 'Finance',
+      href: '/admin/finance',
+      icon: Banknote,
+      show: isAdmin,
+    },
+    {
+      title: 'Coupons',
+      href: '/admin/coupons',
+      icon: Ticket,
       show: isAdmin,
     },
   ];

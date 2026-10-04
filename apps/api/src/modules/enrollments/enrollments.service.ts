@@ -183,6 +183,14 @@ export class EnrollmentsService {
       );
     }
 
+    if (parseFloat(courseResult.course.price) > 0) {
+      throw new ApiException(
+        'Course requires payment; checkout required',
+        HttpStatus.PAYMENT_REQUIRED,
+        'PAYMENT_REQUIRED'
+      );
+    }
+
     // 2. Check duplicate / existing enrollment
     const [existing] = await this.db
       .select()

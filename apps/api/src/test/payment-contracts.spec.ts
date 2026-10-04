@@ -15,6 +15,8 @@ import {
   COUPON_CODE_MAX_LENGTH,
   REFUND_REASON_MIN_LENGTH,
   REFUND_REASON_MAX_LENGTH,
+  GATEWAY_MIN_AMOUNT_CENTS,
+  GATEWAY_MAX_AMOUNT_CENTS,
 
   // Order Contracts
   type CreateOrderRequest,
@@ -814,6 +816,8 @@ describe('P5.1 — Payments & Admin Shared Contracts & Reusable Zod Schemas Test
         'PAYMENT_NOT_FOUND',
         'PAYMENT_VALIDATION_FAILED',
         'PAYMENT_AMOUNT_MISMATCH',
+        'PAYMENT_AMOUNT_BELOW_GATEWAY_MINIMUM',
+        'PAYMENT_AMOUNT_ABOVE_GATEWAY_MAXIMUM',
         'PAYMENT_CURRENCY_MISMATCH',
         'PAYMENT_REPLAY_DETECTED',
         'COUPON_NOT_FOUND',
@@ -829,10 +833,15 @@ describe('P5.1 — Payments & Admin Shared Contracts & Reusable Zod Schemas Test
         'RECONCILIATION_FAILED',
       ];
 
-      expect(errorCodes).toHaveLength(20);
+      expect(errorCodes).toHaveLength(22);
       for (const code of errorCodes) {
         expect(typeof code).toBe('string');
       }
+    });
+
+    it('10.2 should verify official SSLCommerz V4 transaction amount boundaries', () => {
+      expect(GATEWAY_MIN_AMOUNT_CENTS).toBe(1000); // 10.00 BDT
+      expect(GATEWAY_MAX_AMOUNT_CENTS).toBe(50_000_000); // 500,000.00 BDT
     });
   });
 

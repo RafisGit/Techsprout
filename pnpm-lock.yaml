@@ -38,6 +38,9 @@ importers:
       '@sentry/node':
         specifier: ^11.0.0
         version: 11.0.0(rollup@4.63.5)
+      '@techsprout/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@types/cookie-parser':
         specifier: ^1.4.8
         version: 1.4.10(@types/express@4.17.25)
