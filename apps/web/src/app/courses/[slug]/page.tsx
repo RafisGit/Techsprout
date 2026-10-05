@@ -1,5 +1,7 @@
 'use client';
 
+import { formatMoney } from '@/lib/money';
+
 import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -166,7 +168,7 @@ export default function CourseDetailPage() {
   const currency = course.currency || 'BDT';
   const formattedPrice = isFree
     ? 'Free'
-    : `${Number(course.price).toLocaleString()} ${currency}`;
+    : formatMoney(course.price, currency);
 
   const modules = (course.modules || []).slice().sort((a, b) => a.position - b.position);
   const totalLessons = modules.reduce((acc, m) => acc + (m.lessons?.length || 0), 0);

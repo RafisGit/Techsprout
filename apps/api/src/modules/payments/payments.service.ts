@@ -168,7 +168,7 @@ export class PaymentsService {
       return {
         paymentId: zeroBypass.paymentId,
         merchantTranId: zeroBypass.merchantTranId,
-        gatewayUrl: `${env.WEB_ORIGIN}/orders/${order.id}/success`,
+        gatewayUrl: `${env.WEB_PUBLIC_ORIGIN}/orders/${order.id}/success`,
         provider: 'SSLCOMMERZ',
       };
     }
@@ -257,11 +257,8 @@ export class PaymentsService {
         product_category: 'Education',
       });
     } catch (err) {
-      // Gateway error: update payment to FAILED
-      await this.db
-        .update(payments)
-        .set({ status: 'FAILED', updatedAt: new Date() })
-        .where(eq(payments.id, payment.id));
+      // Network/transport/credential error: no usable gateway session exists.
+      await this.recoverFromFailedInitiation(payment.id, order.id);
 
       throw new ApiException(
         'Failed to establish session with payment gateway',
@@ -271,14 +268,11 @@ export class PaymentsService {
     }
 
     if (gatewaySession.status !== 'SUCCESS' || !gatewaySession.GatewayPageURL) {
-      await this.db
-        .update(payments)
-        .set({
-          status: 'FAILED',
-          rawResponse: JSON.stringify(this.sanitizeGatewayData(gatewaySession)),
-          updatedAt: new Date(),
-        })
-        .where(eq(payments.id, payment.id));
+      await this.recoverFromFailedInitiation(
+        payment.id,
+        order.id,
+        JSON.stringify(this.sanitizeGatewayData(gatewaySession))
+      );
 
       throw new ApiException(
         `Payment gateway session rejected: ${gatewaySession.failedreason || 'Gateway error'}`,
@@ -321,6 +315,57 @@ export class PaymentsService {
       provider: 'SSLCOMMERZ',
     };
   }
+
+  /**
+   * Recovery after SSLCommerz session creation fails before a usable session exists.
+   * - Payment attempt -> FAILED
+   * - Order PAYMENT_PROCESSING -> PENDING (existing retryable state; still expires normally,
+   *   which releases the coupon reservation exactly once via the existing expiry/cancel flows)
+   * The order is only reverted if it is still PAYMENT_PROCESSING and has no other live attempt,
+   * so a concurrent successful payment can never be downgraded.
+   */
+  private async recoverFromFailedInitiation(
+    paymentId: string,
+    orderId: string,
+    rawResponse?: string
+  ): Promise<void> {
+    try {
+      await this.db.transaction(async (tx) => {
+        await tx
+          .update(payments)
+          .set({
+            status: 'FAILED',
+            ...(rawResponse ? { rawResponse } : {}),
+            updatedAt: new Date(),
+          })
+          .where(eq(payments.id, paymentId));
+
+        const [liveAttempt] = await tx
+          .select({ id: payments.id })
+          .from(payments)
+          .where(
+            and(
+              eq(payments.orderId, orderId),
+              inArray(payments.status, ['INITIATED', 'VALIDATED'])
+            )
+          )
+          .limit(1);
+
+        if (!liveAttempt) {
+          await tx
+            .update(orders)
+            .set({ status: 'PENDING', updatedAt: new Date() })
+            .where(and(eq(orders.id, orderId), eq(orders.status, 'PAYMENT_PROCESSING')));
+        }
+      });
+    } catch (recoveryErr) {
+      this.logger.error(
+        `Failed to roll back order ${orderId} after gateway initiation failure`,
+        recoveryErr as Error
+      );
+    }
+  }
+
 
   /**
    * Server-Authoritative SSLCommerz Validation

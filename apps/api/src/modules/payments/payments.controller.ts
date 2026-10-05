@@ -91,7 +91,7 @@ export class PaymentsController {
         );
       }
       return res.redirect(
-        `${env.WEB_ORIGIN}/orders/unknown/failure?reason=${encodeURIComponent('Invalid callback payload')}`
+        `${env.WEB_PUBLIC_ORIGIN}/orders/unknown/failure?reason=${encodeURIComponent('Invalid callback payload')}`
       );
     }
 
@@ -107,7 +107,7 @@ export class PaymentsController {
         }
       );
 
-      const redirectUrl = `${env.WEB_ORIGIN}/orders/${result.order.id}/success`;
+      const redirectUrl = `${env.WEB_PUBLIC_ORIGIN}/orders/${result.order.id}/success`;
 
       if (wantsJson) {
         return res.status(HttpStatus.OK).json({
@@ -128,7 +128,7 @@ export class PaymentsController {
 
       const reason = err instanceof ApiException ? err.message : 'Payment fulfillment failed';
       return res.redirect(
-        `${env.WEB_ORIGIN}/orders/unknown/failure?reason=${encodeURIComponent(reason)}`
+        `${env.WEB_PUBLIC_ORIGIN}/orders/unknown/failure?reason=${encodeURIComponent(reason)}`
       );
     }
   }
@@ -156,7 +156,7 @@ export class PaymentsController {
         );
       }
       return res.redirect(
-        `${env.WEB_ORIGIN}/orders/unknown/failure?reason=${encodeURIComponent('Invalid callback payload')}`
+        `${env.WEB_PUBLIC_ORIGIN}/orders/unknown/failure?reason=${encodeURIComponent('Invalid callback payload')}`
       );
     }
 
@@ -173,7 +173,7 @@ export class PaymentsController {
         }
       );
 
-      const redirectUrl = `${env.WEB_ORIGIN}/orders/${result.orderId}/failure?reason=${encodeURIComponent(failedReason)}`;
+      const redirectUrl = `${env.WEB_PUBLIC_ORIGIN}/orders/${result.orderId}/failure?reason=${encodeURIComponent(failedReason)}`;
 
       if (wantsJson) {
         return res.status(HttpStatus.OK).json({
@@ -190,7 +190,7 @@ export class PaymentsController {
         throw err;
       }
       return res.redirect(
-        `${env.WEB_ORIGIN}/orders/unknown/failure?reason=${encodeURIComponent(failedReason)}`
+        `${env.WEB_PUBLIC_ORIGIN}/orders/unknown/failure?reason=${encodeURIComponent(failedReason)}`
       );
     }
   }
@@ -218,7 +218,7 @@ export class PaymentsController {
         );
       }
       return res.redirect(
-        `${env.WEB_ORIGIN}/orders/unknown/cancelled`
+        `${env.WEB_PUBLIC_ORIGIN}/orders/unknown/cancelled`
       );
     }
 
@@ -232,7 +232,7 @@ export class PaymentsController {
         }
       );
 
-      const redirectUrl = `${env.WEB_ORIGIN}/orders/${result.orderId}/cancelled`;
+      const redirectUrl = `${env.WEB_PUBLIC_ORIGIN}/orders/${result.orderId}/cancelled`;
 
       if (wantsJson) {
         return res.status(HttpStatus.OK).json({
@@ -248,7 +248,7 @@ export class PaymentsController {
       if (wantsJson) {
         throw err;
       }
-      return res.redirect(`${env.WEB_ORIGIN}/orders/unknown/cancelled`);
+      return res.redirect(`${env.WEB_PUBLIC_ORIGIN}/orders/unknown/cancelled`);
     }
   }
 

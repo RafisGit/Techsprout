@@ -1,5 +1,7 @@
 'use client';
 
+import { formatMinorUnits } from '@/lib/money';
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -362,8 +364,8 @@ export default function CheckoutPage() {
                         Coupon &apos;{appliedCoupon.code}&apos; Applied!
                       </p>
                       <p className='text-[11px] text-emerald-700'>
-                        You saved {(appliedCoupon.discountCents / 100).toLocaleString()}{' '}
-                        {currency} ({appliedCoupon.discountType === 'PERCENTAGE' ? `${appliedCoupon.discountValue}% off` : 'fixed off'})
+                        You saved {formatMinorUnits(appliedCoupon.discountCents, currency)}{' '}
+                        ({appliedCoupon.discountType === 'PERCENTAGE' ? `${appliedCoupon.discountValue}% off` : 'fixed off'})
                       </p>
                     </div>
                   </div>
@@ -442,14 +444,14 @@ export default function CheckoutPage() {
                 <div className='flex justify-between items-center text-gray-600'>
                   <span>Original Course Price</span>
                   <span className='font-medium text-gray-900'>
-                    {(originalPriceCents / 100).toLocaleString()} {currency}
+                    {formatMinorUnits(originalPriceCents, currency)}
                   </span>
                 </div>
 
                 <div className='flex justify-between items-center text-gray-600'>
                   <span>Subtotal</span>
                   <span className='font-medium text-gray-900'>
-                    {(originalPriceCents / 100).toLocaleString()} {currency}
+                    {formatMinorUnits(originalPriceCents, currency)}
                   </span>
                 </div>
 
@@ -459,7 +461,7 @@ export default function CheckoutPage() {
                       <Tag className='w-3.5 h-3.5' />
                       Discount ({appliedCoupon?.code})
                     </span>
-                    <span>-{(discountCents / 100).toLocaleString()} {currency}</span>
+                    <span>-{formatMinorUnits(discountCents, currency)}</span>
                   </div>
                 )}
 
@@ -469,7 +471,7 @@ export default function CheckoutPage() {
                     <p className='text-[10px] text-gray-400'>Includes all applicable course fees</p>
                   </div>
                   <span className='text-2xl font-extrabold text-primary font-lexend'>
-                    {(payableCents / 100).toLocaleString()} {currency}
+                    {formatMinorUnits(payableCents, currency)}
                   </span>
                 </div>
               </div>

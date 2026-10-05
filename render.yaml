@@ -31,6 +31,9 @@ services:
         generateValue: true
       - key: WEB_ORIGIN
         value: https://techsprout-frthqjqb8-tech-sprout.vercel.app,https://techsprout-git-feat-p1-foundation-security-tech-sprout.vercel.app
+      # Single canonical frontend origin for browser redirects (payment callbacks). NOT used for CORS.
+      - key: WEB_PUBLIC_ORIGIN
+        value: https://techsprout-git-feat-p1-foundation-security-tech-sprout.vercel.app
 
   - type: keyvalue
     name: techsprout-redis

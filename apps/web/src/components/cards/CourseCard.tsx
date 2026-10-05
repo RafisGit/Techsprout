@@ -1,5 +1,7 @@
 'use client';
 
+import { formatMoney } from '@/lib/money';
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from 'next/image';
@@ -57,7 +59,7 @@ export function CourseCard({ course }: CourseCardProps) {
 
   const formattedPrice = isFree
     ? 'Free'
-    : `$${Number(course.price).toFixed(2)} ${course.currency || 'USD'}`;
+    : formatMoney(course.price, course.currency || 'BDT');
 
   const thumbnailUrl = course.thumbnailUrl || course.thumbnail;
 

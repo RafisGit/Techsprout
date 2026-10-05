@@ -1,5 +1,7 @@
 'use client';
 
+import { formatMinorUnits } from '@/lib/money';
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -169,15 +171,15 @@ export default function InvoiceDetailPage() {
                     </span>
                   </td>
                   <td className='py-4 px-4 text-right'>
-                    {(invoice.subtotalCents / 100).toLocaleString()} {invoice.currency}
+                    {formatMinorUnits(invoice.subtotalCents, invoice.currency)}
                   </td>
                   <td className='py-4 px-4 text-right text-emerald-600'>
                     {invoice.discountCents > 0
-                      ? `- ${(invoice.discountCents / 100).toLocaleString()} ${invoice.currency}`
-                      : '0 BDT'}
+                      ? `- ${formatMinorUnits(invoice.discountCents, invoice.currency)}`
+                      : formatMinorUnits(0, invoice.currency)}
                   </td>
                   <td className='py-4 px-4 text-right font-bold text-gray-900'>
-                    {(invoice.payableCents / 100).toLocaleString()} {invoice.currency}
+                    {formatMinorUnits(invoice.payableCents, invoice.currency)}
                   </td>
                 </tr>
               </tbody>
@@ -189,16 +191,16 @@ export default function InvoiceDetailPage() {
             <div className='w-64 space-y-2 border-t border-gray-100 pt-4'>
               <div className='flex justify-between text-gray-500'>
                 <span>Subtotal:</span>
-                <span>{(invoice.subtotalCents / 100).toLocaleString()} {invoice.currency}</span>
+                <span>{formatMinorUnits(invoice.subtotalCents, invoice.currency)}</span>
               </div>
               <div className='flex justify-between text-emerald-600'>
                 <span>Total Discount:</span>
-                <span>-{(invoice.discountCents / 100).toLocaleString()} {invoice.currency}</span>
+                <span>-{formatMinorUnits(invoice.discountCents, invoice.currency)}</span>
               </div>
               <div className='flex justify-between text-base font-extrabold text-gray-900 border-t border-gray-200 pt-2'>
                 <span>Total Paid:</span>
                 <span className='text-primary font-lexend'>
-                  {(invoice.payableCents / 100).toLocaleString()} {invoice.currency}
+                  {formatMinorUnits(invoice.payableCents, invoice.currency)}
                 </span>
               </div>
             </div>

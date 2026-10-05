@@ -1,5 +1,7 @@
 'use client';
 
+import { formatMoney } from '@/lib/money';
+
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -398,7 +400,7 @@ export default function AdminCoursesPage() {
                   const formattedPrice =
                     Number(course.price) === 0
                       ? 'Free'
-                      : `$${Number(course.price).toFixed(2)} ${course.currency || 'USD'}`;
+                      : formatMoney(course.price, course.currency || 'BDT');
 
                   const formattedDate = new Date(course.updatedAt || course.createdAt).toLocaleDateString(
                     'en-US',

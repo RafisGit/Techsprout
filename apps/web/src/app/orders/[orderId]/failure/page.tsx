@@ -1,5 +1,7 @@
 'use client';
 
+import { formatMinorUnits } from '@/lib/money';
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -68,7 +70,7 @@ export default function OrderFailurePage() {
             <div className='flex justify-between'>
               <span className='text-gray-400'>Payable Amount:</span>
               <span className='font-bold text-gray-900'>
-                {(order.payableCents / 100).toLocaleString()} {order.currency}
+                {formatMinorUnits(order.payableCents, order.currency)}
               </span>
             </div>
           </div>

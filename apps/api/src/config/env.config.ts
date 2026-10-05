@@ -12,6 +12,8 @@ export const envSchema = z.object({
     .default('development_super_secret_minimum_32_characters_random_string'),
   REDIS_URL: z.string().optional().default('redis://localhost:6379'),
   WEB_ORIGIN: z.string().default('http://localhost:3000'),
+  // Single canonical public frontend origin used for browser redirects (never CORS).
+  WEB_PUBLIC_ORIGIN: z.string().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   SMS_GATEWAY_API_KEY: z.string().optional(),
@@ -24,7 +26,21 @@ export const envSchema = z.object({
   API_PUBLIC_BASE_URL: z.string().default('http://localhost:3001'),
   SSLCOMMERZ_IS_SANDBOX: z.coerce.boolean().default(true),
 }).superRefine((data, ctx) => {
+  if (data.WEB_PUBLIC_ORIGIN?.includes(',')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['WEB_PUBLIC_ORIGIN'],
+      message: 'WEB_PUBLIC_ORIGIN must be a single origin (no commas)',
+    });
+  }
   if (data.NODE_ENV === 'production') {
+    if (!data.WEB_PUBLIC_ORIGIN || data.WEB_PUBLIC_ORIGIN.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['WEB_PUBLIC_ORIGIN'],
+        message: 'WEB_PUBLIC_ORIGIN is required in production environment',
+      });
+    }
     if (!data.SSLCOMMERZ_STORE_ID || data.SSLCOMMERZ_STORE_ID.trim() === '') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -40,7 +56,10 @@ export const envSchema = z.object({
       });
     }
   }
-});
+}).transform((data) => ({
+  ...data,
+  WEB_PUBLIC_ORIGIN: (data.WEB_PUBLIC_ORIGIN?.trim() || 'http://localhost:3000').replace(/\/+$/, ''),
+}));
 
 export type EnvConfig = z.infer<typeof envSchema>;
 

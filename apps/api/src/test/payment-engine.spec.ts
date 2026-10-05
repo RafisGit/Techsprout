@@ -823,7 +823,7 @@ describe('P5.3 — Core Payment Engine & SSLCommerz Test Suite', () => {
         });
 
       expect(res.status).toBe(302);
-      expect(res.headers.location).toBe(`${env.WEB_ORIGIN}/orders/${order.id}/success`);
+      expect(res.headers.location).toBe(`${env.WEB_PUBLIC_ORIGIN}/orders/${order.id}/success`);
     });
   });
 
@@ -1181,7 +1181,7 @@ describe('P5.3 — Core Payment Engine & SSLCommerz Test Suite', () => {
         });
 
       expect(successRes.status).toBe(302);
-      expect(successRes.headers.location).toBe(`${env.WEB_ORIGIN}/orders/${order.id}/success`);
+      expect(successRes.headers.location).toBe(`${env.WEB_PUBLIC_ORIGIN}/orders/${order.id}/success`);
     });
   });
 
@@ -1422,6 +1422,7 @@ describe('P5.3 — Core Payment Engine & SSLCommerz Test Suite', () => {
         AUTH_SECRET: 'super_secret_minimum_32_characters_key_here',
         SSLCOMMERZ_STORE_ID: 'prod_store_id_12345',
         SSLCOMMERZ_STORE_PASSWORD: 'prod_store_password_secure',
+        WEB_PUBLIC_ORIGIN: 'https://frontend.example.test',
       });
       expect(prodValid.success).toBe(true);
     });
@@ -1468,7 +1469,7 @@ describe('P5.3 — Core Payment Engine & SSLCommerz Test Suite', () => {
         .send({ orderId: order.id });
 
       expect(payRes.status).toBe(201);
-      expect(payRes.body.data.gatewayUrl).toBe(`${env.WEB_ORIGIN}/orders/${order.id}/success`);
+      expect(payRes.body.data.gatewayUrl).toBe(`${env.WEB_PUBLIC_ORIGIN}/orders/${order.id}/success`);
       expect(payRes.body.data.merchantTranId).toMatch(/^TSP-FREE-/);
 
       // 3. Verify order is immediately marked PAID
@@ -2023,4 +2024,287 @@ describe('P5.3 — Core Payment Engine & SSLCommerz Test Suite', () => {
       expect(finalOrder.status).toBe('PAID');
     });
   });
+
+  // ==============================================================
+  // 10. P5 REMOTE STAGING REMEDIATION
+  // ==============================================================
+  describe('10. Remote staging remediation', () => {
+    const PUBLIC_ORIGIN = 'https://public-frontend.example.test';
+    const CORS_LIST = 'https://origin-one.example.test,https://origin-two.example.test';
+    let originalPublic: string;
+    let originalWeb: string;
+
+    beforeAll(() => {
+      originalPublic = env.WEB_PUBLIC_ORIGIN;
+      originalWeb = env.WEB_ORIGIN;
+    });
+
+    afterAll(() => {
+      env.WEB_PUBLIC_ORIGIN = originalPublic;
+      env.WEB_ORIGIN = originalWeb;
+    });
+
+    beforeEach(() => {
+      env.WEB_PUBLIC_ORIGIN = PUBLIC_ORIGIN;
+      env.WEB_ORIGIN = CORS_LIST;
+    });
+
+    async function createAndInitiate(cookies: string[], couponCode?: string) {
+      const orderRes = await request(app.getHttpServer())
+        .post('/api/v1/orders')
+        .set('Cookie', cookies)
+        .send({ courseId: paidCourse.id, ...(couponCode ? { couponCode } : {}) });
+      const order = orderRes.body.data;
+      const initRes = await request(app.getHttpServer())
+        .post('/api/v1/payments/initiate')
+        .set('Cookie', cookies)
+        .send({ orderId: order.id });
+      return { order, initRes };
+    }
+
+    describe('10.1 callback redirect origin', () => {
+      it('10.1.1 success redirect uses exactly WEB_PUBLIC_ORIGIN', async () => {
+        const { order, initRes } = await createAndInitiate(studentCookies);
+        const { merchantTranId } = initRes.body.data;
+        const valId = `VAL-${Date.now()}`;
+        mockSslCommerz.setMockValidationSuccess(valId, {
+          tran_id: merchantTranId,
+          amount: '2500.00',
+        });
+
+        const res = await request(app.getHttpServer())
+          .post('/api/v1/payments/sslcommerz/success')
+          .set('Accept', 'text/html')
+          .send({
+            tran_id: merchantTranId,
+            val_id: valId,
+            amount: '2500.00',
+            currency: 'BDT',
+            status: 'VALID',
+          });
+
+        expect(res.status).toBe(302);
+        expect(res.headers.location).toBe(`${PUBLIC_ORIGIN}/orders/${order.id}/success`);
+        expect(res.headers.location).not.toContain(',');
+      });
+
+      it('10.1.2 failure redirect uses exactly WEB_PUBLIC_ORIGIN (valid and invalid callbacks)', async () => {
+        const { order, initRes } = await createAndInitiate(studentCookies);
+        const { merchantTranId } = initRes.body.data;
+
+        const res = await request(app.getHttpServer())
+          .post('/api/v1/payments/sslcommerz/fail')
+          .set('Accept', 'text/html')
+          .send({ tran_id: merchantTranId, status: 'FAILED', failedreason: 'Card declined' });
+
+        expect(res.status).toBe(302);
+        expect(res.headers.location).toBe(
+          `${PUBLIC_ORIGIN}/orders/${order.id}/failure?reason=${encodeURIComponent('Card declined')}`
+        );
+
+        const invalid = await request(app.getHttpServer())
+          .post('/api/v1/payments/sslcommerz/fail')
+          .set('Accept', 'text/html')
+          .send({});
+        expect(invalid.status).toBe(302);
+        expect(invalid.headers.location.startsWith(`${PUBLIC_ORIGIN}/orders/unknown/failure`)).toBe(
+          true
+        );
+
+        const invalidSuccess = await request(app.getHttpServer())
+          .post('/api/v1/payments/sslcommerz/success')
+          .set('Accept', 'text/html')
+          .send({});
+        expect(invalidSuccess.status).toBe(302);
+        expect(
+          invalidSuccess.headers.location.startsWith(`${PUBLIC_ORIGIN}/orders/unknown/failure`)
+        ).toBe(true);
+      });
+
+      it('10.1.3 cancellation redirect uses exactly WEB_PUBLIC_ORIGIN (valid and invalid callbacks)', async () => {
+        const { order, initRes } = await createAndInitiate(studentCookies);
+        const { merchantTranId } = initRes.body.data;
+
+        const res = await request(app.getHttpServer())
+          .post('/api/v1/payments/sslcommerz/cancel')
+          .set('Accept', 'text/html')
+          .send({ tran_id: merchantTranId, status: 'CANCELLED' });
+
+        expect(res.status).toBe(302);
+        expect(res.headers.location).toBe(`${PUBLIC_ORIGIN}/orders/${order.id}/cancelled`);
+
+        const invalid = await request(app.getHttpServer())
+          .post('/api/v1/payments/sslcommerz/cancel')
+          .set('Accept', 'text/html')
+          .send({});
+        expect(invalid.status).toBe(302);
+        expect(invalid.headers.location).toBe(`${PUBLIC_ORIGIN}/orders/unknown/cancelled`);
+      });
+
+      it('10.1.4 comma-separated WEB_ORIGIN never appears in any redirect URL', async () => {
+        const { initRes } = await createAndInitiate(studentCookies);
+        const { merchantTranId } = initRes.body.data;
+
+        const responses = [
+          await request(app.getHttpServer())
+            .post('/api/v1/payments/sslcommerz/fail')
+            .set('Accept', 'text/html')
+            .send({ tran_id: merchantTranId, status: 'FAILED', failedreason: 'x' }),
+          await request(app.getHttpServer())
+            .post('/api/v1/payments/sslcommerz/cancel')
+            .set('Accept', 'text/html')
+            .send({}),
+          await request(app.getHttpServer())
+            .post('/api/v1/payments/sslcommerz/success')
+            .set('Accept', 'text/html')
+            .send({}),
+        ];
+        for (const r of responses) {
+          expect(r.headers.location).not.toContain(CORS_LIST);
+          expect(r.headers.location).not.toContain('origin-one');
+          expect(r.headers.location).not.toContain('origin-two');
+          expect(r.headers.location).not.toContain(',https://');
+        }
+      });
+
+      it('10.1.5 env schema rejects comma-separated WEB_PUBLIC_ORIGIN and requires it in production', () => {
+        const base = {
+          SSLCOMMERZ_STORE_ID: 'x',
+          SSLCOMMERZ_STORE_PASSWORD: 'y',
+        };
+        expect(envSchema.safeParse({ WEB_PUBLIC_ORIGIN: 'https://a.test,https://b.test' }).success).toBe(
+          false
+        );
+        expect(envSchema.safeParse({ NODE_ENV: 'production', ...base }).success).toBe(false);
+        const ok = envSchema.safeParse({
+          NODE_ENV: 'production',
+          ...base,
+          WEB_PUBLIC_ORIGIN: 'https://a.test/',
+        });
+        expect(ok.success).toBe(true);
+        expect(ok.success && ok.data.WEB_PUBLIC_ORIGIN).toBe('https://a.test');
+        const dev = envSchema.safeParse({});
+        expect(dev.success && dev.data.WEB_PUBLIC_ORIGIN).toBe('http://localhost:3000');
+      });
+    });
+
+    describe('10.2 failed payment initiation recovery', () => {
+      async function snapshot(orderId: string) {
+        const [dbOrder] = await testDb
+          .select()
+          .from(schema.orders)
+          .where(eq(schema.orders.id, orderId));
+        const dbPayments = await testDb
+          .select()
+          .from(schema.payments)
+          .where(eq(schema.payments.orderId, orderId));
+        const invoicesRows = await testDb.select().from(schema.invoices);
+        const enrollmentRows = await testDb.select().from(schema.enrollments);
+        const redemptions = await testDb
+          .select()
+          .from(schema.couponRedemptions)
+          .where(eq(schema.couponRedemptions.orderId, orderId));
+        return { dbOrder, dbPayments, invoicesRows, enrollmentRows, redemptions };
+      }
+
+      it('10.2.1 explicit gateway rejection marks payment FAILED, returns order to PENDING, and leaves no invoice/enrollment/paid state', async () => {
+        const orderRes = await request(app.getHttpServer())
+          .post('/api/v1/orders')
+          .set('Cookie', student2Cookies)
+          .send({ courseId: paidCourse.id, couponCode: 'SAVE500' });
+        const order = orderRes.body.data;
+
+        mockSslCommerz.sessionInitiationHandler = async () => ({
+          status: 'FAILED',
+          failedreason: 'Invalid Information',
+          store_passwd: 'must-not-persist',
+        });
+
+        const payRes = await request(app.getHttpServer())
+          .post('/api/v1/payments/initiate')
+          .set('Cookie', student2Cookies)
+          .send({ orderId: order.id });
+
+        expect(payRes.status).toBe(502);
+        expect(payRes.body.errorCode).toBe('GATEWAY_ERROR');
+
+        const s = await snapshot(order.id);
+        expect(s.dbOrder.status).toBe('PENDING');
+        expect(s.dbOrder.paidAt).toBeNull();
+        expect(s.dbPayments).toHaveLength(1);
+        expect(s.dbPayments[0].status).toBe('FAILED');
+        expect(JSON.stringify(s.dbPayments[0].rawResponse ?? '')).not.toContain('must-not-persist');
+        expect(s.invoicesRows).toHaveLength(0);
+        expect(s.enrollmentRows).toHaveLength(0);
+
+        // Coupon reservation stays RESERVED (never CONSUMED) and tied to the live, expiring PENDING order
+        expect(s.redemptions).toHaveLength(1);
+        expect(s.redemptions.every((r: any) => r.status === 'RESERVED')).toBe(true);
+        const [coupon] = await testDb
+          .select()
+          .from(schema.coupons)
+          .where(eq(schema.coupons.id, activeFixedCoupon.id));
+        expect(coupon.redemptionCount).toBe(1); // reservation count; unchanged by the failed initiation
+      });
+
+      it('10.2.2 network failure leaves a consistent retryable state and a retry then succeeds', async () => {
+        const orderRes = await request(app.getHttpServer())
+          .post('/api/v1/orders')
+          .set('Cookie', studentCookies)
+          .send({ courseId: paidCourse.id });
+        const order = orderRes.body.data;
+
+        mockSslCommerz.sessionInitiationHandler = async () => {
+          throw new Error('getaddrinfo ENOTFOUND sandbox.sslcommerz.com');
+        };
+
+        const failRes = await request(app.getHttpServer())
+          .post('/api/v1/payments/initiate')
+          .set('Cookie', studentCookies)
+          .send({ orderId: order.id });
+        expect(failRes.status).toBe(502);
+        expect(failRes.body.errorCode).toBe('GATEWAY_ERROR');
+
+        const s = await snapshot(order.id);
+        expect(s.dbOrder.status).toBe('PENDING');
+        expect(s.dbPayments).toHaveLength(1);
+        expect(s.dbPayments[0].status).toBe('FAILED');
+        expect(s.invoicesRows).toHaveLength(0);
+        expect(s.enrollmentRows).toHaveLength(0);
+
+        // Retry with a healthy gateway
+        mockSslCommerz.sessionInitiationHandler = undefined;
+        const retry = await request(app.getHttpServer())
+          .post('/api/v1/payments/initiate')
+          .set('Cookie', studentCookies)
+          .send({ orderId: order.id });
+        expect(retry.status).toBe(201);
+        expect(retry.body.data.gatewayUrl).toContain('sandbox.sslcommerz.com');
+
+        const after = await snapshot(order.id);
+        expect(after.dbOrder.status).toBe('PAYMENT_PROCESSING');
+        expect(after.dbPayments.filter((p: any) => p.status === 'FAILED')).toHaveLength(1);
+        expect(after.dbPayments.filter((p: any) => p.status === 'INITIATED')).toHaveLength(1);
+      });
+
+      it('10.2.3 successful initiation is unchanged (order stays PAYMENT_PROCESSING)', async () => {
+        const { order, initRes } = await (async () => {
+          const o = await request(app.getHttpServer())
+            .post('/api/v1/orders')
+            .set('Cookie', studentCookies)
+            .send({ courseId: paidCourse.id });
+          const i = await request(app.getHttpServer())
+            .post('/api/v1/payments/initiate')
+            .set('Cookie', studentCookies)
+            .send({ orderId: o.body.data.id });
+          return { order: o.body.data, initRes: i };
+        })();
+        expect(initRes.status).toBe(201);
+        const s = await snapshot(order.id);
+        expect(s.dbOrder.status).toBe('PAYMENT_PROCESSING');
+        expect(s.dbPayments[0].status).toBe('INITIATED');
+      });
+    });
+  });
 });
+

@@ -1,5 +1,7 @@
 'use client';
 
+import { formatMinorUnits } from '@/lib/money';
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -198,14 +200,14 @@ export default function OrderSuccessPage() {
               <div className='flex justify-between items-center text-gray-500'>
                 <span>Amount Paid:</span>
                 <span className='font-bold text-primary text-sm'>
-                  {(order.payableCents / 100).toLocaleString()} {order.currency}
+                  {formatMinorUnits(order.payableCents, order.currency)}
                 </span>
               </div>
               {order.discountCents > 0 && (
                 <div className='flex justify-between items-center text-emerald-600'>
                   <span>Discount Applied:</span>
                   <span className='font-medium'>
-                    -{(order.discountCents / 100).toLocaleString()} {order.currency}{' '}
+                    -{formatMinorUnits(order.discountCents, order.currency)}{' '}
                     {order.couponCode ? `(${order.couponCode})` : ''}
                   </span>
                 </div>
