@@ -22,6 +22,7 @@ import { DialogTitle } from '@radix-ui/react-dialog';
 import { useQuery } from '@tanstack/react-query';
 import { fetchPublicCategories } from '@/lib/api/catalog';
 import { useCurrentUser } from '@/lib/useCurrentUser';
+import { NotificationBell } from './NotificationBell';
 
 const navigationItems = [
   {
@@ -212,6 +213,7 @@ export function Header() {
               >
                 Orders
               </Link>
+              <NotificationBell />
             </div>
           ) : (
             <>
@@ -230,6 +232,13 @@ export function Header() {
                 </Button>
               </Link>
             </>
+          )}
+
+          {/* Mobile notification bell when logged in */}
+          {currentUser && (
+            <div className='sm:hidden flex items-center mr-1'>
+              <NotificationBell />
+            </div>
           )}
 
           {/* Mobile Menu Trigger (visible on screens smaller than lg) */}

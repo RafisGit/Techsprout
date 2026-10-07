@@ -1,4 +1,4 @@
-import { Injectable, Inject, HttpStatus } from '@nestjs/common';
+import { Injectable, Inject, HttpStatus, Optional } from '@nestjs/common';
 import { eq, and, desc, sql, count } from 'drizzle-orm';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import {
@@ -14,6 +14,7 @@ import {
   Enrollment,
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
+import { OutboxService } from '../events/outbox.service';
 import { ApiException } from '../../common/errors/api-error';
 import { QueryEnrollmentsDto } from './dto/query-enrollments.dto';
 import { AdminQueryCourseEnrollmentsDto } from './dto/admin-query-course-enrollments.dto';
@@ -23,7 +24,8 @@ import { UserContext } from '../courses/courses.service';
 export class EnrollmentsService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
-    @Inject(AuditService) private readonly auditService: AuditService
+    @Inject(AuditService) private readonly auditService: AuditService,
+    @Optional() @Inject(OutboxService) private readonly outboxService?: OutboxService
   ) {}
 
   private formatEnrollmentDto(enrollment: Enrollment, progressPercentage = 0) {
@@ -282,6 +284,25 @@ export class EnrollmentsService {
       },
     });
 
+    if (this.outboxService) {
+      this.outboxService.emit({
+        eventType: 'EnrollmentCreated',
+        entityType: 'ENROLLMENT',
+        entityId: created.id,
+        targetUserId: studentId,
+        actorUserId: studentId,
+        payload: {
+          enrollmentId: created.id,
+          courseId,
+          courseTitle: courseResult.course.title,
+          studentId,
+          userId: studentId,
+        },
+      }).catch((err) => {
+        // resilient
+      });
+    }
+
     return {
       statusCode: HttpStatus.CREATED,
       message: 'Course enrollment successful',
@@ -428,6 +449,25 @@ export class EnrollmentsService {
         reactivated: false,
       },
     });
+
+    if (this.outboxService) {
+      this.outboxService.emit({
+        eventType: 'EnrollmentCreated',
+        entityType: 'ENROLLMENT',
+        entityId: created.id,
+        targetUserId: targetStudentId,
+        actorUserId: adminId,
+        payload: {
+          enrollmentId: created.id,
+          courseId,
+          courseTitle: course.title,
+          studentId: targetStudentId,
+          userId: targetStudentId,
+        },
+      }).catch((err) => {
+        // resilient
+      });
+    }
 
     return {
       statusCode: HttpStatus.CREATED,

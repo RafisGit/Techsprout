@@ -1,4 +1,4 @@
-import { Injectable, Inject, HttpStatus, Logger, forwardRef } from '@nestjs/common';
+import { Injectable, Inject, HttpStatus, Logger, forwardRef, Optional } from '@nestjs/common';
 import { eq, and, desc, sql, count, inArray } from 'drizzle-orm';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import {
@@ -15,6 +15,7 @@ import {
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { OrdersService } from '../orders/orders.service';
+import { OutboxService } from '../events/outbox.service';
 import { ApiException } from '../../common/errors/api-error';
 import { env } from '../../config/env.config';
 import {
@@ -63,7 +64,8 @@ export class PaymentsService {
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     @Inject(AuditService) private readonly auditService: AuditService,
     @Inject(forwardRef(() => OrdersService)) private readonly ordersService: OrdersService,
-    @Inject(SSLCOMMERZ_CLIENT) private readonly sslcommerzClient: ISSLCommerzClient
+    @Inject(SSLCOMMERZ_CLIENT) private readonly sslcommerzClient: ISSLCommerzClient,
+    @Optional() @Inject(OutboxService) private readonly outboxService?: OutboxService
   ) {}
 
   public formatPaymentDto(payment: Payment): PaymentDto {
@@ -661,6 +663,25 @@ export class PaymentsService {
       });
     }
 
+    if (this.outboxService) {
+      this.outboxService.emit({
+        eventType: 'OrderPaid',
+        entityType: 'ORDER',
+        entityId: order.orderNumber,
+        targetUserId: order.studentId,
+        actorUserId: order.studentId,
+        payload: {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          amountCents: 0,
+          currency: order.currency,
+          userId: order.studentId,
+        },
+      }).catch((err) => {
+        this.logger.error(`Failed to emit OrderPaid event for zero-payable order: ${err.message}`);
+      });
+    }
+
     return result;
   }
 
@@ -960,6 +981,25 @@ export class PaymentsService {
             couponCode: fulfillment.order.couponCode,
             discountCents: fulfillment.order.discountCents,
           },
+        });
+      }
+
+      if (this.outboxService) {
+        this.outboxService.emit({
+          eventType: 'OrderPaid',
+          entityType: 'ORDER',
+          entityId: fulfillment.order.orderNumber,
+          targetUserId: fulfillment.order.studentId,
+          actorUserId: fulfillment.order.studentId,
+          payload: {
+            orderId: fulfillment.order.id,
+            orderNumber: fulfillment.order.orderNumber,
+            amountCents: fulfillment.payment.amountCents,
+            currency: fulfillment.payment.currency,
+            userId: fulfillment.order.studentId,
+          },
+        }).catch((err) => {
+          this.logger.error(`Failed to emit OrderPaid event: ${err.message}`);
         });
       }
     }

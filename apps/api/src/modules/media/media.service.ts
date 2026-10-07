@@ -97,6 +97,7 @@ export class MediaService {
             fileSize: result.bytes || (file.size ?? file.buffer.length),
             durationSeconds: null,
             metadata,
+            uploaderId: options?.uploaderId || null,
           })
           .returning();
 
@@ -197,6 +198,7 @@ export class MediaService {
             fileSize: result.bytes || (file.size ?? file.buffer.length),
             durationSeconds: result.duration ? Math.round(result.duration) : null,
             metadata,
+            uploaderId: options?.uploaderId || null,
           })
           .returning();
 

@@ -1,4 +1,4 @@
-import { Injectable, Inject, Logger, HttpStatus } from '@nestjs/common';
+import { Injectable, Inject, Logger, HttpStatus, Optional } from '@nestjs/common';
 import { eq, and, count, inArray, or, ilike, desc } from 'drizzle-orm';
 import { randomInt } from 'crypto';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
@@ -14,6 +14,7 @@ import {
   quizAttempts,
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
+import { OutboxService } from '../events/outbox.service';
 import { ApiException } from '../../common/errors/api-error';
 import { AdminQueryCertificatesDto } from './dto/query-certificates.dto';
 import { mapToAdminCertificateDto } from './dto/certificate.dto';
@@ -90,7 +91,8 @@ export class CertificateService {
 
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
-    @Inject(AuditService) private readonly auditService: AuditService
+    @Inject(AuditService) private readonly auditService: AuditService,
+    @Optional() @Inject(OutboxService) private readonly outboxService?: OutboxService
   ) {}
 
   /**
@@ -309,6 +311,26 @@ export class CertificateService {
         issuedAt: createdCert.issuedAt ? createdCert.issuedAt.toISOString() : null,
       },
     });
+
+    if (this.outboxService) {
+      this.outboxService.emit({
+        eventType: 'CertificateIssued',
+        entityType: 'CERTIFICATE',
+        entityId: createdCert.certificateNumber,
+        targetUserId: createdCert.studentId,
+        actorUserId: context?.actorId || createdCert.studentId,
+        payload: {
+          certificateId: createdCert.id,
+          certificateNumber: createdCert.certificateNumber,
+          courseId: createdCert.courseId,
+          courseTitle: createdCert.courseTitle,
+          studentId: createdCert.studentId,
+          userId: createdCert.studentId,
+        },
+      }).catch((err) => {
+        // resilient
+      });
+    }
 
     this.logger.log(
       `Certificate ${createdCert.certificateNumber} successfully issued for enrollment ${enrollmentId}`

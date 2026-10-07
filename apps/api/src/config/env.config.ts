@@ -25,6 +25,8 @@ export const envSchema = z.object({
   SSLCOMMERZ_BASE_URL: z.string().default('https://sandbox.sslcommerz.com'),
   API_PUBLIC_BASE_URL: z.string().default('http://localhost:3001'),
   SSLCOMMERZ_IS_SANDBOX: z.coerce.boolean().default(true),
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM_EMAIL: z.string().default('notifications@techsprout.io'),
 }).superRefine((data, ctx) => {
   if (data.WEB_PUBLIC_ORIGIN?.includes(',')) {
     ctx.addIssue({

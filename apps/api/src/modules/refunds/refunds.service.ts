@@ -1,4 +1,4 @@
-import { Injectable, Inject, HttpStatus, Logger } from '@nestjs/common';
+import { Injectable, Inject, HttpStatus, Logger, Optional } from '@nestjs/common';
 import { eq, and, desc, count, isNull } from 'drizzle-orm';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import {
@@ -17,6 +17,7 @@ import {
   Payment,
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
+import { OutboxService } from '../events/outbox.service';
 import { ApiException } from '../../common/errors/api-error';
 import {
   ISSLCommerzClient,
@@ -39,7 +40,8 @@ export class RefundsService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     @Inject(SSLCOMMERZ_CLIENT) private readonly sslcommerzClient: ISSLCommerzClient,
-    @Inject(AuditService) private readonly auditService: AuditService
+    @Inject(AuditService) private readonly auditService: AuditService,
+    @Optional() @Inject(OutboxService) private readonly outboxService?: OutboxService
   ) {}
 
   public formatRefundDto(refund: Refund, orderNumber?: string): RefundDto {
@@ -421,7 +423,7 @@ export class RefundsService {
     adminId?: string,
     reqMeta?: { ip?: string; userAgent?: string; requestId?: string }
   ): Promise<RefundDto> {
-    return this.db.transaction(async (tx) => {
+    const result = await this.db.transaction(async (tx) => {
       // 1. Lock order
       const [order] = await tx
         .select()
@@ -446,7 +448,13 @@ export class RefundsService {
 
       // Idempotency: if already processed or order refunded, safely return
       if (refund.status === 'PROCESSED' || order.status === 'REFUNDED') {
-        return this.formatRefundDto(refund, order.orderNumber);
+        return {
+          dto: this.formatRefundDto(refund, order.orderNumber),
+          isDuplicate: true,
+          studentId: order.studentId,
+          orderNumber: order.orderNumber,
+          amountCents: refund.amountCents,
+        };
       }
 
       // 3. Find exact course for this order
@@ -583,8 +591,35 @@ export class RefundsService {
         requestId: reqMeta?.requestId,
       });
 
-      return this.formatRefundDto(finalizedRefund, order.orderNumber);
+      return {
+        dto: this.formatRefundDto(finalizedRefund, order.orderNumber),
+        isDuplicate: false,
+        studentId: order.studentId,
+        orderNumber: order.orderNumber,
+        amountCents: refund.amountCents,
+      };
     });
+
+    if (!result.isDuplicate && this.outboxService) {
+      this.outboxService.emit({
+        eventType: 'RefundSettled',
+        entityType: 'REFUND',
+        entityId: result.dto.refundNumber,
+        targetUserId: result.studentId,
+        actorUserId: adminId || 'system',
+        payload: {
+          refundId: result.dto.id,
+          refundNumber: result.dto.refundNumber,
+          orderNumber: result.orderNumber,
+          amountCents: result.amountCents,
+          userId: result.studentId,
+        },
+      }).catch((err) => {
+        // resilient
+      });
+    }
+
+    return result.dto;
   }
 
   /**

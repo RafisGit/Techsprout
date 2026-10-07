@@ -22,6 +22,8 @@ import { z } from 'zod';
 import { OptionsService } from './options.service';
 import { Roles } from '../../common/auth/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { ResourceOwnershipGuard } from '../../common/guards/resource-ownership.guard';
+import { RequireOwnership } from '../../common/auth/decorators/resource-ownership.decorator';
 import { AuthenticatedRequest } from '../../common/http/correlation-id.middleware';
 import { ApiException } from '../../common/errors/api-error';
 import { createOptionSchema } from './dto/create-option.dto';
@@ -33,7 +35,7 @@ const uuidSchema = z.string().uuid('Invalid ID format');
 @ApiTags('Admin Quiz Question Options')
 @ApiBearerAuth()
 @ApiCookieAuth('techsprout_session')
-@UseGuards(RolesGuard)
+@UseGuards(RolesGuard, ResourceOwnershipGuard)
 @Controller('admin')
 export class OptionsController {
   constructor(
@@ -42,6 +44,7 @@ export class OptionsController {
 
   @Post('questions/:questionId/options')
   @Roles('admin', 'instructor')
+  @RequireOwnership('quizQuestion', 'questionId')
   @ApiOperation({ summary: 'Add an option to a question (Admin or course Instructor)' })
   @ApiResponse({ status: 201, description: 'Option created successfully' })
   async create(
@@ -78,6 +81,7 @@ export class OptionsController {
 
   @Patch('options/:id')
   @Roles('admin', 'instructor')
+  @RequireOwnership('quizOption', 'id')
   @ApiOperation({ summary: 'Update an option (Admin or course Instructor)' })
   @ApiResponse({ status: 200, description: 'Option updated successfully' })
   async update(
@@ -114,6 +118,7 @@ export class OptionsController {
 
   @Delete('options/:id')
   @Roles('admin', 'instructor')
+  @RequireOwnership('quizOption', 'id')
   @ApiOperation({ summary: 'Delete an option (Admin or course Instructor)' })
   @ApiResponse({ status: 200, description: 'Option deleted successfully' })
   async remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
@@ -137,6 +142,7 @@ export class OptionsController {
   @Post('questions/:questionId/options/reorder')
   @HttpCode(HttpStatus.OK)
   @Roles('admin', 'instructor')
+  @RequireOwnership('quizQuestion', 'questionId')
   @ApiOperation({ summary: 'Reorder options within a question' })
   @ApiResponse({ status: 200, description: 'Options reordered successfully' })
   async reorder(

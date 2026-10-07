@@ -26,6 +26,8 @@ import {
 import { MediaService } from './media.service';
 import { AuditService } from '../audit/audit.service';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { ResourceOwnershipGuard } from '../../common/guards/resource-ownership.guard';
+import { RequireOwnership } from '../../common/auth/decorators/resource-ownership.decorator';
 import { Roles } from '../../common/auth/decorators/roles.decorator';
 import { Public } from '../../common/auth/decorators/public.decorator';
 import { AuthenticatedRequest } from '../../common/http/correlation-id.middleware';
@@ -42,7 +44,7 @@ import { MediaResourceType } from './interfaces/media.interface';
 @ApiBearerAuth()
 @ApiCookieAuth('techsprout_session')
 @Controller('media')
-@UseGuards(RolesGuard)
+@UseGuards(RolesGuard, ResourceOwnershipGuard)
 export class MediaController {
   constructor(
     @Inject(MediaService) private readonly mediaService: MediaService,
@@ -81,6 +83,7 @@ export class MediaController {
     const result = await this.mediaService.uploadImage(file, {
       folder: body.folder,
       customIdentifier: body.customIdentifier,
+      uploaderId: req.user?.id,
     });
 
     await this.auditService.record({
@@ -133,6 +136,7 @@ export class MediaController {
     const result = await this.mediaService.uploadVideo(file, {
       folder: body.folder,
       customIdentifier: body.customIdentifier,
+      uploaderId: req.user?.id,
     });
 
     await this.auditService.record({
@@ -213,6 +217,7 @@ export class MediaController {
 
   @Post('replace')
   @Roles('admin', 'instructor')
+  @RequireOwnership('media', 'oldPublicId')
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Replace an existing media asset with a new one' })
   @ApiConsumes('multipart/form-data')
@@ -233,7 +238,8 @@ export class MediaController {
         'NO_FILE_PROVIDED'
       );
     }
-    if (!body.oldPublicId) {
+    const targetOldPublicId = body.oldPublicId || (req.query as any)?.oldPublicId;
+    if (!targetOldPublicId) {
       throw new ApiException(
         'Existing oldPublicId must be provided for replacement',
         HttpStatus.BAD_REQUEST,
@@ -242,12 +248,13 @@ export class MediaController {
     }
 
     const result = await this.mediaService.replaceMedia(
-      body.oldPublicId,
+      targetOldPublicId,
       file,
       body.resourceType || 'image',
       {
         folder: body.folder,
         customIdentifier: body.customIdentifier,
+        uploaderId: req.user?.id,
       }
     );
 

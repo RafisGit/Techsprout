@@ -204,6 +204,7 @@ export async function createTestDatabase() {
       file_size integer NOT NULL,
       duration_seconds integer,
       metadata text,
+      uploader_id uuid REFERENCES users(id) ON DELETE set null,
       created_at timestamp with time zone DEFAULT now() NOT NULL,
       updated_at timestamp with time zone DEFAULT now() NOT NULL
     );
@@ -560,6 +561,62 @@ export async function createTestDatabase() {
     );
 
     CREATE UNIQUE INDEX IF NOT EXISTS refund_requests_active_order_uq ON refund_requests (order_id) WHERE status IN ('PENDING', 'APPROVED');
+
+    CREATE TYPE notification_category AS ENUM('TRANSACTIONAL', 'ACADEMIC', 'SYSTEM');
+    CREATE TYPE delivery_channel AS ENUM('EMAIL', 'IN_APP', 'SMS');
+    CREATE TYPE delivery_status AS ENUM('PENDING', 'DELIVERED', 'FAILED');
+    CREATE TYPE outbox_status AS ENUM('PENDING', 'PUBLISHED', 'FAILED');
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE cascade,
+      title varchar(255) NOT NULL,
+      message text NOT NULL,
+      category notification_category DEFAULT 'TRANSACTIONAL' NOT NULL,
+      action_url text,
+      is_read boolean DEFAULT false NOT NULL,
+      read_at timestamp with time zone,
+      metadata text,
+      created_at timestamp with time zone DEFAULT now() NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS notification_preferences (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id uuid NOT NULL UNIQUE REFERENCES users(id) ON DELETE cascade,
+      email_order_updates boolean DEFAULT true NOT NULL,
+      email_course_updates boolean DEFAULT true NOT NULL,
+      email_promotions boolean DEFAULT false NOT NULL,
+      in_app_all boolean DEFAULT true NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS notification_deliveries (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      notification_id uuid REFERENCES notifications(id) ON DELETE set null,
+      channel delivery_channel NOT NULL,
+      status delivery_status DEFAULT 'PENDING' NOT NULL,
+      recipient varchar(255) NOT NULL,
+      provider_message_id varchar(255),
+      attempt_count integer DEFAULT 1 NOT NULL,
+      last_error text,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS outbox_events (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      event_id varchar(100) NOT NULL UNIQUE,
+      event_type varchar(100) NOT NULL,
+      actor_id uuid REFERENCES users(id) ON DELETE set null,
+      entity_id varchar(100) NOT NULL,
+      entity_type varchar(50) NOT NULL,
+      payload text NOT NULL,
+      status outbox_status DEFAULT 'PENDING' NOT NULL,
+      retry_count integer DEFAULT 0 NOT NULL,
+      last_error text,
+      published_at timestamp with time zone,
+      created_at timestamp with time zone DEFAULT now() NOT NULL
+    );
   `);
 
   // Seed baseline roles

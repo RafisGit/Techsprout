@@ -21,6 +21,8 @@ import { z } from 'zod';
 import { LessonsService } from './lessons.service';
 import { Roles } from '../../common/auth/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { ResourceOwnershipGuard } from '../../common/guards/resource-ownership.guard';
+import { RequireOwnership } from '../../common/auth/decorators/resource-ownership.decorator';
 import { AuthenticatedRequest } from '../../common/http/correlation-id.middleware';
 import { ApiException } from '../../common/errors/api-error';
 import { createLessonSchema } from './dto/create-lesson.dto';
@@ -31,13 +33,14 @@ const uuidSchema = z.string().uuid('Invalid ID format');
 @ApiTags('Admin Lessons')
 @ApiBearerAuth()
 @ApiCookieAuth('techsprout_session')
-@UseGuards(RolesGuard)
+@UseGuards(RolesGuard, ResourceOwnershipGuard)
 @Controller('admin')
 export class LessonsController {
   constructor(@Inject(LessonsService) private readonly lessonsService: LessonsService) {}
 
   @Post('modules/:id/lessons')
   @Roles('admin', 'instructor')
+  @RequireOwnership('module', 'id')
   @ApiOperation({ summary: 'Create a lesson inside a module (Admin or course Instructor)' })
   @ApiResponse({ status: 201, description: 'Lesson created successfully' })
   async create(
@@ -78,6 +81,7 @@ export class LessonsController {
 
   @Patch('lessons/:id')
   @Roles('admin', 'instructor')
+  @RequireOwnership('lesson', 'id')
   @ApiOperation({ summary: 'Update a lesson (Admin or course Instructor)' })
   @ApiResponse({ status: 200, description: 'Lesson updated successfully' })
   async update(
@@ -118,6 +122,7 @@ export class LessonsController {
 
   @Delete('lessons/:id')
   @Roles('admin', 'instructor')
+  @RequireOwnership('lesson', 'id')
   @ApiOperation({ summary: 'Delete a lesson (Admin or course Instructor)' })
   @ApiResponse({ status: 200, description: 'Lesson deleted successfully' })
   async remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {

@@ -43,6 +43,13 @@
       "when": 1791184848587,
       "tag": "0005_refund_requests_subsystem",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791353000000,
+      "tag": "0006_p6_1_notification_and_ownership",
+      "breakpoints": true
     }
   ]
 }
