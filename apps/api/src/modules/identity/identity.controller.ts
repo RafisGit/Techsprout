@@ -64,7 +64,7 @@ export class IdentityController {
     // Set secure HttpOnly session cookie
     res.cookie('techsprout_session', result.token, {
       httpOnly: true,
-      secure: env.NODE_ENV === 'production',
+      secure: env.NODE_ENV === 'production' || env.NODE_ENV === 'staging',
       sameSite: 'lax',
       path: '/',
       expires: result.expiresAt,
@@ -110,7 +110,7 @@ export class IdentityController {
 
     res.cookie('techsprout_session', result.token, {
       httpOnly: true,
-      secure: env.NODE_ENV === 'production',
+      secure: env.NODE_ENV === 'production' || env.NODE_ENV === 'staging',
       sameSite: 'lax',
       path: '/',
       expires: result.expiresAt,
@@ -136,7 +136,7 @@ export class IdentityController {
 
     res.cookie('google_oauth_state', state, {
       httpOnly: true,
-      secure: env.NODE_ENV === 'production',
+      secure: env.NODE_ENV === 'production' || env.NODE_ENV === 'staging',
       sameSite: 'lax',
       path: '/',
       maxAge: 10 * 60 * 1000, // 10 minutes
@@ -202,7 +202,7 @@ export class IdentityController {
 
     res.cookie('techsprout_session', result.token, {
       httpOnly: true,
-      secure: env.NODE_ENV === 'production',
+      secure: env.NODE_ENV === 'production' || env.NODE_ENV === 'staging',
       sameSite: 'lax',
       path: '/',
       expires: result.expiresAt,

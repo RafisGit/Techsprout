@@ -91,7 +91,7 @@ export class OtpController {
     // Set secure HttpOnly session cookie
     res.cookie('techsprout_session', result.token, {
       httpOnly: true,
-      secure: env.NODE_ENV === 'production',
+      secure: env.NODE_ENV === 'production' || env.NODE_ENV === 'staging',
       sameSite: 'lax',
       path: '/',
       expires: result.expiresAt,
