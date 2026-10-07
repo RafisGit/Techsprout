@@ -4,7 +4,7 @@ dotenv.config();
 
 export const envSchema = z.object({
   PORT: z.coerce.number().default(3001),
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  NODE_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
   DATABASE_URL: z.string().default('postgresql://postgres:postgres@localhost:5432/techsprout'),
   AUTH_SECRET: z
     .string()
@@ -35,14 +35,16 @@ export const envSchema = z.object({
       message: 'WEB_PUBLIC_ORIGIN must be a single origin (no commas)',
     });
   }
-  if (data.NODE_ENV === 'production') {
+  if (data.NODE_ENV === 'production' || data.NODE_ENV === 'staging') {
     if (!data.WEB_PUBLIC_ORIGIN || data.WEB_PUBLIC_ORIGIN.trim() === '') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['WEB_PUBLIC_ORIGIN'],
-        message: 'WEB_PUBLIC_ORIGIN is required in production environment',
+        message: `WEB_PUBLIC_ORIGIN is required in ${data.NODE_ENV} environment`,
       });
     }
+  }
+  if (data.NODE_ENV === 'production') {
     if (!data.SSLCOMMERZ_STORE_ID || data.SSLCOMMERZ_STORE_ID.trim() === '') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

@@ -2186,6 +2186,21 @@ describe('P5.3 — Core Payment Engine & SSLCommerz Test Suite', () => {
         const dev = envSchema.safeParse({});
         expect(dev.success && dev.data.WEB_PUBLIC_ORIGIN).toBe('http://localhost:3000');
       });
+
+      it('10.1.6 env schema supports staging environment with WEB_PUBLIC_ORIGIN and sandbox payment defaults', () => {
+        expect(envSchema.safeParse({ NODE_ENV: 'staging' }).success).toBe(false);
+        const stagingOk = envSchema.safeParse({
+          NODE_ENV: 'staging',
+          WEB_PUBLIC_ORIGIN: 'https://staging.techsprout-web.vercel.app',
+        });
+        expect(stagingOk.success).toBe(true);
+        if (stagingOk.success) {
+          expect(stagingOk.data.NODE_ENV).toBe('staging');
+          expect(stagingOk.data.WEB_PUBLIC_ORIGIN).toBe('https://staging.techsprout-web.vercel.app');
+          expect(stagingOk.data.SSLCOMMERZ_IS_SANDBOX).toBe(true);
+          expect(stagingOk.data.SSLCOMMERZ_BASE_URL).toBe('https://sandbox.sslcommerz.com');
+        }
+      });
     });
 
     describe('10.2 failed payment initiation recovery', () => {
