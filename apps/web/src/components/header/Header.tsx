@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ChevronDown, Grid3X3, Menu, Search, ShoppingCart, User, BookOpen } from 'lucide-react';
+import { ChevronDown, Grid3X3, Menu, Search, ShoppingCart, User, BookOpen, Receipt } from 'lucide-react';
 import Image from 'next/image';
 import logo from '@/assets/img/logo.png';
 
@@ -62,6 +62,7 @@ export function Header() {
   const [selectedCategory, setSelectedCategory] = React.useState('Categories');
   const [searchInput, setSearchInput] = React.useState('');
   const [isScrolled, setIsScrolled] = React.useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = React.useState(false);
 
   const { data: categories = [] } = useQuery({
     queryKey: ['publicCategories'],
@@ -74,6 +75,7 @@ export function Header() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchInput.trim()) {
+      setIsMobileNavOpen(false);
       router.push(`/courses?search=${encodeURIComponent(searchInput.trim())}`);
     }
   };
@@ -197,12 +199,20 @@ export function Header() {
 
           {/* User Links / Log In */}
           {currentUser ? (
-            <Link
-              href='/my-courses'
-              className='hover:text-primary hidden whitespace-nowrap text-sm font-semibold text-gray-700 sm:block'
-            >
-              My Courses
-            </Link>
+            <div className='hidden items-center space-x-3 sm:flex'>
+              <Link
+                href='/my-courses'
+                className='hover:text-primary whitespace-nowrap text-sm font-semibold text-gray-700'
+              >
+                My Courses
+              </Link>
+              <Link
+                href='/orders'
+                className='hover:text-primary whitespace-nowrap text-sm font-semibold text-gray-700'
+              >
+                Orders
+              </Link>
+            </div>
           ) : (
             <>
               {/* Log In */}
@@ -223,7 +233,7 @@ export function Header() {
           )}
 
           {/* Mobile Menu Trigger (visible on screens smaller than lg) */}
-          <Sheet>
+          <Sheet open={isMobileNavOpen} onOpenChange={setIsMobileNavOpen}>
             <SheetTrigger asChild>
               <Button variant={'ghost'} size={'icon'} className='xl:hidden'>
                 <Menu className='size-6' />
@@ -266,6 +276,7 @@ export function Header() {
                       className='cursor-pointer'
                       onClick={() => {
                         setSelectedCategory('All Categories');
+                        setIsMobileNavOpen(false);
                         router.push('/courses');
                       }}
                     >
@@ -276,6 +287,7 @@ export function Header() {
                         key={category.id}
                         onClick={() => {
                           setSelectedCategory(category.name);
+                          setIsMobileNavOpen(false);
                           router.push(`/categories/${category.slug}`);
                         }}
                         className='cursor-pointer'
@@ -300,6 +312,7 @@ export function Header() {
                             <Link
                               key={subItem.title}
                               href={subItem.href}
+                              onClick={() => setIsMobileNavOpen(false)}
                               className='hover:bg-accent block rounded-md px-3 py-2 text-sm text-gray-600 hover:text-white'
                             >
                               {subItem.title}
@@ -311,6 +324,7 @@ export function Header() {
                       <Link
                         key={item.title}
                         href={item.href}
+                        onClick={() => setIsMobileNavOpen(false)}
                         className='hover:bg-accent hover:text-accent-foreground block rounded-md px-3 py-2 text-sm font-medium'
                       >
                         {item.title}
@@ -322,21 +336,45 @@ export function Header() {
                 {/* Mobile Actions (inside sheet) */}
                 <div className='space-y-2 border-t pt-4'>
                   {currentUser ? (
-                    <Link href='/my-courses' className='block'>
-                      <Button variant='outline' className='w-full justify-start'>
-                        <BookOpen className='mr-2 h-4 w-4' />
-                        My Courses
-                      </Button>
-                    </Link>
+                    <>
+                      <Link
+                        href='/my-courses'
+                        className='block'
+                        onClick={() => setIsMobileNavOpen(false)}
+                      >
+                        <Button variant='outline' className='w-full justify-start'>
+                          <BookOpen className='mr-2 h-4 w-4' />
+                          My Courses
+                        </Button>
+                      </Link>
+                      <Link
+                        href='/orders'
+                        className='block'
+                        onClick={() => setIsMobileNavOpen(false)}
+                      >
+                        <Button variant='outline' className='w-full justify-start'>
+                          <Receipt className='mr-2 h-4 w-4' />
+                          Orders
+                        </Button>
+                      </Link>
+                    </>
                   ) : (
                     <>
-                      <Link href='/login' className='block'>
+                      <Link
+                        href='/login'
+                        className='block'
+                        onClick={() => setIsMobileNavOpen(false)}
+                      >
                         <Button variant='ghost' className='w-full justify-start'>
                           <User className='mr-2 h-4 w-4' />
                           Log In
                         </Button>
                       </Link>
-                      <Link href='/register' className='block'>
+                      <Link
+                        href='/register'
+                        className='block'
+                        onClick={() => setIsMobileNavOpen(false)}
+                      >
                         <Button className='bg-primary hover:bg-accent w-full'>Register</Button>
                       </Link>
                     </>

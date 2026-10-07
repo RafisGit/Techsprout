@@ -4,11 +4,15 @@ import {
   Param,
   Query,
   Req,
+  Res,
   HttpStatus,
   UseGuards,
   Inject,
+  StreamableFile,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiCookieAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import { Response } from 'express';
 import { z } from 'zod';
 import { InvoicesService } from './invoices.service';
 import { Roles } from '../../common/auth/decorators/roles.decorator';
@@ -49,6 +53,41 @@ export class AdminInvoicesController {
       message: 'Invoices retrieved successfully',
       data,
     };
+  }
+
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Get(':id/pdf')
+  @ApiOperation({ summary: 'Download any invoice PDF by ID (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Invoice PDF stream' })
+  async downloadInvoicePdf(
+    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+    @Res({ passthrough: true }) res: Response
+  ): Promise<StreamableFile> {
+    const parseId = uuidSchema.safeParse(id);
+    if (!parseId.success) {
+      throw new ApiException('Invalid invoice ID format', HttpStatus.BAD_REQUEST, 'INVALID_ID');
+    }
+
+    const { stream, filename } = await this.invoicesService.getInvoicePdfStream(
+      id,
+      {
+        id: req.user!.id,
+        role: req.user!.role,
+      },
+      {
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        requestId: req.id,
+      }
+    );
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    });
+
+    return new StreamableFile(stream);
   }
 
   @Get(':id')

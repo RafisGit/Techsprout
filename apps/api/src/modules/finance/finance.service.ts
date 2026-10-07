@@ -1,5 +1,7 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
-import { eq, and, sql, count, inArray, desc } from 'drizzle-orm';
+import { Injectable, Inject, Logger, HttpStatus } from '@nestjs/common';
+import { eq, and, sql, count, inArray, desc, gte, lte } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
+import { PassThrough } from 'stream';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import {
   orders,
@@ -13,11 +15,20 @@ import {
   couponRedemptions,
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
+import { ApiException } from '../../common/errors/api-error';
+import {
+  FinanceCsvService,
+  ORDERS_CSV_HEADERS,
+  REFUNDS_CSV_HEADERS,
+  RECONCILIATION_CSV_HEADERS,
+} from './finance-csv.service';
 import {
   FinanceSummaryDto,
   ReconciliationQuery,
   ReconciliationResultDto,
   ReconciliationDiscrepancyDto,
+  FinanceExportQuery,
+  formatMinorUnits,
 } from '@techsprout/contracts';
 
 @Injectable()
@@ -26,7 +37,8 @@ export class FinanceService {
 
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
-    @Inject(AuditService) private readonly auditService: AuditService
+    @Inject(AuditService) private readonly auditService: AuditService,
+    @Inject(FinanceCsvService) private readonly financeCsvService: FinanceCsvService
   ) {}
 
   /**
@@ -550,5 +562,335 @@ export class FinanceService {
         },
       });
     });
+  }
+
+  /**
+   * Validate and normalize date range for financial export:
+   * - Parses dates into Date objects.
+   * - Enforces startDate <= endDate.
+   * - Enforces maximum window of 90 calendar days.
+   * - Returns normalized UTC boundary Date objects.
+   */
+  public validateAndNormalizeDateRange(
+    startDateStr?: string,
+    endDateStr?: string
+  ): { startDate: Date; endDate: Date } {
+    let parsedStart: Date | undefined;
+    let parsedEnd: Date | undefined;
+
+    if (startDateStr) {
+      const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(startDateStr.trim());
+      parsedStart = new Date(isDateOnly ? `${startDateStr.trim()}T00:00:00.000Z` : startDateStr);
+      if (isNaN(parsedStart.getTime())) {
+        throw new ApiException('Invalid startDate format', HttpStatus.BAD_REQUEST, 'INVALID_DATE');
+      }
+    }
+
+    if (endDateStr) {
+      const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(endDateStr.trim());
+      parsedEnd = new Date(isDateOnly ? `${endDateStr.trim()}T23:59:59.999Z` : endDateStr);
+      if (isNaN(parsedEnd.getTime())) {
+        throw new ApiException('Invalid endDate format', HttpStatus.BAD_REQUEST, 'INVALID_DATE');
+      }
+    }
+
+    let startDate: Date;
+    let endDate: Date;
+
+    if (!parsedStart && !parsedEnd) {
+      endDate = new Date();
+      startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else if (parsedStart && !parsedEnd) {
+      startDate = parsedStart;
+      endDate = new Date();
+      if (startDate > endDate) {
+        endDate = new Date(startDate.getTime() + 24 * 60 * 60 * 1000 - 1);
+      }
+    } else if (!parsedStart && parsedEnd) {
+      endDate = parsedEnd;
+      startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else {
+      startDate = parsedStart!;
+      endDate = parsedEnd!;
+    }
+
+    if (startDate > endDate) {
+      throw new ApiException(
+        'startDate must be before or equal to endDate',
+        HttpStatus.BAD_REQUEST,
+        'INVALID_DATE_RANGE'
+      );
+    }
+
+    const diffMs = endDate.getTime() - startDate.getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    if (diffDays > 90.01) {
+      throw new ApiException(
+        'Export date range cannot exceed 90 days',
+        HttpStatus.BAD_REQUEST,
+        'DATE_RANGE_EXCEEDED'
+      );
+    }
+
+    return { startDate, endDate };
+  }
+
+  /**
+   * Export financial records as a streaming CSV response:
+   * - Enforces admin RBAC.
+   * - Enforces 90-day maximum window and 10,000-record safety cap.
+   * - Streams records chunk-by-chunk using FinanceCsvService with UTF-8 BOM & RFC 4180 escaping.
+   * - Emits audit event FINANCE_CSV_EXPORTED.
+   * - Read-only guarantee: zero modifications to orders, refunds, invoices, or payments.
+   */
+  async exportFinanceCsvStream(
+    query: FinanceExportQuery,
+    adminUser: { id: string; role: string },
+    reqMeta?: { ip?: string; userAgent?: string; requestId?: string }
+  ): Promise<{ stream: PassThrough; filename: string; recordCount: number }> {
+    if (adminUser.role !== 'admin') {
+      throw new ApiException(
+        'Access denied: Admin role required for financial exports',
+        HttpStatus.FORBIDDEN,
+        'FORBIDDEN'
+      );
+    }
+
+    const { startDate, endDate } = this.validateAndNormalizeDateRange(
+      query.startDate,
+      query.endDate
+    );
+
+    const MAX_EXPORT_ROWS = 10000;
+    const filename = this.financeCsvService.getSafeFilename(query.type, startDate, endDate);
+    const outputStream = new PassThrough();
+
+    let totalRecords = 0;
+
+    if (query.type === 'orders') {
+      // 1. Safety Count Gate
+      const [countRes] = await this.db
+        .select({ count: count(orders.id) })
+        .from(orders)
+        .where(and(gte(orders.createdAt, startDate), lte(orders.createdAt, endDate)));
+      totalRecords = Number(countRes?.count || 0);
+
+      if (totalRecords > MAX_EXPORT_ROWS) {
+        throw new ApiException(
+          `Export exceeds maximum limit of ${MAX_EXPORT_ROWS.toLocaleString()} records (${totalRecords.toLocaleString()} found). Please narrow your date range or filter criteria.`,
+          HttpStatus.BAD_REQUEST,
+          'EXPORT_SIZE_EXCEEDED'
+        );
+      }
+
+      // 2. Fetch Authoritative Orders Data
+      const orderRows = await this.db
+        .select({
+          orderNumber: orders.orderNumber,
+          orderId: orders.id,
+          createdAt: orders.createdAt,
+          paidAt: orders.paidAt,
+          status: orders.status,
+          subtotalCents: orders.subtotalCents,
+          discountCents: orders.discountCents,
+          payableCents: orders.payableCents,
+          currency: orders.currency,
+          studentName: users.name,
+          studentEmail: users.email,
+          courseTitle: sql<string>`COALESCE(${orderItems.courseTitle}, ${invoices.courseTitle}, 'Course Purchase')`,
+          invoiceNumber: sql<string>`COALESCE(${invoices.invoiceNumber}, '')`,
+          paymentMethod: sql<string>`COALESCE(${invoices.paymentMethod}, '')`,
+          bankTranId: sql<string>`COALESCE(${invoices.bankTranId}, '')`,
+        })
+        .from(orders)
+        .leftJoin(users, eq(orders.studentId, users.id))
+        .leftJoin(orderItems, eq(orders.id, orderItems.orderId))
+        .leftJoin(invoices, eq(orders.id, invoices.orderId))
+        .where(and(gte(orders.createdAt, startDate), lte(orders.createdAt, endDate)))
+        .orderBy(desc(orders.createdAt));
+
+      // 3. Stream Rows
+      this.financeCsvService
+        .streamRows(outputStream, ORDERS_CSV_HEADERS, orderRows, (row) => [
+          row.orderNumber,
+          row.orderId,
+          row.createdAt.toISOString(),
+          row.paidAt ? row.paidAt.toISOString() : '',
+          row.status,
+          row.studentName || 'N/A',
+          row.studentEmail || 'N/A',
+          row.courseTitle || 'Course Purchase',
+          row.subtotalCents,
+          formatMinorUnits(row.subtotalCents, row.currency as 'BDT'),
+          formatMinorUnits(row.discountCents, row.currency as 'BDT'),
+          formatMinorUnits(row.payableCents, row.currency as 'BDT'),
+          row.currency,
+          row.paymentMethod || 'N/A',
+          row.bankTranId || 'N/A',
+          row.invoiceNumber || 'N/A',
+        ])
+        .then(async (rowCount) => {
+          await this.auditService.record({
+            actorId: adminUser.id,
+            action: 'FINANCE_CSV_EXPORTED',
+            targetType: 'finance_export',
+            targetId: 'orders',
+            metadata: {
+              exportType: 'orders',
+              startDate: startDate.toISOString(),
+              endDate: endDate.toISOString(),
+              recordCount: rowCount,
+            },
+            ipAddress: reqMeta?.ip,
+            userAgent: reqMeta?.userAgent,
+            requestId: reqMeta?.requestId,
+          });
+        })
+        .catch((err) => {
+          this.logger.error(`Failed during orders CSV streaming: ${err.message}`);
+        });
+
+    } else if (query.type === 'refunds') {
+      // 1. Safety Count Gate
+      const [countRes] = await this.db
+        .select({ count: count(refunds.id) })
+        .from(refunds)
+        .where(and(gte(refunds.createdAt, startDate), lte(refunds.createdAt, endDate)));
+      totalRecords = Number(countRes?.count || 0);
+
+      if (totalRecords > MAX_EXPORT_ROWS) {
+        throw new ApiException(
+          `Export exceeds maximum limit of ${MAX_EXPORT_ROWS.toLocaleString()} records (${totalRecords.toLocaleString()} found). Please narrow your date range or filter criteria.`,
+          HttpStatus.BAD_REQUEST,
+          'EXPORT_SIZE_EXCEEDED'
+        );
+      }
+
+      // 2. Fetch Authoritative Refunds Data
+      const adminUserTable = alias(users, 'admin_user');
+      const studentUserTable = alias(users, 'student_user');
+
+      const refundRows = await this.db
+        .select({
+          refundNumber: refunds.refundNumber,
+          refundId: refunds.id,
+          orderId: refunds.orderId,
+          orderNumber: orders.orderNumber,
+          status: refunds.status,
+          amountCents: refunds.amountCents,
+          currency: refunds.currency,
+          reason: refunds.reason,
+          providerRefundRef: sql<string>`COALESCE(${refunds.providerRefundRef}, '')`,
+          processedAt: refunds.processedAt,
+          createdAt: refunds.createdAt,
+          adminName: sql<string>`COALESCE(${adminUserTable.name}, 'SYSTEM')`,
+          studentName: sql<string>`COALESCE(${studentUserTable.name}, 'N/A')`,
+          studentEmail: sql<string>`COALESCE(${studentUserTable.email}, 'N/A')`,
+          courseTitle: sql<string>`COALESCE(${orderItems.courseTitle}, 'Course Purchase')`,
+        })
+        .from(refunds)
+        .leftJoin(orders, eq(refunds.orderId, orders.id))
+        .leftJoin(adminUserTable, eq(refunds.processedBy, adminUserTable.id))
+        .leftJoin(studentUserTable, eq(orders.studentId, studentUserTable.id))
+        .leftJoin(orderItems, eq(orders.id, orderItems.orderId))
+        .where(and(gte(refunds.createdAt, startDate), lte(refunds.createdAt, endDate)))
+        .orderBy(desc(refunds.createdAt));
+
+      // 3. Stream Rows
+      this.financeCsvService
+        .streamRows(outputStream, REFUNDS_CSV_HEADERS, refundRows, (row) => [
+          row.refundNumber,
+          row.refundId,
+          row.orderNumber || 'N/A',
+          row.orderId,
+          row.status,
+          row.amountCents,
+          formatMinorUnits(row.amountCents, row.currency as 'BDT'),
+          row.currency,
+          row.reason || '',
+          row.providerRefundRef || 'N/A',
+          row.adminName,
+          row.studentName,
+          row.studentEmail,
+          row.courseTitle,
+          row.processedAt ? row.processedAt.toISOString() : '',
+          row.createdAt.toISOString(),
+        ])
+        .then(async (rowCount) => {
+          await this.auditService.record({
+            actorId: adminUser.id,
+            action: 'FINANCE_CSV_EXPORTED',
+            targetType: 'finance_export',
+            targetId: 'refunds',
+            metadata: {
+              exportType: 'refunds',
+              startDate: startDate.toISOString(),
+              endDate: endDate.toISOString(),
+              recordCount: rowCount,
+            },
+            ipAddress: reqMeta?.ip,
+            userAgent: reqMeta?.userAgent,
+            requestId: reqMeta?.requestId,
+          });
+        })
+        .catch((err) => {
+          this.logger.error(`Failed during refunds CSV streaming: ${err.message}`);
+        });
+
+    } else if (query.type === 'reconciliation') {
+      // 1. Scan discrepancies using dryRun: true (read-only)
+      const scanResult = await this.scanReconciliation({ limit: MAX_EXPORT_ROWS + 1, dryRun: true });
+      const filtered = scanResult.discrepancies.filter((d) => {
+        const t = new Date(d.detectedAt);
+        return t >= startDate && t <= endDate;
+      });
+      totalRecords = filtered.length;
+
+      if (totalRecords > MAX_EXPORT_ROWS) {
+        throw new ApiException(
+          `Export exceeds maximum limit of ${MAX_EXPORT_ROWS.toLocaleString()} records. Please narrow your date range or filter criteria.`,
+          HttpStatus.BAD_REQUEST,
+          'EXPORT_SIZE_EXCEEDED'
+        );
+      }
+
+      // 2. Stream Rows
+      this.financeCsvService
+        .streamRows(outputStream, RECONCILIATION_CSV_HEADERS, filtered, (row) => [
+          row.id,
+          row.orderNumber,
+          row.orderId,
+          row.discrepancyType,
+          row.description,
+          row.internalPayableCents,
+          formatMinorUnits(row.internalPayableCents, 'BDT'),
+          row.gatewayAmountCents ?? '',
+          row.gatewayAmountCents != null ? formatMinorUnits(row.gatewayAmountCents, 'BDT') : '',
+          row.autoResolvable ? 'YES' : 'NO',
+          row.detectedAt,
+        ])
+        .then(async (rowCount) => {
+          await this.auditService.record({
+            actorId: adminUser.id,
+            action: 'FINANCE_CSV_EXPORTED',
+            targetType: 'finance_export',
+            targetId: 'reconciliation',
+            metadata: {
+              exportType: 'reconciliation',
+              startDate: startDate.toISOString(),
+              endDate: endDate.toISOString(),
+              recordCount: rowCount,
+            },
+            ipAddress: reqMeta?.ip,
+            userAgent: reqMeta?.userAgent,
+            requestId: reqMeta?.requestId,
+          });
+        })
+        .catch((err) => {
+          this.logger.error(`Failed during reconciliation CSV streaming: ${err.message}`);
+        });
+    }
+
+    return { stream: outputStream, filename, recordCount: totalRecords };
   }
 }

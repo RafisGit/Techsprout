@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, ShoppingCart, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, RefreshCw, ClipboardCheck } from 'lucide-react';
 
 export function FinanceSubNav() {
   const pathname = usePathname();
@@ -19,6 +19,12 @@ export function FinanceSubNav() {
       title: 'Orders Explorer',
       href: '/admin/finance/orders',
       icon: ShoppingCart,
+      exact: false,
+    },
+    {
+      title: 'Refund Requests',
+      href: '/admin/finance/refund-requests',
+      icon: ClipboardCheck,
       exact: false,
     },
     {

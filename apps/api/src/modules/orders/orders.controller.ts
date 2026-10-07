@@ -8,14 +8,17 @@ import {
   Req,
   HttpStatus,
   Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiCookieAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 import { OrdersService } from './orders.service';
+import { RefundRequestsService } from '../refunds/refund-requests.service';
 import { AuthenticatedRequest } from '../../common/http/correlation-id.middleware';
 import { ApiException } from '../../common/errors/api-error';
 import { createOrderSchema } from './dto/create-order.dto';
 import { orderListQuerySchema } from './dto/query-orders.dto';
+import { createRefundRequestSchema } from '@techsprout/contracts';
 
 const uuidSchema = z.string().uuid('Invalid ID format');
 
@@ -24,7 +27,10 @@ const uuidSchema = z.string().uuid('Invalid ID format');
 @ApiCookieAuth('techsprout_session')
 @Controller('orders')
 export class OrdersController {
-  constructor(@Inject(OrdersService) private readonly ordersService: OrdersService) {}
+  constructor(
+    @Inject(OrdersService) private readonly ordersService: OrdersService,
+    @Inject(forwardRef(() => RefundRequestsService)) private readonly refundRequestsService: RefundRequestsService
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create an order for a course with server-authoritative pricing' })
@@ -53,6 +59,67 @@ export class OrdersController {
     return {
       success: true,
       message: 'Order created successfully',
+      data,
+    };
+  }
+
+  @Get(':id/refund-eligibility')
+  @ApiOperation({ summary: 'Evaluate student refund eligibility for an order' })
+  @ApiResponse({ status: 200, description: 'Eligibility evaluated successfully' })
+  async getRefundEligibility(
+    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest
+  ) {
+    const parseId = uuidSchema.safeParse(id);
+    if (!parseId.success) {
+      throw new ApiException('Invalid order ID format', HttpStatus.BAD_REQUEST, 'INVALID_ID');
+    }
+
+    const data = await this.refundRequestsService.evaluateEligibility(id, req.user!.id);
+
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  @Post(':id/refund-request')
+  @ApiOperation({ summary: 'Submit refund request for a specific order' })
+  @ApiResponse({ status: 201, description: 'Refund request submitted successfully' })
+  async submitRefundRequest(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @Req() req: AuthenticatedRequest
+  ) {
+    const parseId = uuidSchema.safeParse(id);
+    if (!parseId.success) {
+      throw new ApiException('Invalid order ID format', HttpStatus.BAD_REQUEST, 'INVALID_ID');
+    }
+
+    const parseResult = createRefundRequestSchema.safeParse(body);
+    if (!parseResult.success) {
+      throw new ApiException(
+        'Validation failed',
+        HttpStatus.BAD_REQUEST,
+        'VALIDATION_ERROR',
+        parseResult.error.flatten().fieldErrors
+      );
+    }
+
+    const data = await this.refundRequestsService.createRefundRequest(
+      id,
+      req.user!.id,
+      parseResult.data,
+      {
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        requestId: req.id,
+      }
+    );
+
+    return {
+      success: true,
+      message: 'Refund request submitted successfully and is pending administrator review',
       data,
     };
   }
@@ -103,3 +170,4 @@ export class OrdersController {
     };
   }
 }
+

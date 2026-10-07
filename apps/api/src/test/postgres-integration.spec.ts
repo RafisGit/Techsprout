@@ -77,7 +77,8 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
         'users', 'sessions', 'roles', 'user_roles', 'otps', 'audit_logs', 'accounts',
         'categories', 'media', 'courses', 'modules', 'lessons', 'enrollments', 'lesson_progress',
         'quizzes', 'quiz_questions', 'quiz_question_options', 'quiz_attempts', 'quiz_attempt_answers', 'certificates',
-        'coupons', 'orders', 'order_items', 'payments', 'coupon_redemptions', 'invoices', 'refunds'
+        'coupons', 'orders', 'order_items', 'payments', 'coupon_redemptions', 'invoices', 'refunds',
+        'refund_requests'
       );
     `);
 
@@ -109,6 +110,7 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
     expect(tableNames).toContain('coupon_redemptions');
     expect(tableNames).toContain('invoices');
     expect(tableNames).toContain('refunds');
+    expect(tableNames).toContain('refund_requests');
   });
 
   it('2. Real PostgreSQL: Enforces unique database constraints on users', async () => {

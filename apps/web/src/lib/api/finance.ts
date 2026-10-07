@@ -16,6 +16,13 @@ import type {
   PaginatedCouponsData,
   CreateCouponRequest,
   UpdateCouponRequest,
+  RefundRequestListQuery,
+  PaginatedRefundRequestsData,
+  RefundRequestDto,
+  AdminApproveRefundRequestRequest,
+  AdminRejectRefundRequestRequest,
+  ProcessApprovedRefundsResultDto,
+  FinanceExportQuery,
 } from '@techsprout/contracts';
 
 /**
@@ -144,3 +151,103 @@ export async function deleteAdminCoupon(couponId: string): Promise<CouponDto> {
   const response = await axiosInstance.delete(`/api/v1/admin/coupons/${couponId}`);
   return response.data.data;
 }
+
+// ==========================================
+// 5. ADMIN REFUND REQUESTS QUEUE API
+// ==========================================
+
+export async function fetchAdminRefundRequests(
+  query: RefundRequestListQuery = {}
+): Promise<PaginatedRefundRequestsData> {
+  const response = await axiosInstance.get('/api/v1/admin/refund-requests', {
+    params: query,
+  });
+  return response.data.data;
+}
+
+export async function fetchAdminRefundRequestById(
+  requestId: string
+): Promise<RefundRequestDto> {
+  const response = await axiosInstance.get(`/api/v1/admin/refund-requests/${requestId}`);
+  return response.data.data;
+}
+
+export async function approveRefundRequest(
+  requestId: string,
+  input: AdminApproveRefundRequestRequest = {}
+): Promise<RefundRequestDto> {
+  const response = await axiosInstance.post(
+    `/api/v1/admin/refund-requests/${requestId}/approve`,
+    input
+  );
+  return response.data.data;
+}
+
+export async function rejectRefundRequest(
+  requestId: string,
+  input: AdminRejectRefundRequestRequest
+): Promise<RefundRequestDto> {
+  const response = await axiosInstance.post(
+    `/api/v1/admin/refund-requests/${requestId}/reject`,
+    input
+  );
+  return response.data.data;
+}
+
+export async function executeAdminRefundRequest(
+  requestId: string
+): Promise<RefundDto> {
+  const response = await axiosInstance.post(
+    `/api/v1/admin/refund-requests/${requestId}/execute`
+  );
+  return response.data.data;
+}
+
+export async function processApprovedRefundRequests(
+  limit: number = 50
+): Promise<ProcessApprovedRefundsResultDto> {
+  const response = await axiosInstance.post(
+    '/api/v1/admin/refund-requests/process-approved',
+    { limit }
+  );
+  return response.data.data;
+}
+
+export async function fetchApprovedUnprocessedRefundRequests(
+  limit: number = 50
+): Promise<RefundRequestDto[]> {
+  const response = await axiosInstance.get(
+    '/api/v1/admin/refund-requests/approved-unprocessed',
+    { params: { limit } }
+  );
+  return response.data.data;
+}
+
+/**
+ * Download authoritative financial transactions as a streaming CSV Blob
+ * GET /api/v1/admin/finance/export
+ */
+export async function downloadFinanceCsvBlob(
+  query: FinanceExportQuery
+): Promise<{ blob: Blob; filename: string }> {
+  const response = await axiosInstance.get('/api/v1/admin/finance/export', {
+    params: query,
+    responseType: 'blob',
+  });
+
+  let filename = `techsprout-${query.type}-export.csv`;
+  const disposition = response.headers?.['content-disposition'];
+  if (disposition) {
+    const filenameMatch = disposition.match(/filename="?([^";]+)"?/i);
+    if (filenameMatch && filenameMatch[1]) {
+      filename = filenameMatch[1].trim();
+    }
+  }
+
+  return {
+    blob: response.data,
+    filename,
+  };
+}
+
+

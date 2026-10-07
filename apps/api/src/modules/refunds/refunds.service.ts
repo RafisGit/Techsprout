@@ -1,5 +1,5 @@
 import { Injectable, Inject, HttpStatus, Logger } from '@nestjs/common';
-import { eq, and, desc, count } from 'drizzle-orm';
+import { eq, and, desc, count, isNull } from 'drizzle-orm';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import {
   orders,
@@ -9,6 +9,7 @@ import {
   enrollments,
   certificates,
   orderItems,
+  refundRequests,
   Refund,
   Enrollment,
   Certificate,
@@ -199,6 +200,15 @@ export class RefundsService {
             .returning();
           currentRefund = created;
         }
+
+        // Link any unlinked refund request for this order
+        await tx
+          .update(refundRequests)
+          .set({
+            refundId: currentRefund.id,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(refundRequests.orderId, order.id), isNull(refundRequests.refundId)));
 
         return {
           refundRecord: currentRefund,
@@ -544,6 +554,15 @@ export class RefundsService {
           })
           .where(eq(certificates.id, targetCert.id));
       }
+
+      // 12. Link any unlinked refund request for this order
+      await tx
+        .update(refundRequests)
+        .set({
+          refundId: refund.id,
+          updatedAt: now,
+        })
+        .where(and(eq(refundRequests.orderId, order.id), isNull(refundRequests.refundId)));
 
       await this.auditService.record({
         actorId: adminId || 'system',

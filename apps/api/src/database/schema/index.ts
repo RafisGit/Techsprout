@@ -18,3 +18,4 @@ export * from './coupon-redemptions';
 export * from './payments';
 export * from './invoices';
 export * from './refunds';
+export * from './refund-requests';

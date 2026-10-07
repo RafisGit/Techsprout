@@ -1,4 +1,4 @@
-import { Injectable, Inject, HttpStatus, Logger } from '@nestjs/common';
+import { Injectable, Inject, HttpStatus, Logger, forwardRef } from '@nestjs/common';
 import { eq, and, desc, sql, count, inArray } from 'drizzle-orm';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import {
@@ -62,7 +62,7 @@ export class PaymentsService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     @Inject(AuditService) private readonly auditService: AuditService,
-    @Inject(OrdersService) private readonly ordersService: OrdersService,
+    @Inject(forwardRef(() => OrdersService)) private readonly ordersService: OrdersService,
     @Inject(SSLCOMMERZ_CLIENT) private readonly sslcommerzClient: ISSLCommerzClient
   ) {}
 

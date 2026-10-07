@@ -8,6 +8,13 @@ import type {
   ValidateCouponRequest,
   InvoiceDto,
   PaginatedInvoicesData,
+  OrderListQuery,
+  PaginatedOrdersData,
+  RefundEligibilityDto,
+  CreateRefundRequestRequest,
+  StudentRefundRequestDto,
+  StudentRefundRequestListQuery,
+  PaginatedStudentRefundRequestsData,
 } from '@techsprout/contracts';
 
 /**
@@ -72,4 +79,75 @@ export async function fetchInvoiceByOrderId(orderId: string): Promise<InvoiceDto
     return fetchInvoiceById(data.items[0].id);
   }
   return null;
+}
+
+/**
+ * Fetch authenticated student's orders with pagination and filtering
+ * GET /api/v1/orders
+ */
+export async function fetchStudentOrders(query?: OrderListQuery): Promise<PaginatedOrdersData> {
+  const response = await axiosInstance.get('/api/v1/orders', {
+    params: query,
+  });
+  return response.data.data;
+}
+
+/**
+ * Fetch refund eligibility for a student order
+ * GET /api/v1/orders/:id/refund-eligibility
+ */
+export async function fetchOrderRefundEligibility(orderId: string): Promise<RefundEligibilityDto> {
+  const response = await axiosInstance.get(`/api/v1/orders/${orderId}/refund-eligibility`);
+  return response.data.data;
+}
+
+/**
+ * Submit student refund request for an order
+ * POST /api/v1/orders/:id/refund-request
+ */
+export async function submitOrderRefundRequest(
+  orderId: string,
+  input: CreateRefundRequestRequest
+): Promise<StudentRefundRequestDto> {
+  const response = await axiosInstance.post(`/api/v1/orders/${orderId}/refund-request`, input);
+  return response.data.data;
+}
+
+/**
+ * Fetch student's submitted refund requests
+ * GET /api/v1/refund-requests
+ */
+export async function fetchStudentRefundRequests(
+  query?: StudentRefundRequestListQuery
+): Promise<PaginatedStudentRefundRequestsData> {
+  const response = await axiosInstance.get('/api/v1/refund-requests', {
+    params: query,
+  });
+  return response.data.data;
+}
+
+/**
+ * Download authoritative invoice PDF as a binary Blob
+ * GET /api/v1/invoices/:id/pdf
+ */
+export async function downloadInvoicePdfBlob(
+  invoiceId: string
+): Promise<{ blob: Blob; filename: string }> {
+  const response = await axiosInstance.get(`/api/v1/invoices/${invoiceId}/pdf`, {
+    responseType: 'blob',
+  });
+
+  let filename = `invoice-${invoiceId}.pdf`;
+  const disposition = response.headers?.['content-disposition'];
+  if (disposition) {
+    const filenameMatch = disposition.match(/filename="?([^";]+)"?/i);
+    if (filenameMatch && filenameMatch[1]) {
+      filename = filenameMatch[1].trim();
+    }
+  }
+
+  return {
+    blob: response.data,
+    filename,
+  };
 }

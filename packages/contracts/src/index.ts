@@ -769,14 +769,31 @@ export type InvoiceStatus = 'PAID' | 'REFUNDED' | 'VOID';
 
 export type RefundStatus = 'PENDING' | 'PROCESSED' | 'FAILED';
 
+export type RefundRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export type RefundRequestReasonCategory =
+  | 'COURSE_CONTENT_MISMATCH'
+  | 'TECHNICAL_ISSUES'
+  | 'ACCIDENTAL_PURCHASE'
+  | 'PERSONAL_REASONS'
+  | 'OTHER';
+
 export type Currency = 'BDT';
 
-// --- P5 CONSTANTS ---
+// --- P5 & P5.5 CONSTANTS ---
 
 export const COUPON_CODE_MIN_LENGTH = 3;
 export const COUPON_CODE_MAX_LENGTH = 30;
 export const REFUND_REASON_MIN_LENGTH = 5;
 export const REFUND_REASON_MAX_LENGTH = 1000;
+export const REFUND_POLICY_WINDOW_DAYS = 7;
+export const REFUND_POLICY_WINDOW_HOURS = 168;
+export const REFUND_POLICY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+export const REFUND_MAX_PROGRESS_PERCENTAGE = 20;
+export const REFUND_REQUEST_REASON_MIN_LENGTH = 10;
+export const REFUND_REQUEST_REASON_MAX_LENGTH = 1000;
+export const REFUND_REQUEST_REJECTION_REASON_MIN_LENGTH = 5;
+export const REFUND_REQUEST_REJECTION_REASON_MAX_LENGTH = 1000;
 
 // --- ORDER CONTRACTS ---
 
@@ -1158,6 +1175,131 @@ export interface PaginatedRefundsData {
 export type RefundDetailResponse = ApiSuccessResponse<RefundDto>;
 export type PaginatedRefundsResponse = ApiSuccessResponse<PaginatedRefundsData>;
 
+// --- P5.5 REFUND REQUEST CONTRACTS ---
+
+export interface RefundRequestDto {
+  id: string;
+  requestNumber: string;
+  orderId: string;
+  orderNumber?: string;
+  studentId: string;
+  studentName?: string;
+  studentEmail?: string;
+  courseId: string;
+  courseTitle?: string;
+  enrollmentId: string;
+  reasonCategory: RefundRequestReasonCategory;
+  reasonDetail: string;
+  courseProgressAtRequest: number;
+  status: RefundRequestStatus;
+  reviewedBy?: string | null;
+  reviewedByName?: string | null;
+  reviewedAt?: string | null;
+  rejectionReason?: string | null;
+  adminNotes?: string | null;
+  refundId?: string | null;
+  refundStatus?: RefundStatus | null;
+  currentProgress?: number;
+  orderPaidAt?: string | null;
+  orderStatus?: OrderStatus;
+  payableCents?: number;
+  subtotalCents?: number;
+  discountCents?: number;
+  currency?: Currency;
+  invoiceId?: string | null;
+  invoiceNumber?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RefundRequestListItemDto {
+  id: string;
+  requestNumber: string;
+  orderId: string;
+  orderNumber: string;
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+  courseId: string;
+  courseTitle: string;
+  payableCents: number;
+  currency: Currency;
+  reasonCategory: RefundRequestReasonCategory;
+  courseProgressAtRequest: number;
+  status: RefundRequestStatus;
+  refundStatus?: RefundStatus | null;
+  createdAt: string;
+  reviewedAt?: string | null;
+}
+
+export interface RefundEligibilityDto {
+  isEligible: boolean;
+  reason?: string | null;
+  daysRemaining: number;
+  courseProgressPercentage: number;
+  maxAllowedProgressPercentage: number;
+  orderPaidAt: string | null;
+  payableCents: number;
+  currency: Currency;
+  existingRequestId?: string | null;
+  existingRequestStatus?: RefundRequestStatus | null;
+}
+
+export interface CreateRefundRequestRequest {
+  reasonCategory: RefundRequestReasonCategory;
+  reasonDetail: string;
+}
+
+export interface AdminApproveRefundRequestRequest {
+  adminNotes?: string;
+}
+
+export interface AdminRejectRefundRequestRequest {
+  rejectionReason: string;
+  adminNotes?: string;
+}
+
+export interface RefundRequestListQuery {
+  page?: number;
+  limit?: number;
+  status?: RefundRequestStatus;
+  search?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface PaginatedRefundRequestsData {
+  items: RefundRequestListItemDto[];
+  pagination: PaginationMetadata;
+}
+
+export interface StudentRefundRequestDto {
+  id: string;
+  requestNumber: string;
+  orderId: string;
+  orderNumber?: string;
+  courseId: string;
+  courseTitle?: string;
+  reasonCategory: RefundRequestReasonCategory;
+  reasonDetail: string;
+  courseProgressAtRequest: number;
+  status: RefundRequestStatus;
+  rejectionReason?: string | null;
+  createdAt: string;
+  reviewedAt?: string | null;
+}
+
+export interface PaginatedStudentRefundRequestsData {
+  items: StudentRefundRequestDto[];
+  pagination: PaginationMetadata;
+}
+
+export type StudentRefundRequestResponse = ApiSuccessResponse<StudentRefundRequestDto>;
+export type PaginatedStudentRefundRequestsResponse = ApiSuccessResponse<PaginatedStudentRefundRequestsData>;
+export type RefundRequestDetailResponse = ApiSuccessResponse<RefundRequestDto>;
+export type PaginatedRefundRequestsResponse = ApiSuccessResponse<PaginatedRefundRequestsData>;
+export type RefundEligibilityResponse = ApiSuccessResponse<RefundEligibilityDto>;
+
 // --- FINANCE & RECONCILIATION CONTRACTS ---
 
 export interface FinanceSummaryDto {
@@ -1204,6 +1346,19 @@ export interface ReconciliationQuery {
   dryRun?: boolean;
 }
 
+// --- P5.5.7: FINANCIAL CSV EXPORT CONTRACTS ---
+export type FinanceExportType = 'orders' | 'refunds' | 'reconciliation';
+
+export const financeExportTypeSchema = z.enum(['orders', 'refunds', 'reconciliation']);
+
+export const financeExportQuerySchema = z.object({
+  type: financeExportTypeSchema,
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+});
+
+export type FinanceExportQuery = z.infer<typeof financeExportQuerySchema>;
+
 // --- P5 CONSTANTS & LIMITS ---
 export const GATEWAY_MIN_AMOUNT_CENTS = 1000; // 10.00 BDT (Official SSLCommerz V4 minimum)
 export const GATEWAY_MAX_AMOUNT_CENTS = 50_000_000; // 500,000.00 BDT (Official SSLCommerz V4 maximum)
@@ -1247,7 +1402,13 @@ export type PaymentErrorCode =
   | 'REFUND_NOT_FOUND'
   | 'REFUND_FINALIZATION_CONFLICT'
   | 'PARTIAL_REFUNDS_NOT_SUPPORTED'
-  | 'RECONCILIATION_FAILED';
+  | 'RECONCILIATION_FAILED'
+  | 'REFUND_REQUEST_NOT_FOUND'
+  | 'REFUND_REQUEST_ALREADY_ACTIVE'
+  | 'REFUND_REQUEST_ALREADY_REVIEWED'
+  | 'REFUND_WINDOW_EXPIRED'
+  | 'REFUND_PROGRESS_LIMIT_EXCEEDED'
+  | 'ENROLLMENT_INELIGIBLE';
 
 // ==========================================
 // --- P5: SHARED ZOD VALIDATION SCHEMAS ---
@@ -1278,6 +1439,16 @@ export const couponRedemptionStatusSchema = z.enum(['RESERVED', 'CONSUMED', 'REL
 export const invoiceStatusSchema = z.enum(['PAID', 'REFUNDED', 'VOID']);
 
 export const refundStatusSchema = z.enum(['PENDING', 'PROCESSED', 'FAILED']);
+
+export const refundRequestStatusSchema = z.enum(['PENDING', 'APPROVED', 'REJECTED']);
+
+export const refundRequestReasonCategorySchema = z.enum([
+  'COURSE_CONTENT_MISMATCH',
+  'TECHNICAL_ISSUES',
+  'ACCIDENTAL_PURCHASE',
+  'PERSONAL_REASONS',
+  'OTHER',
+]);
 
 export const reconciliationDiscrepancyTypeSchema = z.enum([
   'PAID_WITHOUT_ENROLLMENT',
@@ -1517,3 +1688,124 @@ export const reconciliationQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(500).optional().default(50),
   dryRun: z.boolean().optional().default(false),
 });
+
+export const createRefundRequestSchema = z.object({
+  reasonCategory: refundRequestReasonCategorySchema,
+  reasonDetail: z
+    .string({ required_error: 'Reason details are required' })
+    .trim()
+    .min(
+      REFUND_REQUEST_REASON_MIN_LENGTH,
+      `Reason details must be at least ${REFUND_REQUEST_REASON_MIN_LENGTH} characters`
+    )
+    .max(
+      REFUND_REQUEST_REASON_MAX_LENGTH,
+      `Reason details cannot exceed ${REFUND_REQUEST_REASON_MAX_LENGTH} characters`
+    ),
+});
+
+export const createRefundRequestWithOrderSchema = createRefundRequestSchema.extend({
+  orderId: z.string().uuid('Invalid order ID format'),
+});
+
+export type CreateRefundRequestWithOrderRequest = z.infer<typeof createRefundRequestWithOrderSchema>;
+
+export const studentRefundRequestListQuerySchema = paginationQuerySchema.extend({
+  status: refundRequestStatusSchema.optional(),
+});
+
+export type StudentRefundRequestListQuery = z.infer<typeof studentRefundRequestListQuerySchema>;
+
+export const adminApproveRefundRequestSchema = z.object({
+  adminNotes: z.string().trim().max(1000).optional(),
+});
+
+export const adminRejectRefundRequestSchema = z.object({
+  rejectionReason: z
+    .string({ required_error: 'Rejection reason is required' })
+    .trim()
+    .min(
+      REFUND_REQUEST_REJECTION_REASON_MIN_LENGTH,
+      `Rejection reason must be at least ${REFUND_REQUEST_REJECTION_REASON_MIN_LENGTH} characters`
+    )
+    .max(
+      REFUND_REQUEST_REJECTION_REASON_MAX_LENGTH,
+      `Rejection reason cannot exceed ${REFUND_REQUEST_REJECTION_REASON_MAX_LENGTH} characters`
+    ),
+  adminNotes: z.string().trim().max(1000).optional(),
+});
+
+export const refundRequestListQuerySchema = paginationQuerySchema.extend({
+  status: refundRequestStatusSchema.optional(),
+  search: z.string().trim().max(100).optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+});
+
+// --- REFUND EXECUTION CONTRACTS (P5.5.5) ---
+
+export type RefundProcessingOutcome =
+  | 'INITIATED'
+  | 'RETRIED'
+  | 'LINKED_DIRECT_REFUND'
+  | 'LINKED_PENDING'
+  | 'LINKED_PROCESSED'
+  | 'SKIPPED_INVALID_ORDER_STATE';
+
+export interface ProcessApprovedRefundItemResultDto {
+  requestId: string;
+  orderId: string;
+  outcome: RefundProcessingOutcome;
+  refundId?: string;
+  refundNumber?: string;
+  refundStatus?: string;
+  orderStatus?: string;
+  error?: string;
+}
+
+export interface ProcessApprovedRefundsResultDto {
+  discovered: number;
+  processed: number;
+  results: ProcessApprovedRefundItemResultDto[];
+}
+
+export const processApprovedRefundsQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(100).optional().default(50),
+});
+
+export type ProcessApprovedRefundsQuery = z.infer<typeof processApprovedRefundsQuerySchema>;
+
+// --- MONEY FORMATTING UTILITIES ---
+
+function groupedFixed2(value: number): string {
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/**
+ * Format a major-unit amount (e.g. "1000" or 1000) for a currency code.
+ * BDT -> "BDT 1,000.00". Other codes are rendered as "<CODE> 1,000.00".
+ */
+export function formatMoney(
+  amount: number | string | null | undefined,
+  currency: string | null | undefined = 'BDT'
+): string {
+  const code = (currency || 'BDT').toUpperCase();
+  const value = Number(amount);
+  const safe = Number.isFinite(value) ? value : 0;
+  return `${code} ${groupedFixed2(safe)}`;
+}
+
+/** Format integer minor units (poisha / cents) for a currency code. */
+export function formatMinorUnits(
+  minor: number | null | undefined,
+  currency: string | null | undefined = 'BDT'
+): string {
+  if (minor === null || minor === undefined || isNaN(minor)) {
+    return formatMoney(0, currency);
+  }
+  return formatMoney(minor / 100, currency);
+}
+

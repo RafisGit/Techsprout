@@ -1,8 +1,11 @@
 import { Injectable, Inject, HttpStatus } from '@nestjs/common';
 import { eq, and, or, desc, gte, lte, count, ilike } from 'drizzle-orm';
+import { PassThrough } from 'stream';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
-import { invoices, Invoice } from '../../database/schema';
+import { invoices, Invoice, orders } from '../../database/schema';
 import { ApiException } from '../../common/errors/api-error';
+import { AuditService } from '../audit/audit.service';
+import { InvoicePdfService } from './invoice-pdf.service';
 import {
   InvoiceDto,
   InvoiceListItemDto,
@@ -17,7 +20,11 @@ export interface UserContext {
 
 @Injectable()
 export class InvoicesService {
-  constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {}
+  constructor(
+    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
+    @Inject(AuditService) private readonly auditService: AuditService,
+    @Inject(InvoicePdfService) private readonly invoicePdfService: InvoicePdfService
+  ) {}
 
   /**
    * Format persisted database invoice into immutable financial snapshot DTO.
@@ -223,5 +230,107 @@ export class InvoicesService {
         hasPreviousPage: page > 1,
       },
     };
+  }
+
+  /**
+   * Retrieves invoice and associated order number with strict ownership authorization.
+   * Student may access only their own invoice; Admin may access any invoice.
+   */
+  async getInvoiceForPdf(
+    invoiceId: string,
+    user: UserContext
+  ): Promise<{ invoice: Invoice; orderNumber: string }> {
+    const rows = await this.db
+      .select({
+        invoice: invoices,
+        orderNumber: orders.orderNumber,
+      })
+      .from(invoices)
+      .leftJoin(orders, eq(invoices.orderId, orders.id))
+      .where(eq(invoices.id, invoiceId))
+      .limit(1);
+
+    if (rows.length === 0 || !rows[0].invoice) {
+      throw new ApiException('Invoice not found', HttpStatus.NOT_FOUND, 'INVOICE_NOT_FOUND');
+    }
+
+    const { invoice, orderNumber } = rows[0];
+
+    if (user.role !== 'admin' && invoice.studentId !== user.id) {
+      throw new ApiException(
+        'Access denied: cannot download another student invoice',
+        HttpStatus.FORBIDDEN,
+        'INVOICE_ACCESS_DENIED'
+      );
+    }
+
+    return {
+      invoice,
+      orderNumber: orderNumber || 'N/A',
+    };
+  }
+
+  /**
+   * Generates a streaming PDF for an authorized invoice and emits an audit event.
+   */
+  async getInvoicePdfStream(
+    invoiceId: string,
+    user: UserContext,
+    reqMeta?: { ip?: string; userAgent?: string; requestId?: string }
+  ): Promise<{ stream: PassThrough; filename: string; invoice: Invoice }> {
+    const { invoice, orderNumber } = await this.getInvoiceForPdf(invoiceId, user);
+
+    const filename = this.invoicePdfService.getSafeFilename(invoice.invoiceNumber);
+    const stream = this.invoicePdfService.createStream({ invoice, orderNumber });
+
+    await this.auditService.record({
+      actorId: user.id,
+      action: 'INVOICE_PDF_DOWNLOADED',
+      targetType: 'invoice',
+      targetId: invoice.id,
+      metadata: {
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        orderNumber,
+        status: invoice.status,
+      },
+      ipAddress: reqMeta?.ip,
+      userAgent: reqMeta?.userAgent,
+      requestId: reqMeta?.requestId,
+    });
+
+    return { stream, filename, invoice };
+  }
+
+  /**
+   * Generates a PDF buffer for an authorized invoice and emits an audit event.
+   */
+  async getInvoicePdfBuffer(
+    invoiceId: string,
+    user: UserContext,
+    reqMeta?: { ip?: string; userAgent?: string; requestId?: string }
+  ): Promise<{ buffer: Buffer; filename: string; invoice: Invoice }> {
+    const { invoice, orderNumber } = await this.getInvoiceForPdf(invoiceId, user);
+
+    const filename = this.invoicePdfService.getSafeFilename(invoice.invoiceNumber);
+    const buffer = await this.invoicePdfService.generatePdfBuffer({ invoice, orderNumber });
+
+    await this.auditService.record({
+      actorId: user.id,
+      action: 'INVOICE_PDF_DOWNLOADED',
+      targetType: 'invoice',
+      targetId: invoice.id,
+      metadata: {
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        orderNumber,
+        status: invoice.status,
+      },
+      ipAddress: reqMeta?.ip,
+      userAgent: reqMeta?.userAgent,
+      requestId: reqMeta?.requestId,
+    });
+
+    return { buffer, filename, invoice };
   }
 }

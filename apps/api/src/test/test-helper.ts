@@ -181,6 +181,8 @@ export async function createTestDatabase() {
     CREATE TYPE coupon_redemption_status AS ENUM('RESERVED', 'CONSUMED', 'RELEASED');
     CREATE TYPE invoice_status AS ENUM('PAID', 'REFUNDED', 'VOID');
     CREATE TYPE refund_status AS ENUM('PENDING', 'PROCESSED', 'FAILED');
+    CREATE TYPE refund_request_status AS ENUM('PENDING', 'APPROVED', 'REJECTED');
+    CREATE TYPE refund_request_reason_category AS ENUM('COURSE_CONTENT_MISMATCH', 'TECHNICAL_ISSUES', 'ACCIDENTAL_PURCHASE', 'PERSONAL_REASONS', 'OTHER');
 
     CREATE TABLE IF NOT EXISTS categories (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -534,6 +536,30 @@ export async function createTestDatabase() {
       CONSTRAINT refunds_currency_bdt CHECK (currency = 'BDT'),
       CONSTRAINT refunds_reason_non_empty CHECK (length(trim(reason)) >= 5)
     );
+
+    CREATE TABLE IF NOT EXISTS refund_requests (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      request_number varchar(50) NOT NULL UNIQUE,
+      order_id uuid NOT NULL REFERENCES orders(id) ON DELETE restrict,
+      student_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      course_id uuid NOT NULL REFERENCES courses(id) ON DELETE restrict,
+      enrollment_id uuid NOT NULL REFERENCES enrollments(id) ON DELETE restrict,
+      reason_category refund_request_reason_category NOT NULL,
+      reason_detail text NOT NULL,
+      course_progress_at_request integer NOT NULL,
+      status refund_request_status DEFAULT 'PENDING' NOT NULL,
+      reviewed_by uuid REFERENCES users(id) ON DELETE restrict,
+      reviewed_at timestamp with time zone,
+      rejection_reason text,
+      admin_notes text,
+      refund_id uuid REFERENCES refunds(id) ON DELETE restrict,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT refund_requests_progress_range CHECK (course_progress_at_request >= 0 AND course_progress_at_request <= 100),
+      CONSTRAINT refund_requests_reason_detail_min_len CHECK (length(trim(reason_detail)) >= 10)
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS refund_requests_active_order_uq ON refund_requests (order_id) WHERE status IN ('PENDING', 'APPROVED');
   `);
 
   // Seed baseline roles

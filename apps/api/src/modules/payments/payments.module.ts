@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 import { SSLCommerzClient, SSLCOMMERZ_CLIENT } from './sslcommerz.client';
@@ -8,7 +8,7 @@ import { OrdersModule } from '../orders/orders.module';
 import { env } from '../../config/env.config';
 
 @Module({
-  imports: [DatabaseModule, AuditModule, OrdersModule],
+  imports: [DatabaseModule, AuditModule, forwardRef(() => OrdersModule)],
   controllers: [PaymentsController],
   providers: [
     PaymentsService,

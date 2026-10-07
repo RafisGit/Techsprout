@@ -5,7 +5,7 @@ import { formatMinorUnits } from '@/lib/money';
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { fetchInvoiceById } from '@/lib/api/orders';
+import { fetchInvoiceById, downloadInvoicePdfBlob } from '@/lib/api/orders';
 import { Button } from '@/components/ui/button';
 import {
   FileText,
@@ -15,6 +15,8 @@ import {
   AlertCircle,
   ShieldCheck,
   Building,
+  Download,
+  Loader2,
 } from 'lucide-react';
 import type { InvoiceDto } from '@techsprout/contracts';
 
@@ -26,6 +28,8 @@ export default function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<InvoiceDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!invoiceId) return;
@@ -85,11 +89,33 @@ export default function InvoiceDetailPage() {
     );
   }
 
+  const handleDownloadPdf = async () => {
+    if (!invoice?.id) return;
+    setIsDownloading(true);
+    setDownloadError(null);
+    try {
+      const { blob, filename } = await downloadInvoicePdfBlob(invoice.id);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Failed to download PDF invoice. Please try again.';
+      setDownloadError(msg);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <div className='min-h-screen bg-[#F8FAFC] py-12 px-4 print:bg-white print:py-0 print:px-0'>
       <div className='max-w-3xl mx-auto space-y-6'>
         {/* Navigation / Actions Bar */}
-        <div className='flex items-center justify-between print:hidden'>
+        <div className='flex flex-wrap items-center justify-between gap-3 print:hidden'>
           <Link
             href='/my-courses'
             className='inline-flex items-center text-xs text-gray-500 hover:text-gray-900 transition-colors'
@@ -97,15 +123,49 @@ export default function InvoiceDetailPage() {
             <ArrowLeft className='w-4 h-4 mr-1.5' />
             Return to Dashboard
           </Link>
-          <Button
-            onClick={() => window.print()}
-            variant='outline'
-            className='rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 border-gray-200 shadow-2xs'
-          >
-            <Printer className='w-3.5 h-3.5 mr-1.5 text-primary' />
-            Print / Save as PDF
-          </Button>
+          <div className='flex items-center gap-2'>
+            <Button
+              onClick={handleDownloadPdf}
+              disabled={isDownloading}
+              variant='default'
+              className='rounded-xl text-xs font-semibold text-white bg-primary hover:bg-primary/90 shadow-2xs'
+              aria-label='Download Invoice PDF'
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className='w-3.5 h-3.5 mr-1.5 animate-spin' />
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <Download className='w-3.5 h-3.5 mr-1.5' />
+                  Download PDF
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={() => window.print()}
+              variant='outline'
+              className='rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 border-gray-200 shadow-2xs'
+            >
+              <Printer className='w-3.5 h-3.5 mr-1.5 text-primary' />
+              Print
+            </Button>
+          </div>
         </div>
+
+        {downloadError && (
+          <div className='bg-red-50 border border-red-200 rounded-2xl p-3 text-xs text-red-700 flex items-center justify-between print:hidden'>
+            <span>{downloadError}</span>
+            <button
+              onClick={() => setDownloadError(null)}
+              className='text-red-500 hover:text-red-700 font-bold ml-2 text-sm leading-none'
+              aria-label='Dismiss download error'
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {/* Official Printable Invoice Card */}
         <div className='bg-white rounded-3xl border border-gray-200 p-8 lg:p-12 shadow-sm space-y-8 print:border-none print:shadow-none print:p-0'>

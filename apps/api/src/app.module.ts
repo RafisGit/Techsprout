@@ -22,8 +22,10 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { InvoicesModule } from './modules/invoices/invoices.module';
 import { RefundsModule } from './modules/refunds/refunds.module';
+import { RefundRequestsModule } from './modules/refunds/refund-requests.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { FinanceModule } from './modules/finance/finance.module';
+
 
 import { HealthController } from './common/health/health.controller';
 import { CorrelationIdMiddleware } from './common/http/correlation-id.middleware';
@@ -57,6 +59,7 @@ import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
     OrdersModule,
     PaymentsModule,
     InvoicesModule,
+    RefundRequestsModule,
     RefundsModule,
     CouponsModule,
     FinanceModule,
