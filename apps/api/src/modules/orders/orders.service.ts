@@ -1,4 +1,4 @@
-import { Injectable, Inject, HttpStatus } from '@nestjs/common';
+import { Injectable, Inject, HttpStatus, Optional } from '@nestjs/common';
 import { eq, and, desc, sql, count, inArray, gte, lte, or, ilike } from 'drizzle-orm';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import {
@@ -16,6 +16,7 @@ import {
   Coupon,
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
+import { OutboxService } from '../events/outbox.service';
 import { ApiException } from '../../common/errors/api-error';
 import { decimalStringToCents, calculateDiscountCents } from '../payments/money.util';
 import { CreateOrderRequest, OrderListQuery, OrderDto } from '@techsprout/contracts';
@@ -31,7 +32,8 @@ export interface UserContext {
 export class OrdersService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
-    @Inject(AuditService) private readonly auditService: AuditService
+    @Inject(AuditService) private readonly auditService: AuditService,
+    @Optional() @Inject(OutboxService) private readonly outboxService?: OutboxService
   ) {}
 
   public formatOrderDto(
@@ -323,7 +325,27 @@ export class OrdersService {
       },
     });
 
-    // 7. Fetch student info for format
+    // 7. Emit Domain Event
+    if (this.outboxService) {
+      this.outboxService.emit({
+        eventType: 'OrderPlaced',
+        entityType: 'ORDER',
+        entityId: created.order.orderNumber,
+        targetUserId: studentId,
+        actorUserId: studentId,
+        payload: {
+          orderId: created.order.id,
+          orderNumber: created.order.orderNumber,
+          amountCents: payableCents,
+          currency,
+          userId: studentId,
+        },
+      }).catch((err) => {
+        // Asynchronous resilience: event dispatch never disrupts core operation
+      });
+    }
+
+    // 8. Fetch student info for format
     const [student] = await this.db
       .select({ name: users.name, email: users.email })
       .from(users)

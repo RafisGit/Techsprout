@@ -19,3 +19,4 @@ export * from './payments';
 export * from './invoices';
 export * from './refunds';
 export * from './refund-requests';
+export * from './notifications';

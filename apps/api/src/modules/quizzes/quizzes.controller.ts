@@ -23,6 +23,8 @@ import { z } from 'zod';
 import { QuizzesService } from './quizzes.service';
 import { Roles } from '../../common/auth/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { ResourceOwnershipGuard } from '../../common/guards/resource-ownership.guard';
+import { RequireOwnership } from '../../common/auth/decorators/resource-ownership.decorator';
 import { AuthenticatedRequest } from '../../common/http/correlation-id.middleware';
 import { ApiException } from '../../common/errors/api-error';
 import { createQuizSchema } from './dto/create-quiz.dto';
@@ -34,7 +36,7 @@ const uuidSchema = z.string().uuid('Invalid ID format');
 @ApiTags('Admin Quizzes')
 @ApiBearerAuth()
 @ApiCookieAuth('techsprout_session')
-@UseGuards(RolesGuard)
+@UseGuards(RolesGuard, ResourceOwnershipGuard)
 @Controller('admin')
 export class QuizzesController {
   constructor(
@@ -43,6 +45,7 @@ export class QuizzesController {
 
   @Post('modules/:id/quizzes')
   @Roles('admin', 'instructor')
+  @RequireOwnership('module', 'id')
   @ApiOperation({ summary: 'Create a quiz inside a module (Admin or course Instructor)' })
   @ApiResponse({ status: 201, description: 'Quiz created successfully' })
   async create(
@@ -83,6 +86,7 @@ export class QuizzesController {
 
   @Get('modules/:id/quizzes')
   @Roles('admin', 'instructor')
+  @RequireOwnership('module', 'id')
   @ApiOperation({ summary: 'List quizzes inside a module (Admin or course Instructor)' })
   @ApiResponse({ status: 200, description: 'Quizzes listed successfully' })
   async listByModule(
@@ -108,6 +112,7 @@ export class QuizzesController {
 
   @Get('quizzes/:id')
   @Roles('admin', 'instructor')
+  @RequireOwnership('quiz', 'id')
   @ApiOperation({ summary: 'Get authoring quiz details with questions and options' })
   @ApiResponse({ status: 200, description: 'Quiz retrieved successfully' })
   async findById(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
@@ -130,6 +135,7 @@ export class QuizzesController {
 
   @Patch('quizzes/:id')
   @Roles('admin', 'instructor')
+  @RequireOwnership('quiz', 'id')
   @ApiOperation({ summary: 'Update a quiz (Admin or course Instructor)' })
   @ApiResponse({ status: 200, description: 'Quiz updated successfully' })
   async update(
@@ -170,6 +176,7 @@ export class QuizzesController {
 
   @Delete('quizzes/:id')
   @Roles('admin', 'instructor')
+  @RequireOwnership('quiz', 'id')
   @ApiOperation({ summary: 'Delete a quiz (Admin or course Instructor)' })
   @ApiResponse({ status: 200, description: 'Quiz deleted successfully' })
   async remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
@@ -196,6 +203,7 @@ export class QuizzesController {
   @Post('quizzes/:id/publish')
   @HttpCode(HttpStatus.OK)
   @Roles('admin', 'instructor')
+  @RequireOwnership('quiz', 'id')
   @ApiOperation({ summary: 'Publish a draft quiz' })
   @ApiResponse({ status: 200, description: 'Quiz published successfully' })
   async publish(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
@@ -222,6 +230,7 @@ export class QuizzesController {
   @Post('quizzes/:id/archive')
   @HttpCode(HttpStatus.OK)
   @Roles('admin', 'instructor')
+  @RequireOwnership('quiz', 'id')
   @ApiOperation({ summary: 'Archive a published quiz' })
   @ApiResponse({ status: 200, description: 'Quiz archived successfully' })
   async archive(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
@@ -248,6 +257,7 @@ export class QuizzesController {
   @Post('modules/:id/quizzes/reorder')
   @HttpCode(HttpStatus.OK)
   @Roles('admin', 'instructor')
+  @RequireOwnership('module', 'id')
   @ApiOperation({ summary: 'Reorder quizzes within a module' })
   @ApiResponse({ status: 200, description: 'Quizzes reordered successfully' })
   async reorder(

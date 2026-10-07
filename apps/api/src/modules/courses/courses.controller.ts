@@ -24,6 +24,8 @@ import { z } from 'zod';
 import { CoursesService } from './courses.service';
 import { Roles } from '../../common/auth/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { ResourceOwnershipGuard } from '../../common/guards/resource-ownership.guard';
+import { RequireOwnership } from '../../common/auth/decorators/resource-ownership.decorator';
 import { AuthenticatedRequest } from '../../common/http/correlation-id.middleware';
 import { ApiException } from '../../common/errors/api-error';
 import { createCourseSchema } from './dto/create-course.dto';
@@ -35,7 +37,7 @@ const uuidSchema = z.string().uuid('Invalid course ID');
 @ApiTags('Admin Courses')
 @ApiBearerAuth()
 @ApiCookieAuth('techsprout_session')
-@UseGuards(RolesGuard)
+@UseGuards(RolesGuard, ResourceOwnershipGuard)
 @Controller('admin/courses')
 export class CoursesController {
   constructor(@Inject(CoursesService) private readonly coursesService: CoursesService) {}
@@ -121,6 +123,7 @@ export class CoursesController {
 
   @Patch(':id')
   @Roles('admin', 'instructor')
+  @RequireOwnership('course', 'id')
   @ApiOperation({ summary: 'Update course metadata' })
   @ApiResponse({ status: 200, description: 'Course updated successfully' })
   async update(
@@ -161,6 +164,7 @@ export class CoursesController {
 
   @Delete(':id')
   @Roles('admin', 'instructor')
+  @RequireOwnership('course', 'id')
   @ApiOperation({ summary: 'Delete a draft course' })
   @ApiResponse({ status: 200, description: 'Course deleted successfully' })
   async remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {

@@ -23,6 +23,8 @@ import { z } from 'zod';
 import { QuestionsService } from './questions.service';
 import { Roles } from '../../common/auth/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { ResourceOwnershipGuard } from '../../common/guards/resource-ownership.guard';
+import { RequireOwnership } from '../../common/auth/decorators/resource-ownership.decorator';
 import { AuthenticatedRequest } from '../../common/http/correlation-id.middleware';
 import { ApiException } from '../../common/errors/api-error';
 import { createQuestionSchema } from './dto/create-question.dto';
@@ -34,7 +36,7 @@ const uuidSchema = z.string().uuid('Invalid ID format');
 @ApiTags('Admin Quiz Questions')
 @ApiBearerAuth()
 @ApiCookieAuth('techsprout_session')
-@UseGuards(RolesGuard)
+@UseGuards(RolesGuard, ResourceOwnershipGuard)
 @Controller('admin')
 export class QuestionsController {
   constructor(
@@ -43,6 +45,7 @@ export class QuestionsController {
 
   @Post('quizzes/:quizId/questions')
   @Roles('admin', 'instructor')
+  @RequireOwnership('quiz', 'quizId')
   @ApiOperation({ summary: 'Add a question to a quiz (Admin or course Instructor)' })
   @ApiResponse({ status: 201, description: 'Question created successfully' })
   async create(
@@ -79,6 +82,7 @@ export class QuestionsController {
 
   @Get('questions/:id')
   @Roles('admin', 'instructor')
+  @RequireOwnership('quizQuestion', 'id')
   @ApiOperation({ summary: 'Get question details with options' })
   @ApiResponse({ status: 200, description: 'Question retrieved successfully' })
   async findById(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
@@ -101,6 +105,7 @@ export class QuestionsController {
 
   @Patch('questions/:id')
   @Roles('admin', 'instructor')
+  @RequireOwnership('quizQuestion', 'id')
   @ApiOperation({ summary: 'Update a question (Admin or course Instructor)' })
   @ApiResponse({ status: 200, description: 'Question updated successfully' })
   async update(
@@ -137,6 +142,7 @@ export class QuestionsController {
 
   @Delete('questions/:id')
   @Roles('admin', 'instructor')
+  @RequireOwnership('quizQuestion', 'id')
   @ApiOperation({ summary: 'Delete a question (Admin or course Instructor)' })
   @ApiResponse({ status: 200, description: 'Question deleted successfully' })
   async remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
@@ -160,6 +166,7 @@ export class QuestionsController {
   @Post('quizzes/:quizId/questions/reorder')
   @HttpCode(HttpStatus.OK)
   @Roles('admin', 'instructor')
+  @RequireOwnership('quiz', 'quizId')
   @ApiOperation({ summary: 'Reorder questions within a quiz' })
   @ApiResponse({ status: 200, description: 'Questions reordered successfully' })
   async reorder(

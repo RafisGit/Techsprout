@@ -1809,3 +1809,81 @@ export function formatMinorUnits(
   return formatMoney(minor / 100, currency);
 }
 
+// --- NOTIFICATION & EVENT CONTRACTS (P6.1) ---
+
+export type NotificationCategory = 'TRANSACTIONAL' | 'ACADEMIC' | 'SYSTEM';
+export type DeliveryChannel = 'EMAIL' | 'IN_APP' | 'SMS';
+export type DeliveryStatus = 'PENDING' | 'DELIVERED' | 'FAILED';
+
+export interface NotificationDto {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  category: NotificationCategory;
+  actionUrl?: string | null;
+  isRead: boolean;
+  readAt?: string | null;
+  createdAt: string;
+}
+
+export interface UnreadNotificationCountDto {
+  unreadCount: number;
+}
+
+export interface PaginatedNotificationsData {
+  items: NotificationDto[];
+  pagination: PaginationMetadata;
+  unreadCount: number;
+}
+
+export interface NotificationPreferencesDto {
+  id: string;
+  userId: string;
+  emailOrderUpdates: boolean;
+  emailCourseUpdates: boolean;
+  emailPromotions: boolean;
+  inAppAll: boolean;
+  updatedAt: string;
+}
+
+export const notificationCategorySchema = z.enum([
+  'TRANSACTIONAL',
+  'ACADEMIC',
+  'SYSTEM',
+]);
+
+export const notificationListQuerySchema = paginationQuerySchema.extend({
+  category: notificationCategorySchema.optional(),
+  isRead: z.preprocess((val) => {
+    if (val === 'true' || val === true) return true;
+    if (val === 'false' || val === false) return false;
+    return undefined;
+  }, z.boolean().optional()),
+});
+
+export type NotificationListQuery = z.infer<typeof notificationListQuerySchema>;
+
+export const updateNotificationPreferencesSchema = z
+  .object({
+    emailCourseUpdates: z.boolean().optional(),
+    emailPromotions: z.boolean().optional(),
+    inAppAll: z.boolean().optional(),
+  })
+  .strict('Client cannot modify userId or transactional email settings');
+
+export type UpdateNotificationPreferencesRequest = z.infer<
+  typeof updateNotificationPreferencesSchema
+>;
+
+export interface DomainEventPayload<T = unknown> {
+  eventId: string;
+  eventType: string;
+  occurredAt: string;
+  actorId?: string | null;
+  entityId: string;
+  entityType: string;
+  payload: T;
+  version: number;
+}
+

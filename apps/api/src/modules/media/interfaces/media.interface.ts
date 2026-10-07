@@ -46,6 +46,7 @@ export interface UploadMediaOptions {
   customIdentifier?: string;
   tags?: string[];
   overwrite?: boolean;
+  uploaderId?: string;
 }
 
 export interface FilePayload {

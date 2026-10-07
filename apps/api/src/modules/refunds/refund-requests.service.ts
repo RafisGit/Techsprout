@@ -1,4 +1,4 @@
-import { Injectable, Inject, HttpStatus, Logger, forwardRef } from '@nestjs/common';
+import { Injectable, Inject, HttpStatus, Logger, forwardRef, Optional } from '@nestjs/common';
 import { eq, and, desc, count, inArray, or, ilike, gte, lte, isNull, asc } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
@@ -19,6 +19,7 @@ import {
   invoices,
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
+import { OutboxService } from '../events/outbox.service';
 import { ApiException } from '../../common/errors/api-error';
 import { RefundsService } from './refunds.service';
 import {
@@ -52,7 +53,8 @@ export class RefundRequestsService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     @Inject(AuditService) private readonly auditService: AuditService,
-    @Inject(forwardRef(() => RefundsService)) private readonly refundsService: RefundsService
+    @Inject(forwardRef(() => RefundsService)) private readonly refundsService: RefundsService,
+    @Optional() @Inject(OutboxService) private readonly outboxService?: OutboxService
   ) {}
 
   /**
@@ -311,7 +313,7 @@ export class RefundRequestsService {
     reqMeta?: { ip?: string; userAgent?: string; requestId?: string }
   ): Promise<StudentRefundRequestDto> {
     try {
-      return await this.db.transaction(async (tx) => {
+      const result = await this.db.transaction(async (tx) => {
         // 1. Acquire order with row-lock to prevent race conditions
         const [order] = await tx
           .select()
@@ -476,6 +478,28 @@ export class RefundRequestsService {
           purchasedItem.courseTitle
         );
       });
+
+      if (this.outboxService) {
+        this.outboxService.emit({
+          eventType: 'RefundRequested',
+          entityType: 'REFUND_REQUEST',
+          entityId: result.requestNumber,
+          targetUserId: studentId,
+          actorUserId: studentId,
+          payload: {
+            requestId: result.id,
+            requestNumber: result.requestNumber,
+            orderId: result.orderId,
+            orderNumber: result.orderNumber,
+            reason: result.reasonDetail || result.reasonCategory,
+            userId: studentId,
+          },
+        }).catch((err) => {
+          // resilient
+        });
+      }
+
+      return result;
     } catch (error: any) {
       if (error instanceof ApiException) {
         throw error;
@@ -831,7 +855,29 @@ export class RefundRequestsService {
       });
     });
 
-    return this.getAdminRefundRequestById(requestId);
+    const updatedDto = await this.getAdminRefundRequestById(requestId);
+
+    if (this.outboxService) {
+      this.outboxService.emit({
+        eventType: 'RefundRejected',
+        entityType: 'REFUND_REQUEST',
+        entityId: updatedDto.requestNumber,
+        targetUserId: updatedDto.studentId,
+        actorUserId: adminId,
+        payload: {
+          requestId: updatedDto.id,
+          requestNumber: updatedDto.requestNumber,
+          orderId: updatedDto.orderId,
+          orderNumber: updatedDto.orderNumber,
+          reason: input.rejectionReason.trim(),
+          userId: updatedDto.studentId,
+        },
+      }).catch((err) => {
+        // resilient
+      });
+    }
+
+    return updatedDto;
   }
 
   /**
@@ -941,7 +987,29 @@ export class RefundRequestsService {
       });
     });
 
-    return this.getAdminRefundRequestById(requestId);
+    const updatedDto = await this.getAdminRefundRequestById(requestId);
+
+    if (this.outboxService) {
+      this.outboxService.emit({
+        eventType: 'RefundApproved',
+        entityType: 'REFUND_REQUEST',
+        entityId: updatedDto.requestNumber,
+        targetUserId: updatedDto.studentId,
+        actorUserId: adminId,
+        payload: {
+          requestId: updatedDto.id,
+          requestNumber: updatedDto.requestNumber,
+          orderId: updatedDto.orderId,
+          orderNumber: updatedDto.orderNumber,
+          amountCents: updatedDto.payableCents || 0,
+          userId: updatedDto.studentId,
+        },
+      }).catch((err) => {
+        // resilient
+      });
+    }
+
+    return updatedDto;
   }
 
   /**

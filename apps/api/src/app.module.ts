@@ -25,7 +25,8 @@ import { RefundsModule } from './modules/refunds/refunds.module';
 import { RefundRequestsModule } from './modules/refunds/refund-requests.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { FinanceModule } from './modules/finance/finance.module';
-
+import { EventsModule } from './modules/events/events.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 import { HealthController } from './common/health/health.controller';
 import { CorrelationIdMiddleware } from './common/http/correlation-id.middleware';
@@ -63,6 +64,8 @@ import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
     RefundsModule,
     CouponsModule,
     FinanceModule,
+    EventsModule,
+    NotificationsModule,
   ],
   controllers: [HealthController],
   providers: [
