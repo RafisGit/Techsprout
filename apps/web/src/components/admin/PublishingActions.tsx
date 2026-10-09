@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, RotateCcw, Archive, AlertCircle, Loader2, Send, XCircle } from 'lucide-react';
+import { CheckCircle2, RotateCcw, Archive, AlertCircle, Loader2, Send, XCircle, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CourseStatusBadge } from './StatusBadge';
 import { publishCourse, unpublishCourse, archiveCourse } from '@/lib/api/catalog';
@@ -106,9 +107,22 @@ export function PublishingActions({ course, isAdmin, onStatusChanged }: Publishi
             Formal state machine governing public visibility and lifecycle status.
           </p>
         </div>
-        <div className='flex items-center space-x-2'>
-          <span className='text-xs text-gray-500 font-medium'>Current Status:</span>
-          <CourseStatusBadge status={course.status} />
+        <div className='flex items-center space-x-3'>
+          <Link href={`/instructor/courses/${course.id}/learners`}>
+            <Button
+              type='button'
+              variant='outline'
+              size='sm'
+              className='text-xs flex items-center gap-1.5 text-blue-700 border-blue-200 hover:bg-blue-50'
+            >
+              <Users className='w-3.5 h-3.5' />
+              <span>Learner Roster</span>
+            </Button>
+          </Link>
+          <div className='flex items-center space-x-2'>
+            <span className='text-xs text-gray-500 font-medium'>Current Status:</span>
+            <CourseStatusBadge status={course.status} />
+          </div>
         </div>
       </div>
 

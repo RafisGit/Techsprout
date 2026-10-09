@@ -18,6 +18,7 @@ import {
   Clock,
   CheckCircle2,
   AlertTriangle,
+  Users,
 } from 'lucide-react';
 import type { CourseDto } from '@techsprout/contracts';
 
@@ -200,6 +201,13 @@ export function InstructorCoursesClient() {
                         </Button>
                       </Link>
                     )}
+
+                    <Link href={`/instructor/courses/${course.id}/learners`}>
+                      <Button variant='outline' size='sm' className='flex items-center gap-1.5 text-blue-700 border-blue-200 hover:bg-blue-50'>
+                        <Users className='w-4 h-4' />
+                        <span>Learners</span>
+                      </Button>
+                    </Link>
 
                     <Link href={`/admin/courses/${course.id}`}>
                       <Button variant='outline' size='sm' className='flex items-center gap-1.5'>

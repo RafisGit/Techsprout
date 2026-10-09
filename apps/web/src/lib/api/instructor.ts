@@ -164,3 +164,57 @@ export async function rejectCourseReview(
   const response = await axiosInstance.post(`/api/v1/admin/courses/${courseId}/reject-review`, data);
   return response.data.data;
 }
+
+// =========================================================================
+// COURSE ENROLLMENTS & LEARNER ROSTER API
+// =========================================================================
+
+export type EnrollmentStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+
+export interface CourseEnrollmentStudent {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface CourseEnrollmentItem {
+  enrollmentId: string;
+  student: CourseEnrollmentStudent;
+  status: EnrollmentStatus;
+  enrolledAt: string;
+  completedAt: string | null;
+  lastAccessedAt: string | null;
+  progressPercentage: number;
+}
+
+export interface CourseEnrollmentsQueryParams {
+  status?: EnrollmentStatus;
+  page?: number;
+  limit?: number;
+}
+
+export interface CourseEnrollmentsResponse {
+  courseId: string;
+  totalEnrolled: number;
+  completedCount: number;
+  items: CourseEnrollmentItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+}
+
+export async function fetchCourseEnrollments(
+  courseId: string,
+  params?: CourseEnrollmentsQueryParams
+): Promise<CourseEnrollmentsResponse> {
+  const response = await axiosInstance.get(`/api/v1/admin/courses/${courseId}/enrollments`, {
+    params,
+  });
+  return response.data.data;
+}
+
