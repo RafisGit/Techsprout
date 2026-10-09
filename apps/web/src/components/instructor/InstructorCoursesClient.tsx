@@ -4,12 +4,28 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { fetchInstructorCourses } from '@/lib/api/instructor';
+import { CourseReviewModal } from '@/components/instructor/CourseReviewModal';
+import { ReviewWithdrawalModal } from '@/components/instructor/ReviewWithdrawalModal';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Search, BookOpen, Clock, CheckCircle2, FileEdit } from 'lucide-react';
+import {
+  PlusCircle,
+  Search,
+  BookOpen,
+  Send,
+  RotateCcw,
+  FileEdit,
+  ExternalLink,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+} from 'lucide-react';
+import type { CourseDto } from '@techsprout/contracts';
 
 export function InstructorCoursesClient() {
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [reviewModalCourseId, setReviewModalCourseId] = useState<string | null>(null);
+  const [withdrawModalCourse, setWithdrawModalCourse] = useState<CourseDto | null>(null);
 
   const {
     data: coursesData,
@@ -151,11 +167,44 @@ export function InstructorCoursesClient() {
                     </div>
                   </div>
 
-                  <div className='flex items-center gap-3'>
+                  {/* Context-Sensitive Action Buttons */}
+                  <div className='flex flex-wrap items-center gap-2.5'>
+                    {course.status === 'DRAFT' && (
+                      <Button
+                        size='sm'
+                        onClick={() => setReviewModalCourseId(course.id)}
+                        className='bg-primary text-white hover:bg-primary/90 flex items-center gap-1.5'
+                      >
+                        <Send className='w-4 h-4' />
+                        <span>Submit for Review</span>
+                      </Button>
+                    )}
+
+                    {course.status === 'IN_REVIEW' && (
+                      <Button
+                        size='sm'
+                        variant='outline'
+                        onClick={() => setWithdrawModalCourse(course)}
+                        className='border-blue-300 text-blue-800 hover:bg-blue-50 flex items-center gap-1.5'
+                      >
+                        <RotateCcw className='w-4 h-4' />
+                        <span>Withdraw Review</span>
+                      </Button>
+                    )}
+
+                    {course.status === 'PUBLISHED' && (
+                      <Link href={`/courses/${course.slug}`} target='_blank' rel='noopener noreferrer'>
+                        <Button variant='outline' size='sm' className='flex items-center gap-1.5 text-emerald-700 border-emerald-300 hover:bg-emerald-50'>
+                          <ExternalLink className='w-4 h-4' />
+                          <span>View Live</span>
+                        </Button>
+                      </Link>
+                    )}
+
                     <Link href={`/admin/courses/${course.id}`}>
                       <Button variant='outline' size='sm' className='flex items-center gap-1.5'>
                         <FileEdit className='w-4 h-4' />
-                        <span>Edit Curriculum</span>
+                        <span>{course.status === 'IN_REVIEW' ? 'View Curriculum' : 'Edit Curriculum'}</span>
                       </Button>
                     </Link>
                   </div>
@@ -165,6 +214,28 @@ export function InstructorCoursesClient() {
           </div>
         )}
       </div>
+
+      {/* Review Submission Modal */}
+      {reviewModalCourseId && (
+        <CourseReviewModal
+          courseId={reviewModalCourseId}
+          courseTitle={allCourses.find((c) => c.id === reviewModalCourseId)?.title}
+          open={!!reviewModalCourseId}
+          onOpenChange={(open) => !open && setReviewModalCourseId(null)}
+          onSuccess={() => refetch()}
+        />
+      )}
+
+      {/* Review Withdrawal Modal */}
+      {withdrawModalCourse && (
+        <ReviewWithdrawalModal
+          courseId={withdrawModalCourse.id}
+          courseTitle={withdrawModalCourse.title}
+          open={!!withdrawModalCourse}
+          onOpenChange={(open) => !open && setWithdrawModalCourse(null)}
+          onSuccess={() => refetch()}
+        />
+      )}
     </div>
   );
 }

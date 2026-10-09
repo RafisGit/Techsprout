@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, FolderTree, LayoutDashboard, UserCheck, Banknote, Ticket } from 'lucide-react';
+import { BookOpen, FolderTree, LayoutDashboard, UserCheck, Banknote, Ticket, ClipboardCheck } from 'lucide-react';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 
 export function AdminNav() {
@@ -24,6 +24,12 @@ export function AdminNav() {
       href: '/admin/courses',
       icon: BookOpen,
       show: true,
+    },
+    {
+      title: 'Review Queue',
+      href: '/admin/courses/review-queue',
+      icon: ClipboardCheck,
+      show: isAdmin,
     },
     {
       title: 'Categories',
@@ -55,7 +61,10 @@ export function AdminNav() {
             .map((link) => {
               const Icon = link.icon;
               const isActive =
-                pathname === link.href || (link.href !== '/dashboard/admin/overview' && pathname.startsWith(link.href));
+                pathname === link.href ||
+                (link.href === '/admin/courses'
+                  ? pathname.startsWith('/admin/courses') && !pathname.startsWith('/admin/courses/review-queue')
+                  : link.href !== '/dashboard/admin/overview' && pathname.startsWith(link.href));
 
               return (
                 <Link
