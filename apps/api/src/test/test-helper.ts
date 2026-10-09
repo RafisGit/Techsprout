@@ -165,7 +165,8 @@ export async function createTestDatabase() {
 
     CREATE TYPE storage_provider AS ENUM('CLOUDINARY', 'LOCAL', 'S3');
     CREATE TYPE course_level AS ENUM('BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'ALL_LEVELS');
-    CREATE TYPE course_status AS ENUM('DRAFT', 'PUBLISHED', 'ARCHIVED');
+    CREATE TYPE course_status AS ENUM('DRAFT', 'IN_REVIEW', 'PUBLISHED', 'ARCHIVED');
+    CREATE TYPE course_review_status AS ENUM('PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN');
     CREATE TYPE course_visibility AS ENUM('PUBLIC', 'PRIVATE');
     CREATE TYPE lesson_type AS ENUM('VIDEO', 'TEXT', 'PDF');
     CREATE TYPE enrollment_status AS ENUM('ACTIVE', 'COMPLETED', 'CANCELLED');
@@ -616,6 +617,34 @@ export async function createTestDatabase() {
       last_error text,
       published_at timestamp with time zone,
       created_at timestamp with time zone DEFAULT now() NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS course_review_requests (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      course_id uuid NOT NULL REFERENCES courses(id) ON DELETE cascade,
+      instructor_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      status course_review_status DEFAULT 'PENDING' NOT NULL,
+      submission_notes text,
+      admin_feedback text,
+      reviewed_by uuid REFERENCES users(id) ON DELETE set null,
+      submitted_at timestamp with time zone DEFAULT now() NOT NULL,
+      reviewed_at timestamp with time zone,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS instructor_profiles (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id uuid NOT NULL UNIQUE REFERENCES users(id) ON DELETE cascade,
+      headline varchar(150),
+      bio text,
+      credentials text,
+      expertise_areas text,
+      website_url varchar(255),
+      linkedin_url varchar(255),
+      github_url varchar(255),
+      avatar_media_id uuid REFERENCES media(id) ON DELETE set null,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
     );
   `);
 

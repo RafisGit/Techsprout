@@ -50,6 +50,13 @@
       "when": 1791353000000,
       "tag": "0006_p6_1_notification_and_ownership",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791584243020,
+      "tag": "0007_instructor_platform_foundation",
+      "breakpoints": true
     }
   ]
 }

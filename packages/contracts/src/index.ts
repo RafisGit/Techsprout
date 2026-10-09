@@ -87,7 +87,8 @@ export interface AuditLogDto {
 
 // --- CATALOG CONTRACTS ---
 
-export type CourseStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+export type CourseStatus = 'DRAFT' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED';
+export const courseStatusSchema = z.enum(['DRAFT', 'IN_REVIEW', 'PUBLISHED', 'ARCHIVED']);
 export type CourseVisibility = 'PUBLIC' | 'PRIVATE';
 export type CourseLevel = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'ALL_LEVELS';
 export type LessonType = 'VIDEO' | 'TEXT' | 'PDF';
@@ -1136,7 +1137,6 @@ export type InvoiceListResponse = PaginatedInvoicesData;
 export type InvoiceDetailResponse = ApiSuccessResponse<InvoiceDto>;
 export type PaginatedInvoicesResponse = ApiSuccessResponse<PaginatedInvoicesData>;
 
-
 // --- REFUND CONTRACTS ---
 
 export interface AdminRefundOrderRequest {
@@ -1295,7 +1295,8 @@ export interface PaginatedStudentRefundRequestsData {
 }
 
 export type StudentRefundRequestResponse = ApiSuccessResponse<StudentRefundRequestDto>;
-export type PaginatedStudentRefundRequestsResponse = ApiSuccessResponse<PaginatedStudentRefundRequestsData>;
+export type PaginatedStudentRefundRequestsResponse =
+  ApiSuccessResponse<PaginatedStudentRefundRequestsData>;
 export type RefundRequestDetailResponse = ApiSuccessResponse<RefundRequestDto>;
 export type PaginatedRefundRequestsResponse = ApiSuccessResponse<PaginatedRefundRequestsData>;
 export type RefundEligibilityResponse = ApiSuccessResponse<RefundEligibilityDto>;
@@ -1708,7 +1709,9 @@ export const createRefundRequestWithOrderSchema = createRefundRequestSchema.exte
   orderId: z.string().uuid('Invalid order ID format'),
 });
 
-export type CreateRefundRequestWithOrderRequest = z.infer<typeof createRefundRequestWithOrderSchema>;
+export type CreateRefundRequestWithOrderRequest = z.infer<
+  typeof createRefundRequestWithOrderSchema
+>;
 
 export const studentRefundRequestListQuerySchema = paginationQuerySchema.extend({
   status: refundRequestStatusSchema.optional(),
@@ -1847,11 +1850,7 @@ export interface NotificationPreferencesDto {
   updatedAt: string;
 }
 
-export const notificationCategorySchema = z.enum([
-  'TRANSACTIONAL',
-  'ACADEMIC',
-  'SYSTEM',
-]);
+export const notificationCategorySchema = z.enum(['TRANSACTIONAL', 'ACADEMIC', 'SYSTEM']);
 
 export const notificationListQuerySchema = paginationQuerySchema.extend({
   category: notificationCategorySchema.optional(),
@@ -1887,3 +1886,99 @@ export interface DomainEventPayload<T = unknown> {
   version: number;
 }
 
+// --- INSTRUCTOR PLATFORM & COURSE REVIEW CONTRACTS (P6.2) ---
+
+export type CourseReviewStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
+
+export const courseReviewStatusSchema = z.enum(['PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN']);
+
+export interface CourseReviewRequestDto {
+  id: string;
+  courseId: string;
+  instructorId: string;
+  status: CourseReviewStatus;
+  submissionNotes?: string | null;
+  adminFeedback?: string | null;
+  reviewedBy?: string | null;
+  submittedAt: string;
+  reviewedAt?: string | null;
+  updatedAt: string;
+  course?: {
+    id: string;
+    title: string;
+    slug: string;
+  };
+  instructor?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  reviewer?: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+}
+
+export const submitCourseReviewSchema = z.object({
+  submissionNotes: z
+    .string()
+    .max(2000, 'Submission notes cannot exceed 2000 characters')
+    .optional(),
+});
+
+export type SubmitCourseReviewRequest = z.infer<typeof submitCourseReviewSchema>;
+
+export const reviewDecisionSchema = z
+  .object({
+    status: z.enum(['APPROVED', 'REJECTED']),
+    adminFeedback: z.string().max(2000, 'Feedback cannot exceed 2000 characters').optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.status === 'REJECTED') {
+        return typeof data.adminFeedback === 'string' && data.adminFeedback.trim().length > 0;
+      }
+      return true;
+    },
+    {
+      message: 'Rejection feedback is required when rejecting a course',
+      path: ['adminFeedback'],
+    }
+  );
+
+export type ReviewDecisionRequest = z.infer<typeof reviewDecisionSchema>;
+
+export interface InstructorProfileDto {
+  id: string;
+  userId: string;
+  headline?: string | null;
+  bio?: string | null;
+  credentials?: string | null;
+  expertiseAreas?: string[] | null;
+  websiteUrl?: string | null;
+  linkedinUrl?: string | null;
+  githubUrl?: string | null;
+  avatarMediaId?: string | null;
+  avatarUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
+export const updateInstructorProfileSchema = z.object({
+  headline: z.string().max(150, 'Headline cannot exceed 150 characters').optional(),
+  bio: z.string().max(2000, 'Bio cannot exceed 2000 characters').optional(),
+  credentials: z.string().max(500, 'Credentials cannot exceed 500 characters').optional(),
+  expertiseAreas: z.array(z.string().max(50)).max(10).optional(),
+  websiteUrl: z.string().url('Invalid website URL').or(z.literal('')).optional(),
+  linkedinUrl: z.string().url('Invalid LinkedIn URL').or(z.literal('')).optional(),
+  githubUrl: z.string().url('Invalid GitHub URL').or(z.literal('')).optional(),
+  avatarMediaId: z.string().uuid('Invalid media ID').nullable().optional(),
+});
+
+export type UpdateInstructorProfileRequest = z.infer<typeof updateInstructorProfileSchema>;

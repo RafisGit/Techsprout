@@ -14,7 +14,12 @@ import { users } from './users';
 import { categories } from './categories';
 import { media } from './media';
 
-export const courseStatusEnum = pgEnum('course_status', ['DRAFT', 'PUBLISHED', 'ARCHIVED']);
+export const courseStatusEnum = pgEnum('course_status', [
+  'DRAFT',
+  'IN_REVIEW',
+  'PUBLISHED',
+  'ARCHIVED',
+]);
 export const courseVisibilityEnum = pgEnum('course_visibility', ['PUBLIC', 'PRIVATE']);
 export const courseLevelEnum = pgEnum('course_level', [
   'BEGINNER',
