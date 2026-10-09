@@ -514,17 +514,21 @@ export class NotificationsService {
         };
 
       case 'CourseApproved':
+      case 'CourseReviewApproved':
         return {
           title: `Course Approved & Published`,
-          message: `Congratulations! Your course "${payload.title || event.entityId}" was approved.`,
+          message: `Congratulations! Your course "${payload.title || event.entityId}" was approved and is live in the catalog.`,
           category: 'SYSTEM',
           actionUrl: `/courses/${event.entityId}`,
         };
 
       case 'CourseRejected':
+      case 'CourseReviewRejected':
         return {
           title: `Course Review Feedback`,
-          message: `Your course "${payload.title || event.entityId}" requires adjustments before publication.`,
+          message: payload.adminFeedback
+            ? `Your course "${payload.title || event.entityId}" requires adjustments: ${payload.adminFeedback}`
+            : `Your course "${payload.title || event.entityId}" requires adjustments before publication.`,
           category: 'SYSTEM',
           actionUrl: `/courses/${event.entityId}`,
         };

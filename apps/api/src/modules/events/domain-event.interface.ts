@@ -9,7 +9,9 @@ export type DomainEventType =
   | 'EnrollmentCancelled'
   | 'CourseSubmittedForReview'
   | 'CourseApproved'
+  | 'CourseReviewApproved'
   | 'CourseRejected'
+  | 'CourseReviewRejected'
   | 'LessonCompleted'
   | 'QuizPassed'
   | 'CertificateIssued';

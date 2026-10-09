@@ -1,5 +1,5 @@
-import { Injectable, Inject, HttpStatus } from '@nestjs/common';
-import { eq, and, sql, ilike, or, gte, lte, asc, desc, not } from 'drizzle-orm';
+import { Injectable, Inject, Optional, HttpStatus } from '@nestjs/common';
+import { eq, and, sql, ilike, or, gte, lte, asc, desc, not, inArray } from 'drizzle-orm';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import {
   courses,
@@ -8,13 +8,20 @@ import {
   media,
   modules,
   lessons,
+  courseReviewRequests,
   Course,
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
+import { OutboxService } from '../events/outbox.service';
 import { ApiException } from '../../common/errors/api-error';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { QueryCoursesDto, AdminQueryCoursesDto } from './dto/query-courses.dto';
+import {
+  SubmitCourseReviewRequest,
+  RejectCourseReviewDto,
+  QueryReviewQueueDto,
+} from './dto/review-course.dto';
 import { slugify } from '../../common/utils/slug.util';
 
 export interface UserContext {
@@ -26,7 +33,8 @@ export interface UserContext {
 export class CoursesService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
-    @Inject(AuditService) private readonly auditService: AuditService
+    @Inject(AuditService) private readonly auditService: AuditService,
+    @Optional() @Inject(OutboxService) private readonly outboxService?: OutboxService
   ) {}
 
   /**
@@ -182,6 +190,14 @@ export class CoursesService {
     requestId?: string
   ): Promise<Course> {
     const existing = await this.verifyCourseOwnership(id, user);
+
+    if (existing.status === 'IN_REVIEW') {
+      throw new ApiException(
+        'Course is under review and cannot be modified',
+        HttpStatus.BAD_REQUEST,
+        'COURSE_LOCKED_FOR_REVIEW'
+      );
+    }
 
     const updatedFields: string[] = [];
     const updates: Partial<typeof courses.$inferInsert> = {
@@ -351,6 +367,14 @@ export class CoursesService {
     requestId?: string
   ): Promise<{ deleted: true; id: string }> {
     const existing = await this.verifyCourseOwnership(id, user);
+
+    if (existing.status === 'IN_REVIEW') {
+      throw new ApiException(
+        'Course is under review and cannot be modified',
+        HttpStatus.BAD_REQUEST,
+        'COURSE_LOCKED_FOR_REVIEW'
+      );
+    }
 
     if (existing.status !== 'DRAFT') {
       throw new ApiException(
@@ -1028,6 +1052,628 @@ export class CoursesService {
     return {
       ...course,
       modules: modulesWithLessons,
+    };
+  }
+
+  // --- INSTRUCTOR PLATFORM & REVIEW WORKFLOW ---
+
+  async findInstructorCourseById(id: string, user: UserContext) {
+    const course = await this.findAdminCourseById(id, user);
+
+    const [latestReview] = await this.db
+      .select({
+        id: courseReviewRequests.id,
+        courseId: courseReviewRequests.courseId,
+        instructorId: courseReviewRequests.instructorId,
+        status: courseReviewRequests.status,
+        submissionNotes: courseReviewRequests.submissionNotes,
+        adminFeedback: courseReviewRequests.adminFeedback,
+        reviewedBy: courseReviewRequests.reviewedBy,
+        submittedAt: courseReviewRequests.submittedAt,
+        reviewedAt: courseReviewRequests.reviewedAt,
+        updatedAt: courseReviewRequests.updatedAt,
+      })
+      .from(courseReviewRequests)
+      .where(eq(courseReviewRequests.courseId, id))
+      .orderBy(desc(courseReviewRequests.submittedAt))
+      .limit(1);
+
+    return {
+      ...course,
+      reviewRequest: latestReview || null,
+    };
+  }
+
+  async getReviewStatus(id: string, user: UserContext) {
+    const course = await this.verifyCourseOwnership(id, user);
+
+    const history = await this.db
+      .select({
+        id: courseReviewRequests.id,
+        courseId: courseReviewRequests.courseId,
+        instructorId: courseReviewRequests.instructorId,
+        status: courseReviewRequests.status,
+        submissionNotes: courseReviewRequests.submissionNotes,
+        adminFeedback: courseReviewRequests.adminFeedback,
+        reviewedBy: courseReviewRequests.reviewedBy,
+        submittedAt: courseReviewRequests.submittedAt,
+        reviewedAt: courseReviewRequests.reviewedAt,
+        updatedAt: courseReviewRequests.updatedAt,
+        reviewer: {
+          id: users.id,
+          name: users.name,
+          email: users.email,
+        },
+      })
+      .from(courseReviewRequests)
+      .leftJoin(users, eq(courseReviewRequests.reviewedBy, users.id))
+      .where(eq(courseReviewRequests.courseId, id))
+      .orderBy(desc(courseReviewRequests.submittedAt));
+
+    return {
+      courseId: id,
+      courseStatus: course.status,
+      currentReview: history[0] || null,
+      history,
+    };
+  }
+
+  async submitForReview(
+    id: string,
+    user: UserContext,
+    dto?: SubmitCourseReviewRequest,
+    ipAddress?: string,
+    userAgent?: string,
+    requestId?: string
+  ) {
+    const course = await this.verifyCourseOwnership(id, user);
+
+    if (course.status === 'IN_REVIEW') {
+      throw new ApiException(
+        'Course is already under review',
+        HttpStatus.BAD_REQUEST,
+        'ALREADY_IN_REVIEW'
+      );
+    }
+    if (course.status === 'PUBLISHED') {
+      throw new ApiException(
+        'Course is already published',
+        HttpStatus.BAD_REQUEST,
+        'COURSE_ALREADY_PUBLISHED'
+      );
+    }
+    if (course.status === 'ARCHIVED') {
+      throw new ApiException(
+        'Archived course cannot be submitted for review',
+        HttpStatus.BAD_REQUEST,
+        'CANNOT_SUBMIT_ARCHIVED_COURSE'
+      );
+    }
+    if (course.status !== 'DRAFT') {
+      throw new ApiException(
+        'Only draft courses can be submitted for review',
+        HttpStatus.BAD_REQUEST,
+        'INVALID_STATUS_TRANSITION'
+      );
+    }
+
+    // Preflight curriculum completeness checks
+    const missingRequirements: string[] = [];
+    if (!course.title || course.title.trim().length === 0) {
+      missingRequirements.push('Course title is required');
+    }
+    if (!course.description || course.description.trim().length === 0) {
+      missingRequirements.push('Course description is required');
+    }
+    if (!course.thumbnailMediaId) {
+      missingRequirements.push('Course thumbnail image is required');
+    }
+
+    const courseModules = await this.db
+      .select({ id: modules.id })
+      .from(modules)
+      .where(eq(modules.courseId, id));
+
+    if (courseModules.length === 0) {
+      missingRequirements.push('Course must have at least one module');
+    } else {
+      const moduleIds = courseModules.map((m) => m.id);
+      const courseLessons = await this.db
+        .select({ id: lessons.id })
+        .from(lessons)
+        .where(inArray(lessons.moduleId, moduleIds));
+
+      if (courseLessons.length === 0) {
+        missingRequirements.push('Course must have at least one lesson');
+      }
+    }
+
+    if (missingRequirements.length > 0) {
+      throw new ApiException(
+        'Course curriculum is incomplete for review',
+        HttpStatus.BAD_REQUEST,
+        'INCOMPLETE_CURRICULUM',
+        { missingRequirements }
+      );
+    }
+
+    // State transition in atomic transaction
+    const result = await this.db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(courses)
+        .where(eq(courses.id, id))
+        .limit(1);
+
+      if (current.status !== 'DRAFT') {
+        throw new ApiException(
+          'Course is no longer in draft status',
+          HttpStatus.CONFLICT,
+          'CONCURRENT_MODIFICATION'
+        );
+      }
+
+      const [updatedCourse] = await tx
+        .update(courses)
+        .set({
+          status: 'IN_REVIEW',
+          updatedAt: new Date(),
+        })
+        .where(eq(courses.id, id))
+        .returning();
+
+      const [reviewRequest] = await tx
+        .insert(courseReviewRequests)
+        .values({
+          courseId: id,
+          instructorId: course.instructorId,
+          status: 'PENDING',
+          submissionNotes: dto?.submissionNotes?.trim() || null,
+          submittedAt: new Date(),
+        })
+        .returning();
+
+      return { updatedCourse, reviewRequest };
+    });
+
+    await this.auditService.record({
+      actorId: user.id,
+      action: 'COURSE_SUBMITTED_FOR_REVIEW',
+      targetType: 'COURSE',
+      targetId: id,
+      ipAddress,
+      userAgent,
+      requestId,
+      metadata: {
+        reviewRequestId: result.reviewRequest.id,
+        submissionNotes: result.reviewRequest.submissionNotes,
+      },
+    });
+
+    if (this.outboxService) {
+      await this.outboxService.emit({
+        eventType: 'CourseSubmittedForReview',
+        entityType: 'course',
+        entityId: id,
+        actorUserId: user.id,
+        payload: {
+          courseId: id,
+          title: result.updatedCourse.title,
+          slug: result.updatedCourse.slug,
+          instructorId: result.updatedCourse.instructorId,
+          reviewRequestId: result.reviewRequest.id,
+          submissionNotes: result.reviewRequest.submissionNotes,
+        },
+      });
+    }
+
+    return {
+      course: result.updatedCourse,
+      reviewRequest: result.reviewRequest,
+    };
+  }
+
+  async withdrawReview(
+    id: string,
+    user: UserContext,
+    ipAddress?: string,
+    userAgent?: string,
+    requestId?: string
+  ) {
+    const course = await this.verifyCourseOwnership(id, user);
+
+    if (course.status !== 'IN_REVIEW') {
+      throw new ApiException(
+        'Only courses currently under review can be withdrawn',
+        HttpStatus.BAD_REQUEST,
+        'CANNOT_WITHDRAW_NON_PENDING_REVIEW'
+      );
+    }
+
+    const result = await this.db.transaction(async (tx) => {
+      const [pendingReview] = await tx
+        .select()
+        .from(courseReviewRequests)
+        .where(
+          and(
+            eq(courseReviewRequests.courseId, id),
+            eq(courseReviewRequests.status, 'PENDING')
+          )
+        )
+        .orderBy(desc(courseReviewRequests.submittedAt))
+        .limit(1);
+
+      if (!pendingReview) {
+        throw new ApiException(
+          'No pending review request found for this course',
+          HttpStatus.BAD_REQUEST,
+          'REVIEW_REQUEST_NOT_FOUND'
+        );
+      }
+
+      const now = new Date();
+      const [updatedRequest] = await tx
+        .update(courseReviewRequests)
+        .set({
+          status: 'WITHDRAWN',
+          updatedAt: now,
+        })
+        .where(eq(courseReviewRequests.id, pendingReview.id))
+        .returning();
+
+      const [updatedCourse] = await tx
+        .update(courses)
+        .set({
+          status: 'DRAFT',
+          updatedAt: now,
+        })
+        .where(eq(courses.id, id))
+        .returning();
+
+      return { updatedCourse, updatedRequest };
+    });
+
+    await this.auditService.record({
+      actorId: user.id,
+      action: 'COURSE_REVIEW_WITHDRAWN',
+      targetType: 'COURSE',
+      targetId: id,
+      ipAddress,
+      userAgent,
+      requestId,
+      metadata: {
+        reviewRequestId: result.updatedRequest.id,
+      },
+    });
+
+    return {
+      course: result.updatedCourse,
+      reviewRequest: result.updatedRequest,
+    };
+  }
+
+  async getReviewQueue(query: QueryReviewQueueDto, user: UserContext) {
+    if (user.role !== 'admin') {
+      throw new ApiException(
+        'Access denied: review queue is restricted to administrators',
+        HttpStatus.FORBIDDEN,
+        'FORBIDDEN'
+      );
+    }
+
+    const page = query.page || 1;
+    const limit = Math.min(query.limit || 12, 100);
+    const offset = (page - 1) * limit;
+
+    const baseWhere = query.status
+      ? eq(courseReviewRequests.status, query.status)
+      : eq(courseReviewRequests.status, 'PENDING');
+
+    const [countResult] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(courseReviewRequests)
+      .where(baseWhere);
+
+    const total = countResult?.count || 0;
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    const items = await this.db
+      .select({
+        id: courseReviewRequests.id,
+        courseId: courseReviewRequests.courseId,
+        instructorId: courseReviewRequests.instructorId,
+        status: courseReviewRequests.status,
+        submissionNotes: courseReviewRequests.submissionNotes,
+        adminFeedback: courseReviewRequests.adminFeedback,
+        reviewedBy: courseReviewRequests.reviewedBy,
+        submittedAt: courseReviewRequests.submittedAt,
+        reviewedAt: courseReviewRequests.reviewedAt,
+        updatedAt: courseReviewRequests.updatedAt,
+        course: {
+          id: courses.id,
+          title: courses.title,
+          slug: courses.slug,
+          status: courses.status,
+          price: courses.price,
+          currency: courses.currency,
+          thumbnailUrl: media.publicUrl,
+        },
+        instructor: {
+          id: users.id,
+          name: users.name,
+          email: users.email,
+        },
+      })
+      .from(courseReviewRequests)
+      .innerJoin(courses, eq(courseReviewRequests.courseId, courses.id))
+      .innerJoin(users, eq(courseReviewRequests.instructorId, users.id))
+      .leftJoin(media, eq(courses.thumbnailMediaId, media.id))
+      .where(baseWhere)
+      .orderBy(desc(courseReviewRequests.submittedAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      items,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
+  }
+
+  async approveReview(
+    id: string,
+    adminUser: UserContext,
+    ipAddress?: string,
+    userAgent?: string,
+    requestId?: string
+  ) {
+    if (adminUser.role !== 'admin') {
+      throw new ApiException(
+        'Access denied: only administrators can approve course reviews',
+        HttpStatus.FORBIDDEN,
+        'FORBIDDEN'
+      );
+    }
+
+    const [course] = await this.db
+      .select()
+      .from(courses)
+      .where(eq(courses.id, id))
+      .limit(1);
+
+    if (!course) {
+      throw new ApiException(
+        `Course with ID "${id}" not found`,
+        HttpStatus.NOT_FOUND,
+        'COURSE_NOT_FOUND'
+      );
+    }
+
+    if (course.status !== 'IN_REVIEW') {
+      throw new ApiException(
+        'Only courses under review can be approved',
+        HttpStatus.BAD_REQUEST,
+        'INVALID_REVIEW_STATE'
+      );
+    }
+
+    const result = await this.db.transaction(async (tx) => {
+      const [pendingReview] = await tx
+        .select()
+        .from(courseReviewRequests)
+        .where(
+          and(
+            eq(courseReviewRequests.courseId, id),
+            eq(courseReviewRequests.status, 'PENDING')
+          )
+        )
+        .orderBy(desc(courseReviewRequests.submittedAt))
+        .limit(1);
+
+      if (!pendingReview) {
+        throw new ApiException(
+          'No pending review request found for this course',
+          HttpStatus.BAD_REQUEST,
+          'NO_PENDING_REVIEW'
+        );
+      }
+
+      const now = new Date();
+      const [updatedRequest] = await tx
+        .update(courseReviewRequests)
+        .set({
+          status: 'APPROVED',
+          reviewedBy: adminUser.id,
+          reviewedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(courseReviewRequests.id, pendingReview.id))
+        .returning();
+
+      const [updatedCourse] = await tx
+        .update(courses)
+        .set({
+          status: 'PUBLISHED',
+          publishedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(courses.id, id))
+        .returning();
+
+      return { updatedCourse, updatedRequest };
+    });
+
+    await this.auditService.record({
+      actorId: adminUser.id,
+      action: 'COURSE_REVIEW_APPROVED',
+      targetType: 'COURSE',
+      targetId: id,
+      ipAddress,
+      userAgent,
+      requestId,
+      metadata: {
+        reviewRequestId: result.updatedRequest.id,
+        instructorId: result.updatedCourse.instructorId,
+      },
+    });
+
+    if (this.outboxService) {
+      await this.outboxService.emit({
+        eventType: 'CourseReviewApproved',
+        entityType: 'course',
+        entityId: id,
+        actorUserId: adminUser.id,
+        targetUserId: result.updatedCourse.instructorId,
+        payload: {
+          courseId: id,
+          title: result.updatedCourse.title,
+          slug: result.updatedCourse.slug,
+          instructorId: result.updatedCourse.instructorId,
+          reviewRequestId: result.updatedRequest.id,
+        },
+      });
+    }
+
+    return {
+      course: result.updatedCourse,
+      reviewRequest: result.updatedRequest,
+    };
+  }
+
+  async rejectReview(
+    id: string,
+    adminUser: UserContext,
+    dto: RejectCourseReviewDto,
+    ipAddress?: string,
+    userAgent?: string,
+    requestId?: string
+  ) {
+    if (adminUser.role !== 'admin') {
+      throw new ApiException(
+        'Access denied: only administrators can reject course reviews',
+        HttpStatus.FORBIDDEN,
+        'FORBIDDEN'
+      );
+    }
+
+    if (!dto.adminFeedback || dto.adminFeedback.trim().length === 0) {
+      throw new ApiException(
+        'Rejection feedback is required when rejecting a course review',
+        HttpStatus.BAD_REQUEST,
+        'FEEDBACK_REQUIRED'
+      );
+    }
+
+    const [course] = await this.db
+      .select()
+      .from(courses)
+      .where(eq(courses.id, id))
+      .limit(1);
+
+    if (!course) {
+      throw new ApiException(
+        `Course with ID "${id}" not found`,
+        HttpStatus.NOT_FOUND,
+        'COURSE_NOT_FOUND'
+      );
+    }
+
+    if (course.status !== 'IN_REVIEW') {
+      throw new ApiException(
+        'Only courses under review can be rejected',
+        HttpStatus.BAD_REQUEST,
+        'INVALID_REVIEW_STATE'
+      );
+    }
+
+    const result = await this.db.transaction(async (tx) => {
+      const [pendingReview] = await tx
+        .select()
+        .from(courseReviewRequests)
+        .where(
+          and(
+            eq(courseReviewRequests.courseId, id),
+            eq(courseReviewRequests.status, 'PENDING')
+          )
+        )
+        .orderBy(desc(courseReviewRequests.submittedAt))
+        .limit(1);
+
+      if (!pendingReview) {
+        throw new ApiException(
+          'No pending review request found for this course',
+          HttpStatus.BAD_REQUEST,
+          'NO_PENDING_REVIEW'
+        );
+      }
+
+      const now = new Date();
+      const [updatedRequest] = await tx
+        .update(courseReviewRequests)
+        .set({
+          status: 'REJECTED',
+          adminFeedback: dto.adminFeedback.trim(),
+          reviewedBy: adminUser.id,
+          reviewedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(courseReviewRequests.id, pendingReview.id))
+        .returning();
+
+      const [updatedCourse] = await tx
+        .update(courses)
+        .set({
+          status: 'DRAFT',
+          updatedAt: now,
+        })
+        .where(eq(courses.id, id))
+        .returning();
+
+      return { updatedCourse, updatedRequest };
+    });
+
+    await this.auditService.record({
+      actorId: adminUser.id,
+      action: 'COURSE_REVIEW_REJECTED',
+      targetType: 'COURSE',
+      targetId: id,
+      ipAddress,
+      userAgent,
+      requestId,
+      metadata: {
+        reviewRequestId: result.updatedRequest.id,
+        instructorId: result.updatedCourse.instructorId,
+        adminFeedback: result.updatedRequest.adminFeedback,
+      },
+    });
+
+    if (this.outboxService) {
+      await this.outboxService.emit({
+        eventType: 'CourseReviewRejected',
+        entityType: 'course',
+        entityId: id,
+        actorUserId: adminUser.id,
+        targetUserId: result.updatedCourse.instructorId,
+        payload: {
+          courseId: id,
+          title: result.updatedCourse.title,
+          slug: result.updatedCourse.slug,
+          instructorId: result.updatedCourse.instructorId,
+          reviewRequestId: result.updatedRequest.id,
+          adminFeedback: result.updatedRequest.adminFeedback,
+        },
+      });
+    }
+
+    return {
+      course: result.updatedCourse,
+      reviewRequest: result.updatedRequest,
     };
   }
 }

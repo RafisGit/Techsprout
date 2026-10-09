@@ -31,13 +31,14 @@ export class LessonsService {
   async resolveLessonOwnership(
     lessonId: string,
     user: UserContext
-  ): Promise<{ lesson: Lesson; moduleId: string; courseId: string; courseInstructorId: string }> {
+  ): Promise<{ lesson: Lesson; moduleId: string; courseId: string; courseInstructorId: string; courseStatus: string }> {
     const [result] = await this.db
       .select({
         lesson: lessons,
         moduleId: modules.id,
         courseId: courses.id,
         courseInstructorId: courses.instructorId,
+        courseStatus: courses.status,
       })
       .from(lessons)
       .innerJoin(modules, eq(lessons.moduleId, modules.id))
@@ -72,8 +73,15 @@ export class LessonsService {
     userAgent?: string,
     requestId?: string
   ): Promise<Lesson> {
-    // 1. Verify caller owns ancestor module and course
-    await this.modulesService.resolveModuleOwnership(moduleId, user);
+    // 1. Verify caller owns ancestor module and course and course is not locked
+    const { courseStatus } = await this.modulesService.resolveModuleOwnership(moduleId, user);
+    if (courseStatus === 'IN_REVIEW') {
+      throw new ApiException(
+        'Course is under review and cannot be modified',
+        HttpStatus.BAD_REQUEST,
+        'COURSE_LOCKED_FOR_REVIEW'
+      );
+    }
 
     // 2. Validate media existence if mediaId provided
     if (dto.mediaId) {
@@ -171,7 +179,15 @@ export class LessonsService {
     userAgent?: string,
     requestId?: string
   ): Promise<Lesson> {
-    const { lesson: existing } = await this.resolveLessonOwnership(id, user);
+    const { lesson: existing, courseStatus } = await this.resolveLessonOwnership(id, user);
+
+    if (courseStatus === 'IN_REVIEW') {
+      throw new ApiException(
+        'Course is under review and cannot be modified',
+        HttpStatus.BAD_REQUEST,
+        'COURSE_LOCKED_FOR_REVIEW'
+      );
+    }
 
     const updatedFields: string[] = [];
     const updates: Partial<typeof lessons.$inferInsert> = {
@@ -286,7 +302,15 @@ export class LessonsService {
     userAgent?: string,
     requestId?: string
   ): Promise<{ deleted: true; id: string }> {
-    const { lesson: existing } = await this.resolveLessonOwnership(id, user);
+    const { lesson: existing, courseStatus } = await this.resolveLessonOwnership(id, user);
+
+    if (courseStatus === 'IN_REVIEW') {
+      throw new ApiException(
+        'Course is under review and cannot be modified',
+        HttpStatus.BAD_REQUEST,
+        'COURSE_LOCKED_FOR_REVIEW'
+      );
+    }
 
     // Pre-check: cannot delete lesson if students have recorded progress
     const [progressCountResult] = await this.db
