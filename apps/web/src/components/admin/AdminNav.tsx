@@ -17,7 +17,7 @@ export function AdminNav() {
       title: 'Overview',
       href: '/dashboard/admin/overview',
       icon: LayoutDashboard,
-      show: true,
+      show: isAdmin,
     },
     {
       title: 'Courses',

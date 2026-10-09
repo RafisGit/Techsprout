@@ -42,6 +42,8 @@ export default function Login() {
         const user = response.data.user;
         if (user && user.role === 'admin') {
           window.location.href = '/dashboard/admin/overview';
+        } else if (user && user.role === 'instructor') {
+          window.location.href = '/instructor/dashboard';
         } else {
           window.location.href = '/dashboard';
         }

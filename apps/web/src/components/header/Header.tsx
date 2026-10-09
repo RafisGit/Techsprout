@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ChevronDown, Grid3X3, Menu, Search, ShoppingCart, User, BookOpen, Receipt } from 'lucide-react';
+import { ChevronDown, Grid3X3, Menu, Search, ShoppingCart, User, BookOpen, Receipt, GraduationCap, LayoutDashboard } from 'lucide-react';
 import Image from 'next/image';
 import logo from '@/assets/img/logo.png';
 
@@ -201,6 +201,24 @@ export function Header() {
           {/* User Links / Log In */}
           {currentUser ? (
             <div className='hidden items-center space-x-3 sm:flex'>
+              {currentUser.role === 'instructor' && (
+                <Link
+                  href='/instructor/dashboard'
+                  className='hover:text-primary whitespace-nowrap text-sm font-semibold text-primary flex items-center gap-1.5'
+                >
+                  <GraduationCap className='w-4 h-4' />
+                  Instructor Portal
+                </Link>
+              )}
+              {currentUser.role === 'admin' && (
+                <Link
+                  href='/admin/courses'
+                  className='hover:text-primary whitespace-nowrap text-sm font-semibold text-primary flex items-center gap-1.5'
+                >
+                  <LayoutDashboard className='w-4 h-4' />
+                  Admin Portal
+                </Link>
+              )}
               <Link
                 href='/my-courses'
                 className='hover:text-primary whitespace-nowrap text-sm font-semibold text-gray-700'
@@ -346,6 +364,30 @@ export function Header() {
                 <div className='space-y-2 border-t pt-4'>
                   {currentUser ? (
                     <>
+                      {currentUser.role === 'instructor' && (
+                        <Link
+                          href='/instructor/dashboard'
+                          className='block'
+                          onClick={() => setIsMobileNavOpen(false)}
+                        >
+                          <Button variant='default' className='w-full justify-start bg-primary text-white'>
+                            <GraduationCap className='mr-2 h-4 w-4' />
+                            Instructor Portal
+                          </Button>
+                        </Link>
+                      )}
+                      {currentUser.role === 'admin' && (
+                        <Link
+                          href='/admin/courses'
+                          className='block'
+                          onClick={() => setIsMobileNavOpen(false)}
+                        >
+                          <Button variant='default' className='w-full justify-start bg-primary text-white'>
+                            <LayoutDashboard className='mr-2 h-4 w-4' />
+                            Admin Portal
+                          </Button>
+                        </Link>
+                      )}
                       <Link
                         href='/my-courses'
                         className='block'
