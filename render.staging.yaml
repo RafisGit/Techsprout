@@ -1,0 +1,61 @@
+# Render Blueprint Specification for TechSprout School LMS (Staging Environment)
+# Manages dedicated staging infrastructure in an independent Render Hobby Workspace:
+# 1. NestJS REST API Web Service: techsprout-api-staging (NODE_ENV=staging)
+# 2. Managed PostgreSQL 16 Database: techsprout-postgres-staging
+# 3. Managed Redis / Key-Value Store: techsprout-redis-staging
+
+services:
+  # ============================================================================
+  # STAGING SERVICES (ISOLATED PRE-PRODUCTION INFRASTRUCTURE)
+  # ============================================================================
+  - type: web
+    name: techsprout-api-staging
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm --filter @techsprout/contracts build && pnpm --filter @techsprout/api build
+    startCommand: node apps/api/dist/database/migrate.js && node apps/api/dist/database/seed/seed.js && node apps/api/dist/main.js
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: staging
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: techsprout-postgres-staging
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: techsprout-redis-staging
+          property: connectionString
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: WEB_ORIGIN
+        value: https://staging.techsprout-web.vercel.app,https://techsprout-web-staging.vercel.app
+      # Single canonical frontend origin for staging browser redirects
+      - key: WEB_PUBLIC_ORIGIN
+        value: https://staging.techsprout-web.vercel.app
+      - key: SSLCOMMERZ_IS_SANDBOX
+        value: "true"
+      - key: SSLCOMMERZ_BASE_URL
+        value: https://sandbox.sslcommerz.com
+      - key: RESEND_FROM_EMAIL
+        value: staging-notifications@techsprout.io
+
+  - type: keyvalue
+    name: techsprout-redis-staging
+    plan: free
+    region: oregon
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+
+databases:
+  # STAGING DATABASE (ISOLATED PRE-PRODUCTION INSTANCE)
+  - name: techsprout-postgres-staging
+    databaseName: techsprout_staging
+    user: techsprout_staging
+    plan: free
+    region: oregon
+    postgresMajorVersion: 16
