@@ -1,5 +1,10 @@
 import { axiosInstance } from '@/lib/axiosInstance';
-import type { PaginatedCoursesData, CourseDto } from '@techsprout/contracts';
+import type {
+  PaginatedCoursesData,
+  CourseDto,
+  InstructorProfileDto,
+  UpdateInstructorProfileRequest,
+} from '@techsprout/contracts';
 
 export interface InstructorCourseQueryParams {
   page?: number;
@@ -217,4 +222,17 @@ export async function fetchCourseEnrollments(
   });
   return response.data.data;
 }
+
+export async function fetchMyInstructorProfile(): Promise<InstructorProfileDto | null> {
+  const response = await axiosInstance.get('/api/v1/instructor/profile');
+  return response.data.data;
+}
+
+export async function updateMyInstructorProfile(
+  payload: UpdateInstructorProfileRequest
+): Promise<InstructorProfileDto> {
+  const response = await axiosInstance.put('/api/v1/instructor/profile', payload);
+  return response.data.data;
+}
+
 

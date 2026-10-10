@@ -36,6 +36,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import type { LessonDto, ModuleDto } from '@techsprout/contracts';
+import { InstructorBioCard } from '@/components/public/InstructorBioCard';
 
 function formatDuration(minutes?: number | null): string {
   if (!minutes) return 'Self-paced';
@@ -408,6 +409,9 @@ export default function CourseDetailPage() {
                 </Accordion>
               )}
             </div>
+
+            {/* Instructor Biography */}
+            <InstructorBioCard instructor={course.instructor} />
           </div>
 
           {/* Right Column: Sticky Sidebar Card */}

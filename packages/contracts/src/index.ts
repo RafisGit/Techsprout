@@ -205,6 +205,14 @@ export interface CourseDto {
     id: string;
     name: string;
     email?: string;
+    headline?: string | null;
+    bio?: string | null;
+    credentials?: string | null;
+    expertiseAreas?: string[] | null;
+    avatarUrl?: string | null;
+    websiteUrl?: string | null;
+    linkedinUrl?: string | null;
+    githubUrl?: string | null;
   };
   modulesCount?: number;
   lessonsCount?: number;
@@ -1971,13 +1979,13 @@ export interface InstructorProfileDto {
 }
 
 export const updateInstructorProfileSchema = z.object({
-  headline: z.string().max(150, 'Headline cannot exceed 150 characters').optional(),
-  bio: z.string().max(2000, 'Bio cannot exceed 2000 characters').optional(),
-  credentials: z.string().max(500, 'Credentials cannot exceed 500 characters').optional(),
-  expertiseAreas: z.array(z.string().max(50)).max(10).optional(),
-  websiteUrl: z.string().url('Invalid website URL').or(z.literal('')).optional(),
-  linkedinUrl: z.string().url('Invalid LinkedIn URL').or(z.literal('')).optional(),
-  githubUrl: z.string().url('Invalid GitHub URL').or(z.literal('')).optional(),
+  headline: z.string().max(150, 'Headline cannot exceed 150 characters').nullable().optional(),
+  bio: z.string().max(2000, 'Bio cannot exceed 2000 characters').nullable().optional(),
+  credentials: z.string().max(500, 'Credentials cannot exceed 500 characters').nullable().optional(),
+  expertiseAreas: z.array(z.string().max(50)).max(10).nullable().optional(),
+  websiteUrl: z.string().url('Invalid website URL').or(z.literal('')).nullable().optional(),
+  linkedinUrl: z.string().url('Invalid LinkedIn URL').or(z.literal('')).nullable().optional(),
+  githubUrl: z.string().url('Invalid GitHub URL').or(z.literal('')).nullable().optional(),
   avatarMediaId: z.string().uuid('Invalid media ID').nullable().optional(),
 });
 

@@ -1,5 +1,6 @@
 import { Injectable, Inject, Optional, HttpStatus } from '@nestjs/common';
 import { eq, and, sql, ilike, or, gte, lte, asc, desc, not, inArray } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import {
   courses,
@@ -9,8 +10,10 @@ import {
   modules,
   lessons,
   courseReviewRequests,
+  instructorProfiles,
   Course,
 } from '../../database/schema';
+import { InstructorProfileDto, UpdateInstructorProfileRequest } from '@techsprout/contracts';
 import { AuditService } from '../audit/audit.service';
 import { OutboxService } from '../events/outbox.service';
 import { ApiException } from '../../common/errors/api-error';
@@ -954,6 +957,8 @@ export class CoursesService {
   }
 
   async findPublicCourseBySlug(slug: string) {
+    const avatarMedia = alias(media, 'avatar_media');
+
     const [course] = await this.db
       .select({
         id: courses.id,
@@ -976,12 +981,22 @@ export class CoursesService {
         instructor: {
           id: users.id,
           name: users.name,
+          headline: instructorProfiles.headline,
+          bio: instructorProfiles.bio,
+          credentials: instructorProfiles.credentials,
+          expertiseAreas: instructorProfiles.expertiseAreas,
+          websiteUrl: instructorProfiles.websiteUrl,
+          linkedinUrl: instructorProfiles.linkedinUrl,
+          githubUrl: instructorProfiles.githubUrl,
+          avatarUrl: avatarMedia.publicUrl,
         },
       })
       .from(courses)
       .innerJoin(categories, eq(courses.categoryId, categories.id))
       .innerJoin(users, eq(courses.instructorId, users.id))
       .leftJoin(media, eq(courses.thumbnailMediaId, media.id))
+      .leftJoin(instructorProfiles, eq(users.id, instructorProfiles.userId))
+      .leftJoin(avatarMedia, eq(instructorProfiles.avatarMediaId, avatarMedia.id))
       .where(
         and(
           eq(courses.slug, slug),
@@ -1049,8 +1064,24 @@ export class CoursesService {
       })
     );
 
+    const sanitizedInstructor = course.instructor
+      ? {
+          id: course.instructor.id,
+          name: course.instructor.name,
+          headline: course.instructor.headline ?? null,
+          bio: course.instructor.bio ?? null,
+          credentials: course.instructor.credentials ?? null,
+          expertiseAreas: this.parseExpertiseAreas(course.instructor.expertiseAreas),
+          websiteUrl: course.instructor.websiteUrl ?? null,
+          linkedinUrl: course.instructor.linkedinUrl ?? null,
+          githubUrl: course.instructor.githubUrl ?? null,
+          avatarUrl: course.instructor.avatarUrl ?? null,
+        }
+      : undefined;
+
     return {
       ...course,
+      instructor: sanitizedInstructor,
       modules: modulesWithLessons,
     };
   }
@@ -1675,6 +1706,182 @@ export class CoursesService {
       course: result.updatedCourse,
       reviewRequest: result.updatedRequest,
     };
+  }
+
+  // --- INSTRUCTOR PROFILE MANAGEMENT ---
+
+  parseExpertiseAreas(raw: string | null | undefined): string[] {
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map((s) => String(s).trim()).filter(Boolean);
+    } catch {
+      return raw.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    return [];
+  }
+
+  async getInstructorProfile(userId: string): Promise<InstructorProfileDto | null> {
+    const avatarMedia = alias(media, 'profile_avatar_media');
+
+    const [record] = await this.db
+      .select({
+        id: instructorProfiles.id,
+        userId: instructorProfiles.userId,
+        headline: instructorProfiles.headline,
+        bio: instructorProfiles.bio,
+        credentials: instructorProfiles.credentials,
+        expertiseAreas: instructorProfiles.expertiseAreas,
+        websiteUrl: instructorProfiles.websiteUrl,
+        linkedinUrl: instructorProfiles.linkedinUrl,
+        githubUrl: instructorProfiles.githubUrl,
+        avatarMediaId: instructorProfiles.avatarMediaId,
+        avatarUrl: avatarMedia.publicUrl,
+        createdAt: instructorProfiles.createdAt,
+        updatedAt: instructorProfiles.updatedAt,
+        user: {
+          id: users.id,
+          name: users.name,
+          email: users.email,
+        },
+      })
+      .from(instructorProfiles)
+      .innerJoin(users, eq(instructorProfiles.userId, users.id))
+      .leftJoin(avatarMedia, eq(instructorProfiles.avatarMediaId, avatarMedia.id))
+      .where(eq(instructorProfiles.userId, userId))
+      .limit(1);
+
+    if (!record) {
+      return null;
+    }
+
+    return {
+      id: record.id,
+      userId: record.userId,
+      headline: record.headline ?? null,
+      bio: record.bio ?? null,
+      credentials: record.credentials ?? null,
+      expertiseAreas: this.parseExpertiseAreas(record.expertiseAreas),
+      websiteUrl: record.websiteUrl ?? null,
+      linkedinUrl: record.linkedinUrl ?? null,
+      githubUrl: record.githubUrl ?? null,
+      avatarMediaId: record.avatarMediaId ?? null,
+      avatarUrl: record.avatarUrl ?? null,
+      createdAt: record.createdAt.toISOString(),
+      updatedAt: record.updatedAt.toISOString(),
+      user: record.user,
+    };
+  }
+
+  async upsertInstructorProfile(
+    userId: string,
+    data: UpdateInstructorProfileRequest,
+    userContext: UserContext,
+    ipAddress?: string,
+    userAgent?: string,
+    requestId?: string
+  ): Promise<InstructorProfileDto> {
+    // 1. Authorization: Only the instructor themselves or admin can update
+    if (userContext.role !== 'admin' && userContext.id !== userId) {
+      throw new ApiException(
+        'You can only modify your own instructor profile',
+        HttpStatus.FORBIDDEN,
+        'FORBIDDEN'
+      );
+    }
+
+    // 2. Avatar media ownership check (if avatarMediaId is provided)
+    if (data.avatarMediaId) {
+      const [mediaRecord] = await this.db
+        .select({ id: media.id, uploaderId: media.uploaderId })
+        .from(media)
+        .where(eq(media.id, data.avatarMediaId))
+        .limit(1);
+
+      if (!mediaRecord) {
+        throw new ApiException(
+          'Avatar media asset not found',
+          HttpStatus.BAD_REQUEST,
+          'MEDIA_NOT_FOUND'
+        );
+      }
+
+      if (userContext.role !== 'admin' && mediaRecord.uploaderId && mediaRecord.uploaderId !== userId) {
+        throw new ApiException(
+          'Cannot use media asset owned by another user',
+          HttpStatus.FORBIDDEN,
+          'MEDIA_OWNERSHIP_DENIED'
+        );
+      }
+    }
+
+    // 3. Serialize expertiseAreas
+    let serializedExpertise: string | null = null;
+    if (data.expertiseAreas !== undefined && data.expertiseAreas !== null) {
+      serializedExpertise = JSON.stringify(data.expertiseAreas);
+    }
+
+    // 4. Check if profile exists
+    const [existing] = await this.db
+      .select({ id: instructorProfiles.id })
+      .from(instructorProfiles)
+      .where(eq(instructorProfiles.userId, userId))
+      .limit(1);
+
+    const now = new Date();
+
+    if (existing) {
+      const updateValues: Record<string, any> = {
+        updatedAt: now,
+      };
+      if (data.headline !== undefined) updateValues.headline = data.headline;
+      if (data.bio !== undefined) updateValues.bio = data.bio;
+      if (data.credentials !== undefined) updateValues.credentials = data.credentials;
+      if (data.expertiseAreas !== undefined) updateValues.expertiseAreas = serializedExpertise;
+      if (data.websiteUrl !== undefined) updateValues.websiteUrl = data.websiteUrl || null;
+      if (data.linkedinUrl !== undefined) updateValues.linkedinUrl = data.linkedinUrl || null;
+      if (data.githubUrl !== undefined) updateValues.githubUrl = data.githubUrl || null;
+      if (data.avatarMediaId !== undefined) updateValues.avatarMediaId = data.avatarMediaId;
+
+      await this.db
+        .update(instructorProfiles)
+        .set(updateValues)
+        .where(eq(instructorProfiles.userId, userId));
+    } else {
+      await this.db.insert(instructorProfiles).values({
+        userId,
+        headline: data.headline ?? null,
+        bio: data.bio ?? null,
+        credentials: data.credentials ?? null,
+        expertiseAreas: serializedExpertise,
+        websiteUrl: data.websiteUrl || null,
+        linkedinUrl: data.linkedinUrl || null,
+        githubUrl: data.githubUrl || null,
+        avatarMediaId: data.avatarMediaId ?? null,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    await this.auditService.record({
+      actorId: userContext.id,
+      action: existing ? 'UPDATE_INSTRUCTOR_PROFILE' : 'CREATE_INSTRUCTOR_PROFILE',
+      targetType: 'INSTRUCTOR_PROFILE',
+      targetId: userId,
+      ipAddress,
+      userAgent,
+      requestId,
+    });
+
+    const updated = await this.getInstructorProfile(userId);
+    if (!updated) {
+      throw new ApiException(
+        'Failed to retrieve instructor profile after save',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'INTERNAL_ERROR'
+      );
+    }
+    return updated;
   }
 }
 
