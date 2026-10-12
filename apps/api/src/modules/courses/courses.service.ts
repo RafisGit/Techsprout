@@ -70,6 +70,44 @@ export class CoursesService {
     return course;
   }
 
+  /**
+   * Validate thumbnail media asset existence and authorization.
+   *
+   * Authorization Rules:
+   * 1. Media record must exist in the database (rejects with 404 MEDIA_NOT_FOUND if missing).
+   * 2. Administrators bypass ownership checks and can attach any valid media asset.
+   * 3. System or legacy media assets (uploaderId is null) are permitted for instructors.
+   * 4. Media assets uploaded by a user (uploaderId is not null) can only be attached by that
+   *    same user (uploaderId === user.id). Cross-user attachment attempts are rejected
+   *    with 403 MEDIA_OWNERSHIP_DENIED.
+   *
+   * @param thumbnailMediaId Target media UUID
+   * @param user Authenticated user principal (id and role)
+   */
+  private async validateThumbnailOwnership(thumbnailMediaId: string, user: UserContext): Promise<void> {
+    const [mediaRecord] = await this.db
+      .select({ id: media.id, uploaderId: media.uploaderId })
+      .from(media)
+      .where(eq(media.id, thumbnailMediaId))
+      .limit(1);
+
+    if (!mediaRecord) {
+      throw new ApiException(
+        `Thumbnail media with ID "${thumbnailMediaId}" not found`,
+        HttpStatus.NOT_FOUND,
+        'MEDIA_NOT_FOUND'
+      );
+    }
+
+    if (user.role !== 'admin' && mediaRecord.uploaderId && mediaRecord.uploaderId !== user.id) {
+      throw new ApiException(
+        'Cannot attach a media asset owned by another user',
+        HttpStatus.FORBIDDEN,
+        'MEDIA_OWNERSHIP_DENIED'
+      );
+    }
+  }
+
   async create(
     dto: CreateCourseDto,
     user: UserContext,
@@ -112,19 +150,7 @@ export class CoursesService {
 
     // 4. Validate thumbnail media if provided
     if (dto.thumbnailMediaId) {
-      const [mediaRecord] = await this.db
-        .select()
-        .from(media)
-        .where(eq(media.id, dto.thumbnailMediaId))
-        .limit(1);
-
-      if (!mediaRecord) {
-        throw new ApiException(
-          `Thumbnail media with ID "${dto.thumbnailMediaId}" not found`,
-          HttpStatus.NOT_FOUND,
-          'MEDIA_NOT_FOUND'
-        );
-      }
+      await this.validateThumbnailOwnership(dto.thumbnailMediaId, user);
     }
 
     // 5. Generate and check slug
@@ -318,19 +344,7 @@ export class CoursesService {
 
     if (dto.thumbnailMediaId !== undefined && dto.thumbnailMediaId !== existing.thumbnailMediaId) {
       if (dto.thumbnailMediaId !== null) {
-        const [mediaRecord] = await this.db
-          .select()
-          .from(media)
-          .where(eq(media.id, dto.thumbnailMediaId))
-          .limit(1);
-
-        if (!mediaRecord) {
-          throw new ApiException(
-            `Thumbnail media with ID "${dto.thumbnailMediaId}" not found`,
-            HttpStatus.NOT_FOUND,
-            'MEDIA_NOT_FOUND'
-          );
-        }
+        await this.validateThumbnailOwnership(dto.thumbnailMediaId, user);
       }
       updates.thumbnailMediaId = dto.thumbnailMediaId;
       updatedFields.push('thumbnailMediaId');
