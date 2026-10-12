@@ -65,7 +65,7 @@ export class IdentityController {
     res.cookie('techsprout_session', result.token, {
       httpOnly: true,
       secure: env.NODE_ENV === 'production' || env.NODE_ENV === 'staging',
-      sameSite: 'lax',
+      sameSite: (env.NODE_ENV === 'production' || env.NODE_ENV === 'staging') ? 'none' : 'lax',
       path: '/',
       expires: result.expiresAt,
     });
@@ -111,7 +111,7 @@ export class IdentityController {
     res.cookie('techsprout_session', result.token, {
       httpOnly: true,
       secure: env.NODE_ENV === 'production' || env.NODE_ENV === 'staging',
-      sameSite: 'lax',
+      sameSite: (env.NODE_ENV === 'production' || env.NODE_ENV === 'staging') ? 'none' : 'lax',
       path: '/',
       expires: result.expiresAt,
     });
@@ -203,7 +203,7 @@ export class IdentityController {
     res.cookie('techsprout_session', result.token, {
       httpOnly: true,
       secure: env.NODE_ENV === 'production' || env.NODE_ENV === 'staging',
-      sameSite: 'lax',
+      sameSite: (env.NODE_ENV === 'production' || env.NODE_ENV === 'staging') ? 'none' : 'lax',
       path: '/',
       expires: result.expiresAt,
     });
@@ -238,7 +238,11 @@ export class IdentityController {
       await this.identityService.logout(token, req.user?.id, req.id);
     }
 
-    res.clearCookie('techsprout_session', { path: '/' });
+    res.clearCookie('techsprout_session', {
+      path: '/',
+      secure: env.NODE_ENV === 'production' || env.NODE_ENV === 'staging',
+      sameSite: (env.NODE_ENV === 'production' || env.NODE_ENV === 'staging') ? 'none' : 'lax',
+    });
 
     return {
       success: true,

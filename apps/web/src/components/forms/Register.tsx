@@ -17,6 +17,7 @@ import { useOtpStore } from '@/store/Otpstore';
 import { axiosInstance } from '@/lib/axiosInstance';
 import { useState } from 'react';
 import { Input } from '../ui/input';
+import { setSessionCookie } from '@/lib/session';
 
 export default function RegisterForm() {
   const { setModalStatus, setPhoneNumber } = useOtpStore();
@@ -54,6 +55,9 @@ export default function RegisterForm() {
       const response = await axiosInstance.post('/api/v1/auth/register', userData);
 
       if (response.data.success) {
+        if (response.data.token) {
+          setSessionCookie(response.data.token);
+        }
         if (normalizedPhone) {
           try {
             await axiosInstance.post('/api/v1/auth/otp/send', { phone: normalizedPhone });

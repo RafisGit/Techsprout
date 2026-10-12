@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getSessionToken } from './session';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -12,4 +13,13 @@ const axiosInstance = axios.create({
   },
 });
 
-export { axiosInstance };
+// Request interceptor: inject Authorization header from session cookie for cross-origin API calls
+axiosInstance.interceptors.request.use((config) => {
+  const token = getSessionToken();
+  if (token && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+export { axiosInstance, API_BASE_URL };

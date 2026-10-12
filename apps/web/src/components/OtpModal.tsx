@@ -18,6 +18,7 @@ import { REGEXP_ONLY_DIGITS } from 'input-otp';
 import { useOtpStore } from '@/store/Otpstore';
 import { axiosInstance } from '@/lib/axiosInstance';
 import { useState } from 'react';
+import { setSessionCookie } from '@/lib/session';
 
 export default function OtpModal() {
   const { modalStatus, setModalStatus, phoneNumber } = useOtpStore();
@@ -47,6 +48,9 @@ export default function OtpModal() {
       });
 
       if (response.data.success) {
+        if (response.data.token) {
+          setSessionCookie(response.data.token);
+        }
         setModalStatus('close');
         window.location.href = '/dashboard';
       }

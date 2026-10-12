@@ -3,8 +3,9 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, BookOpen, User, UserCheck } from 'lucide-react';
+import { LayoutDashboard, BookOpen, User, UserCheck, LogOut } from 'lucide-react';
 import { useCurrentUser } from '@/lib/useCurrentUser';
+import { logoutUser } from '@/lib/session';
 
 export function InstructorNav() {
   const pathname = usePathname();
@@ -70,6 +71,14 @@ export function InstructorNav() {
             <span className='px-2 py-0.5 rounded-full font-semibold capitalize bg-emerald-50 text-emerald-700 border border-emerald-200'>
               {user.role}
             </span>
+            <button
+              onClick={() => logoutUser()}
+              className='flex items-center gap-1 ml-2 text-xs text-gray-500 hover:text-red-600 font-medium transition-colors cursor-pointer'
+              title='Sign Out'
+            >
+              <LogOut className='w-3.5 h-3.5' />
+              <span>Sign Out</span>
+            </button>
           </div>
         )}
       </div>
