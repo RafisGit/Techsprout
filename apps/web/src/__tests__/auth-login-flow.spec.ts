@@ -140,6 +140,11 @@ describe('Next.js BFF Secure Authentication & Session Architecture Suite', () =>
       const user = await getCurrentUser('techsprout_session=token');
       expect(user).toBeNull();
     });
+
+    it('4.4 Returns null when cookie header is undefined or missing', async () => {
+      const user = await getCurrentUser(undefined);
+      expect(user).toBeNull();
+    });
   });
 
   // =========================================================================
@@ -302,6 +307,135 @@ describe('Next.js BFF Secure Authentication & Session Architecture Suite', () =>
       const json = await response.json();
       expect(json.success).toBe(false);
       expect(json.message).toBe('Authentication required');
+    });
+
+    it('7.4 Intercepts registration response to set HttpOnly cookie and strip token', async () => {
+      const { POST } = await import('@/app/api/v1/[...path]/route');
+
+      const fakeToken = 'backend_registration_token_67890';
+      const fakeUser = {
+        id: 'u-reg-1',
+        name: 'New Student',
+        role: 'student',
+      };
+
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({
+          success: true,
+          message: 'Registration successful',
+          token: fakeToken,
+          user: fakeUser,
+        }),
+      } as Response);
+
+      const mockReq = new NextRequest('http://localhost:3000/api/v1/auth/register', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          origin: 'http://localhost:3000',
+          host: 'localhost:3000',
+        },
+        body: JSON.stringify({ email: 'student@techsprout.edu', password: 'pass', name: 'New Student' }),
+      });
+
+      const response = await POST(mockReq, {
+        params: Promise.resolve({ path: ['auth', 'register'] }),
+      });
+
+      expect(response.status).toBe(201);
+      const json = await response.json();
+      expect(json.token).toBeUndefined();
+      expect(json.user).toEqual(fakeUser);
+
+      const cookie = response.cookies.get('techsprout_session');
+      expect(cookie).toBeDefined();
+      expect(cookie?.value).toBe(fakeToken);
+      expect(cookie?.httpOnly).toBe(true);
+      expect(cookie?.sameSite?.toLowerCase()).toBe('lax');
+    });
+
+    it('7.5 Intercepts OTP verification response to set HttpOnly cookie and strip token', async () => {
+      const { POST } = await import('@/app/api/v1/[...path]/route');
+
+      const fakeToken = 'backend_otp_verified_token_99999';
+      const fakeUser = {
+        id: 'u-otp-1',
+        name: 'Phone User',
+        role: 'student',
+      };
+
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({
+          success: true,
+          message: 'Phone verified successfully',
+          token: fakeToken,
+          user: fakeUser,
+        }),
+      } as Response);
+
+      const mockReq = new NextRequest('http://localhost:3000/api/v1/auth/otp/verify', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          origin: 'http://localhost:3000',
+          host: 'localhost:3000',
+        },
+        body: JSON.stringify({ phone: '01712345678', code: '123456' }),
+      });
+
+      const response = await POST(mockReq, {
+        params: Promise.resolve({ path: ['auth', 'otp', 'verify'] }),
+      });
+
+      expect(response.status).toBe(200);
+      const json = await response.json();
+      expect(json.token).toBeUndefined();
+      expect(json.user).toEqual(fakeUser);
+
+      const cookie = response.cookies.get('techsprout_session');
+      expect(cookie).toBeDefined();
+      expect(cookie?.value).toBe(fakeToken);
+      expect(cookie?.httpOnly).toBe(true);
+      expect(cookie?.sameSite?.toLowerCase()).toBe('lax');
+    });
+
+    it('7.6 Intercepts logout to clear HttpOnly cookie with Max-Age=0', async () => {
+      const { POST } = await import('@/app/api/v1/[...path]/route');
+
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({
+          success: true,
+          message: 'Logged out successfully',
+        }),
+      } as Response);
+
+      const mockReq = new NextRequest('http://localhost:3000/api/v1/auth/logout', {
+        method: 'POST',
+        headers: {
+          origin: 'http://localhost:3000',
+          host: 'localhost:3000',
+        },
+      });
+
+      const response = await POST(mockReq, {
+        params: Promise.resolve({ path: ['auth', 'logout'] }),
+      });
+
+      expect(response.status).toBe(200);
+      const cookie = response.cookies.get('techsprout_session');
+      expect(cookie).toBeDefined();
+      expect(cookie?.value).toBe('');
+      expect(cookie?.maxAge).toBe(0);
+      expect(cookie?.httpOnly).toBe(true);
     });
   });
 });
