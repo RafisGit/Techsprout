@@ -1,65 +1,14 @@
 /**
  * TechSprout Client Session Management Helper
  *
- * Manages the `techsprout_session` cookie on the frontend domain to allow
- * Next.js Server Components and layout guards to read session identity across
- * cross-origin deployments (e.g., Vercel frontend + Render backend API).
+ * Coordinates post-login redirection and session termination under the
+ * secure Next.js Backend-for-Frontend (BFF) architecture.
+ *
+ * Authentication cookies are strictly HttpOnly, SameSite=Lax, and Secure,
+ * managed entirely by the server boundary (/api/v1/* BFF proxy route handler).
  */
 
 export const SESSION_COOKIE_NAME = 'techsprout_session';
-
-/**
- * Sets the session cookie on the current frontend domain.
- * Configured with 30-day lifetime, Path=/, SameSite=Lax, and Secure on HTTPS.
- */
-export function setSessionCookie(token: string, maxAgeSeconds: number = 30 * 24 * 60 * 60): void {
-  if (typeof document === 'undefined') return;
-
-  const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
-  const cookieParts = [
-    `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}`,
-    'path=/',
-    `max-age=${maxAgeSeconds}`,
-    'SameSite=Lax',
-  ];
-
-  if (isSecure) {
-    cookieParts.push('Secure');
-  }
-
-  document.cookie = cookieParts.join('; ');
-}
-
-/**
- * Clears the session cookie from the current frontend domain.
- */
-export function clearSessionCookie(): void {
-  if (typeof document === 'undefined') return;
-
-  const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
-  const cookieParts = [
-    `${SESSION_COOKIE_NAME}=`,
-    'path=/',
-    'expires=Thu, 01 Jan 1970 00:00:00 GMT',
-    'SameSite=Lax',
-  ];
-
-  if (isSecure) {
-    cookieParts.push('Secure');
-  }
-
-  document.cookie = cookieParts.join('; ');
-}
-
-/**
- * Extracts the active session token from document.cookie if available.
- */
-export function getSessionToken(): string | null {
-  if (typeof document === 'undefined') return null;
-
-  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE_NAME}=([^;]+)`));
-  return match ? decodeURIComponent(match[1]) : null;
-}
 
 /**
  * Resolves post-login redirection URL based on user role.
@@ -75,19 +24,36 @@ export function getPostLoginRedirect(role?: string): string {
 }
 
 /**
- * Signs out the current user by calling the API logout endpoint,
- * clearing the frontend session cookie, and redirecting to /login.
+ * Signs out the current user by calling the BFF logout endpoint,
+ * which invalidates the session token in the database, expires the
+ * HttpOnly session cookie via Set-Cookie headers, and redirects to /login.
  */
 export async function logoutUser(): Promise<void> {
   try {
     const { axiosInstance } = await import('./axiosInstance');
     await axiosInstance.post('/api/v1/auth/logout');
   } catch {
-    // Ignore backend failure so client session is always cleaned up
+    // Ignore backend failure so client navigation proceeds
   } finally {
-    clearSessionCookie();
     if (typeof window !== 'undefined') {
       window.location.href = '/login';
     }
   }
+}
+
+/**
+ * Legacy compatibility shims (deprecated under BFF architecture).
+ * Authentication cookies are now managed exclusively via HttpOnly server cookies.
+ */
+export function setSessionCookie(_token: string): void {
+  // No-op: Authentication cookies are set exclusively as HttpOnly headers by the BFF proxy
+}
+
+export function clearSessionCookie(): void {
+  // No-op: Authentication cookies are cleared via Set-Cookie headers on /api/v1/auth/logout
+}
+
+export function getSessionToken(): string | null {
+  // Return null: Raw tokens are inaccessible to client-side JavaScript for XSS defense
+  return null;
 }

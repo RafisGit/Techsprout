@@ -15,7 +15,7 @@ import { axiosInstance } from '@/lib/axiosInstance';
 import { useState } from 'react';
 import { Input } from '../ui/input';
 import { loginSchema } from '@/schemas/loginSchema';
-import { setSessionCookie, getPostLoginRedirect } from '@/lib/session';
+import { getPostLoginRedirect } from '@/lib/session';
 
 export default function Login() {
   const [serverError, setServerError] = useState('');
@@ -42,14 +42,6 @@ export default function Login() {
       });
 
       if (response.data.success) {
-        if (!response.data.token) {
-          setServerError('Authentication failed: Missing session token in server response.');
-          return;
-        }
-
-        // Set session cookie on the web application domain so Next.js SSR layout guards can read it
-        setSessionCookie(response.data.token);
-
         const targetUrl = getPostLoginRedirect(response.data.user?.role);
         window.location.href = targetUrl;
       } else {

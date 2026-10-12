@@ -34,14 +34,18 @@ export class AuthGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
-    // 1. Extract session token from Cookie or Bearer header
-    let token: string | undefined = request.cookies?.['techsprout_session'];
+    // 1. Extract session token from Bearer header or Cookie
+    let token: string | undefined;
 
-    if (!token && request.headers.authorization) {
+    if (request.headers.authorization) {
       const parts = request.headers.authorization.split(' ');
       if (parts.length === 2 && parts[0].toLowerCase() === 'bearer') {
         token = parts[1];
       }
+    }
+
+    if (!token) {
+      token = request.cookies?.['techsprout_session'];
     }
 
     if (!token) {

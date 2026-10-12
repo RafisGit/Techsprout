@@ -1,42 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-  setSessionCookie,
-  clearSessionCookie,
   getSessionToken,
   getPostLoginRedirect,
   logoutUser,
   SESSION_COOKIE_NAME,
 } from '@/lib/session';
 import { getCurrentUser } from '@/auth';
-import { axiosInstance, API_BASE_URL } from '@/lib/axiosInstance';
+import { axiosInstance, API_BASE_URL, getApiBaseUrl } from '@/lib/axiosInstance';
+import { NextRequest } from 'next/server';
 
-describe('Authentication & Session Management Suite (Cross-Origin Remediation)', () => {
-  let originalDocument: any;
-  let originalWindow: any;
-  let cookieJar = '';
-
+describe('Next.js BFF Secure Authentication & Session Architecture Suite', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    cookieJar = '';
-
-    // Mock document.cookie
-    Object.defineProperty(global, 'document', {
-      value: {
-        get cookie() {
-          return cookieJar;
-        },
-        set cookie(val: string) {
-          if (val.includes('expires=Thu, 01 Jan 1970')) {
-            cookieJar = '';
-          } else {
-            const parts = val.split(';');
-            cookieJar = parts[0];
-          }
-        },
-      },
-      writable: true,
-      configurable: true,
-    });
 
     // Mock window.location
     Object.defineProperty(global, 'window', {
@@ -44,6 +19,7 @@ describe('Authentication & Session Management Suite (Cross-Origin Remediation)',
         location: {
           protocol: 'https:',
           href: 'https://techsprout-web-staging.vercel.app/login',
+          origin: 'https://techsprout-web-staging.vercel.app',
         },
       },
       writable: true,
@@ -56,40 +32,15 @@ describe('Authentication & Session Management Suite (Cross-Origin Remediation)',
   });
 
   // =========================================================================
-  // 1. SESSION COOKIE MANAGEMENT
+  // 1. INACCESSIBILITY OF SENSITIVE TOKENS TO CLIENT JAVASCRIPT
   // =========================================================================
-  describe('1. Frontend Domain Session Cookie Management', () => {
-    it('1.1 setSessionCookie sets the techsprout_session cookie with correct attributes', () => {
-      const mockToken = 'mock_jwt_session_token_12345';
-      setSessionCookie(mockToken);
-
-      expect(cookieJar).toContain(`${SESSION_COOKIE_NAME}=${mockToken}`);
-      expect(getSessionToken()).toBe(mockToken);
-    });
-
-    it('1.2 clearSessionCookie removes the session cookie with epoch expiration', () => {
-      const mockToken = 'mock_jwt_session_token_12345';
-      setSessionCookie(mockToken);
-      expect(getSessionToken()).toBe(mockToken);
-
-      clearSessionCookie();
+  describe('1. Token Inaccessibility to Client-Side JavaScript (XSS Defense)', () => {
+    it('1.1 getSessionToken returns null to prevent script access to session tokens', () => {
       expect(getSessionToken()).toBeNull();
     });
 
-    it('1.3 getSessionToken parses cookie when multiple cookies are present', () => {
-      cookieJar = 'theme=dark; techsprout_session=my_secret_token; analytics=true';
-      expect(getSessionToken()).toBe('my_secret_token');
-    });
-
-    it('1.4 getSessionToken decodes URI encoded tokens correctly', () => {
-      const complexToken = 'token.with.special%2Fchars';
-      cookieJar = `techsprout_session=${encodeURIComponent(complexToken)}`;
-      expect(getSessionToken()).toBe(complexToken);
-    });
-
-    it('1.5 getSessionToken returns null when cookie is absent', () => {
-      cookieJar = 'unrelated_cookie=value';
-      expect(getSessionToken()).toBeNull();
+    it('1.2 SESSION_COOKIE_NAME constant is correctly defined', () => {
+      expect(SESSION_COOKIE_NAME).toBe('techsprout_session');
     });
   });
 
@@ -109,75 +60,32 @@ describe('Authentication & Session Management Suite (Cross-Origin Remediation)',
       expect(getPostLoginRedirect('student')).toBe('/dashboard');
     });
 
-    it('2.4 Unrecognized or undefined role defaults to /dashboard safely', () => {
+    it('2.4 Unrecognized or undefined role defaults safely to /dashboard', () => {
       expect(getPostLoginRedirect(undefined)).toBe('/dashboard');
       expect(getPostLoginRedirect('guest')).toBe('/dashboard');
     });
   });
 
   // =========================================================================
-  // 3. AXIOS REQUEST INTERCEPTOR (CROSS-ORIGIN BEARER INJECTION)
+  // 3. AXIOS SAME-ORIGIN ROUTING & LEAK PREVENTION
   // =========================================================================
-  describe('3. Axios Cross-Origin Authorization Interceptor', () => {
-    it('3.1 Injects Authorization: Bearer token from session cookie when not already present', async () => {
-      const token = 'active_bearer_session_token';
-      setSessionCookie(token);
-
-      const testConfig = {
-        headers: {} as Record<string, string>,
-      };
-
-      // Run registered interceptors
-      // @ts-ignore - access internal axios interceptor handlers
-      const interceptorHandlers = (axiosInstance.interceptors.request as any).handlers;
-      let config = testConfig;
-      for (const handler of interceptorHandlers) {
-        if (handler?.fulfilled) {
-          config = handler.fulfilled(config);
-        }
-      }
-
-      expect(config.headers.Authorization).toBe(`Bearer ${token}`);
+  describe('3. Axios Same-Origin BFF Routing & Credential Isolation', () => {
+    it('3.1 Client axios instance routes through same-origin relative base in browser', () => {
+      expect(getApiBaseUrl(true)).toBe('');
+      expect(getApiBaseUrl(false)).toBe(
+        process.env.INTERNAL_API_URL ||
+          process.env.NEXT_PUBLIC_API_URL ||
+          'http://localhost:3001'
+      );
     });
 
-    it('3.2 Preserves existing Authorization header if explicitly provided', async () => {
-      setSessionCookie('cookie_token');
-
-      const testConfig = {
-        headers: {
-          Authorization: 'Bearer custom_explicit_token',
-        } as Record<string, string>,
-      };
-
-      // @ts-ignore
-      const interceptorHandlers = (axiosInstance.interceptors.request as any).handlers;
-      let config = testConfig;
-      for (const handler of interceptorHandlers) {
-        if (handler?.fulfilled) {
-          config = handler.fulfilled(config);
-        }
-      }
-
-      expect(config.headers.Authorization).toBe('Bearer custom_explicit_token');
+    it('3.2 Credentialed requests (HttpOnly cookies) are enabled on axios instance', () => {
+      expect(axiosInstance.defaults.withCredentials).toBe(true);
     });
 
-    it('3.3 Does not inject Authorization header when no session cookie is found', async () => {
-      clearSessionCookie();
-
-      const testConfig = {
-        headers: {} as Record<string, string>,
-      };
-
-      // @ts-ignore
-      const interceptorHandlers = (axiosInstance.interceptors.request as any).handlers;
-      let config = testConfig;
-      for (const handler of interceptorHandlers) {
-        if (handler?.fulfilled) {
-          config = handler.fulfilled(config);
-        }
-      }
-
-      expect(config.headers.Authorization).toBeUndefined();
+    it('3.3 Does not expose Authorization Bearer header interceptor to external domains', () => {
+      const handlers = (axiosInstance.interceptors.request as any).handlers;
+      expect(handlers.length).toBe(0);
     });
   });
 
@@ -216,7 +124,7 @@ describe('Authentication & Session Management Suite (Cross-Origin Remediation)',
       expect((options as any)?.headers?.Authorization).toBe(`Bearer ${token}`);
     });
 
-    it('4.2 Returns null when API responds with 401 Unauthorized', async () => {
+    it('4.2 Returns null when backend responds with 401 Unauthorized', async () => {
       vi.spyOn(global, 'fetch').mockResolvedValueOnce({
         ok: false,
         status: 401,
@@ -238,10 +146,7 @@ describe('Authentication & Session Management Suite (Cross-Origin Remediation)',
   // 5. LOGOUT AND SESSION REVOCATION
   // =========================================================================
   describe('5. Logout and Client Cleanup Flow', () => {
-    it('5.1 logoutUser calls API logout, clears cookie, and redirects to /login', async () => {
-      setSessionCookie('active_token');
-      expect(getSessionToken()).toBe('active_token');
-
+    it('5.1 logoutUser calls BFF logout endpoint and redirects to /login', async () => {
       const postSpy = vi.spyOn(axiosInstance, 'post').mockResolvedValueOnce({
         data: { success: true },
       } as any);
@@ -249,18 +154,14 @@ describe('Authentication & Session Management Suite (Cross-Origin Remediation)',
       await logoutUser();
 
       expect(postSpy).toHaveBeenCalledWith('/api/v1/auth/logout');
-      expect(getSessionToken()).toBeNull();
       expect(window.location.href).toBe('/login');
     });
 
-    it('5.2 logoutUser clears cookie and redirects to /login even if API call fails', async () => {
-      setSessionCookie('active_token');
-
+    it('5.2 logoutUser redirects to /login even if API call fails', async () => {
       vi.spyOn(axiosInstance, 'post').mockRejectedValueOnce(new Error('API unreachable'));
 
       await logoutUser();
 
-      expect(getSessionToken()).toBeNull();
       expect(window.location.href).toBe('/login');
     });
   });
@@ -270,7 +171,6 @@ describe('Authentication & Session Management Suite (Cross-Origin Remediation)',
   // =========================================================================
   describe('6. Error Feedback & Network Error Distinctions', () => {
     it('6.1 Differentiates invalid credentials (401) from server network failures', () => {
-      // Helper simulating the Login.tsx error extraction logic
       function extractLoginError(err: unknown): string {
         const errorObj = err as {
           response?: { data?: { message?: string } };
@@ -310,10 +210,98 @@ describe('Authentication & Session Management Suite (Cross-Origin Remediation)',
       };
       expect(extractLoginError(validationError)).toBe('Validation failed: Invalid email format');
     });
+  });
 
-    it('6.2 Validates API base URL is configured', () => {
-      expect(API_BASE_URL).toBeDefined();
-      expect(typeof API_BASE_URL).toBe('string');
+  // =========================================================================
+  // 7. BFF PROXY ROUTE HANDLER LOGIC
+  // =========================================================================
+  describe('7. BFF Proxy Route Handler Specifications', () => {
+    it('7.1 Rejects cross-origin state-changing requests when Origin does not match Host (CSRF Defense)', async () => {
+      const { POST } = await import('@/app/api/v1/[...path]/route');
+
+      const mockReq = new NextRequest('http://localhost:3000/api/v1/orders', {
+        method: 'POST',
+        headers: {
+          origin: 'https://malicious-site.com',
+          host: 'localhost:3000',
+        },
+      });
+
+      const response = await POST(mockReq, {
+        params: Promise.resolve({ path: ['orders'] }),
+      });
+
+      expect(response.status).toBe(403);
+      const json = await response.json();
+      expect(json.message).toContain('Forbidden');
+    });
+
+    it('7.2 Strips session token from response body on successful login and sets HttpOnly cookie', async () => {
+      const { POST } = await import('@/app/api/v1/[...path]/route');
+
+      const fakeToken = 'backend_super_secret_token_12345';
+      const fakeUser = {
+        id: 'u-1',
+        name: 'Dr. Mitchell',
+        role: 'instructor',
+      };
+
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({
+          success: true,
+          message: 'Login successful',
+          token: fakeToken,
+          user: fakeUser,
+        }),
+      } as Response);
+
+      const mockReq = new NextRequest('http://localhost:3000/api/v1/auth/login', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          origin: 'http://localhost:3000',
+          host: 'localhost:3000',
+        },
+        body: JSON.stringify({ email: 'instructor@techsprout.edu', password: 'pass' }),
+      });
+
+      const response = await POST(mockReq, {
+        params: Promise.resolve({ path: ['auth', 'login'] }),
+      });
+
+      expect(response.status).toBe(200);
+      const json = await response.json();
+
+      // Raw token MUST be scrubbed from the JSON body
+      expect(json.token).toBeUndefined();
+      expect(json.user).toEqual(fakeUser);
+
+      // HttpOnly cookie MUST be set on the response
+      const cookie = response.cookies.get('techsprout_session');
+      expect(cookie).toBeDefined();
+      expect(cookie?.value).toBe(fakeToken);
+      expect(cookie?.httpOnly).toBe(true);
+      expect(cookie?.sameSite?.toLowerCase()).toBe('lax');
+    });
+
+    it('7.3 Short-circuits /api/v1/auth/me with 401 when session cookie is absent', async () => {
+      const { GET } = await import('@/app/api/v1/[...path]/route');
+
+      const mockReq = new NextRequest('http://localhost:3000/api/v1/auth/me', {
+        method: 'GET',
+      });
+
+      const response = await GET(mockReq, {
+        params: Promise.resolve({ path: ['auth', 'me'] }),
+      });
+
+      expect(response.status).toBe(401);
+      const json = await response.json();
+      expect(json.success).toBe(false);
+      expect(json.message).toBe('Authentication required');
     });
   });
 });

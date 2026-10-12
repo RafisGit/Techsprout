@@ -92,7 +92,7 @@ export class OtpController {
     res.cookie('techsprout_session', result.token, {
       httpOnly: true,
       secure: env.NODE_ENV === 'production' || env.NODE_ENV === 'staging',
-      sameSite: (env.NODE_ENV === 'production' || env.NODE_ENV === 'staging') ? 'none' : 'lax',
+      sameSite: 'lax',
       path: '/',
       expires: result.expiresAt,
     });
