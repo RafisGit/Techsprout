@@ -59,6 +59,7 @@ export const quizAttempts = pgTable(
     index('quiz_attempts_quiz_id_idx').on(table.quizId),
     index('quiz_attempts_student_id_idx').on(table.studentId),
     index('quiz_attempts_status_idx').on(table.status),
+    index('quiz_attempts_quiz_passed_idx').on(table.quizId, table.isPassed),
     check('quiz_attempts_attempt_number_positive', sql`"attempt_number" > 0`),
     check('quiz_attempts_score_non_negative', sql`"score" >= 0`),
     check('quiz_attempts_total_points_non_negative', sql`"total_points" >= 0`),

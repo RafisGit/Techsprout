@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Users,
+  BarChart3,
 } from 'lucide-react';
 import type { CourseDto } from '@techsprout/contracts';
 
@@ -201,6 +202,13 @@ export function InstructorCoursesClient() {
                         </Button>
                       </Link>
                     )}
+
+                    <Link href={`/instructor/courses/${course.id}/analytics`}>
+                      <Button variant='outline' size='sm' className='flex items-center gap-1.5 text-purple-700 border-purple-200 hover:bg-purple-50'>
+                        <BarChart3 className='w-4 h-4' />
+                        <span>Analytics</span>
+                      </Button>
+                    </Link>
 
                     <Link href={`/instructor/courses/${course.id}/learners`}>
                       <Button variant='outline' size='sm' className='flex items-center gap-1.5 text-blue-700 border-blue-200 hover:bg-blue-50'>

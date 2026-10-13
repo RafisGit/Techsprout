@@ -9,7 +9,10 @@ import type {
   ResumePointDto,
   UpdateProgressCheckpointRequest,
   ToggleLessonCompleteRequest,
+  StudentLearningEngagementDto,
 } from '@techsprout/contracts';
+
+export type { StudentLearningEngagementDto };
 
 export interface UserEnrollmentsQueryParams {
   status?: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
@@ -121,5 +124,14 @@ export async function toggleLessonComplete(
     `/api/v1/learn/courses/${courseId}/lessons/${lessonId}/complete`,
     requestBody
   );
+  return response.data.data;
+}
+
+// ==========================================
+// STUDENT ENGAGEMENT ANALYTICS API (P6.3 WP-05)
+// ==========================================
+
+export async function fetchStudentLearningEngagement(): Promise<StudentLearningEngagementDto> {
+  const response = await axiosInstance.get('/api/v1/learn/analytics/engagement');
   return response.data.data;
 }

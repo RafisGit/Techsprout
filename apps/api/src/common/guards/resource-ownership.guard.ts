@@ -84,6 +84,13 @@ export class ResourceOwnershipGuard implements CanActivate {
       );
     }
 
+    if (resourceType !== 'media') {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(resourceId)) {
+        throw new ApiException('Invalid ID format', HttpStatus.BAD_REQUEST, 'INVALID_ID');
+      }
+    }
+
     // 4. Resolve the resource and enforce ownership
     const isOwner = await this.verifyOwnership(resourceType, resourceId, req.user.id);
 

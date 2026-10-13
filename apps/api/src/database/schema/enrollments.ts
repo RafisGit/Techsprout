@@ -40,6 +40,8 @@ export const enrollments = pgTable(
     index('enrollments_student_id_idx').on(table.studentId, table.status),
     index('enrollments_course_id_idx').on(table.courseId, table.status),
     index('enrollments_enrolled_at_idx').on(table.enrolledAt),
+    index('enrollments_course_enrolled_at_idx').on(table.courseId, table.enrolledAt),
+    index('enrollments_status_enrolled_at_idx').on(table.status, table.enrolledAt),
   ]
 );
 

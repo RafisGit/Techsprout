@@ -11,8 +11,13 @@ import {
   Calendar,
   Mail,
   Search,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+
+export type RosterSortField = 'enrolledAt' | 'name' | 'progressPercentage' | 'lastAccessedAt';
 
 interface LearnerRosterTableProps {
   items: CourseEnrollmentItem[];
@@ -21,6 +26,9 @@ interface LearnerRosterTableProps {
   errorMessage?: string | null;
   onRetry?: () => void;
   searchQuery?: string;
+  sortBy?: RosterSortField;
+  sortOrder?: 'asc' | 'desc';
+  onSortChange?: (field: RosterSortField) => void;
   className?: string;
 }
 
@@ -31,6 +39,9 @@ export function LearnerRosterTable({
   errorMessage,
   onRetry,
   searchQuery,
+  sortBy,
+  sortOrder,
+  onSortChange,
   className = '',
 }: LearnerRosterTableProps) {
   // Loading skeleton state
@@ -119,6 +130,17 @@ export function LearnerRosterTable({
       .toUpperCase();
   };
 
+  const renderSortIndicator = (field: RosterSortField) => {
+    if (sortBy !== field) {
+      return <ArrowUpDown className='w-3 h-3 text-gray-400 group-hover:text-gray-600 transition-colors' />;
+    }
+    return sortOrder === 'asc' ? (
+      <ArrowUp className='w-3 h-3 text-primary' />
+    ) : (
+      <ArrowDown className='w-3 h-3 text-primary' />
+    );
+  };
+
   return (
     <div className={className}>
       {/* Desktop Table View */}
@@ -126,10 +148,49 @@ export function LearnerRosterTable({
         <table className='w-full text-left text-sm text-gray-600'>
           <thead className='bg-gray-50/80 text-xs font-semibold text-gray-700 uppercase border-b border-gray-200'>
             <tr>
-              <th scope='col' className='px-6 py-3.5'>Learner</th>
+              <th scope='col' className='px-6 py-3.5'>
+                {onSortChange ? (
+                  <button
+                    type='button'
+                    onClick={() => onSortChange('name')}
+                    className='group flex items-center gap-1.5 hover:text-gray-900 font-semibold focus:outline-none'
+                  >
+                    <span>Learner</span>
+                    {renderSortIndicator('name')}
+                  </button>
+                ) : (
+                  <span>Learner</span>
+                )}
+              </th>
               <th scope='col' className='px-6 py-3.5'>Status</th>
-              <th scope='col' className='px-6 py-3.5'>Course Progress</th>
-              <th scope='col' className='px-6 py-3.5'>Enrolled Date</th>
+              <th scope='col' className='px-6 py-3.5'>
+                {onSortChange ? (
+                  <button
+                    type='button'
+                    onClick={() => onSortChange('progressPercentage')}
+                    className='group flex items-center gap-1.5 hover:text-gray-900 font-semibold focus:outline-none'
+                  >
+                    <span>Course Progress</span>
+                    {renderSortIndicator('progressPercentage')}
+                  </button>
+                ) : (
+                  <span>Course Progress</span>
+                )}
+              </th>
+              <th scope='col' className='px-6 py-3.5'>
+                {onSortChange ? (
+                  <button
+                    type='button'
+                    onClick={() => onSortChange('enrolledAt')}
+                    className='group flex items-center gap-1.5 hover:text-gray-900 font-semibold focus:outline-none'
+                  >
+                    <span>Enrolled Date</span>
+                    {renderSortIndicator('enrolledAt')}
+                  </button>
+                ) : (
+                  <span>Enrolled Date</span>
+                )}
+              </th>
               <th scope='col' className='px-6 py-3.5'>Completion Date</th>
             </tr>
           </thead>

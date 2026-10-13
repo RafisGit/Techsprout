@@ -43,6 +43,7 @@ export const lessonProgress = pgTable(
     index('lesson_progress_enrollment_status_idx').on(table.enrollmentId, table.status),
     index('lesson_progress_lesson_id_idx').on(table.lessonId),
     index('lesson_progress_last_accessed_idx').on(table.lastAccessedAt),
+    index('lesson_progress_lesson_status_idx').on(table.lessonId, table.status),
   ]
 );
 

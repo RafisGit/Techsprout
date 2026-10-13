@@ -1,5 +1,5 @@
 import { Injectable, Inject, HttpStatus, Optional } from '@nestjs/common';
-import { eq, and, desc, sql, count } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, count, or, ilike, inArray } from 'drizzle-orm';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import {
   enrollments,
@@ -790,6 +790,7 @@ export class EnrollmentsService {
 
   /**
    * Admin / Instructor roster: GET /api/v1/admin/courses/:id/enrollments
+   * Server-side search, deterministic sorting, and bounded batch progress calculation (DEF-P6.2-UX-01)
    */
   async getAdminCourseEnrollments(
     courseId: string,
@@ -810,64 +811,218 @@ export class EnrollmentsService {
       );
     }
 
-    const page = query.page;
-    const limit = query.limit;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
     const offset = (page - 1) * limit;
 
-    const baseWhere = query.status
-      ? and(eq(enrollments.courseId, courseId), eq(enrollments.status, query.status))
-      : eq(enrollments.courseId, courseId);
+    const trimmedSearch = query.search?.trim();
+    const hasSearch = Boolean(trimmedSearch && trimmedSearch.length > 0);
 
-    const [totalCountResult] = await this.db
-      .select({ count: count(enrollments.id) })
-      .from(enrollments)
-      .where(baseWhere);
+    const escapeLikePattern = (val: string): string => {
+      return val.replace(/[%_\\]/g, '\\$&');
+    };
 
-    const [completedCountResult] = await this.db
-      .select({ count: count(enrollments.id) })
-      .from(enrollments)
-      .where(and(eq(enrollments.courseId, courseId), eq(enrollments.status, 'COMPLETED')));
+    // Construct filter clause across enrollments and student details
+    const filterConditions = [eq(enrollments.courseId, courseId)];
 
-    const total = Number(totalCountResult?.count || 0);
-    const completedCount = Number(completedCountResult?.count || 0);
-    const totalPages = Math.ceil(total / limit) || 1;
+    if (query.status) {
+      filterConditions.push(eq(enrollments.status, query.status));
+    }
 
-    const courseEnrollmentRows = await this.db
+    if (hasSearch) {
+      const searchPattern = `%${trimmedSearch!}%`;
+      filterConditions.push(
+        or(ilike(users.name, searchPattern), ilike(users.email, searchPattern))!
+      );
+    }
+
+    const filteredWhere = and(...filterConditions);
+
+    // 1. Course lesson count (constant 1 query)
+    const [totalLessonsResult] = await this.db
+      .select({ count: count(lessons.id) })
+      .from(lessons)
+      .innerJoin(modules, eq(lessons.moduleId, modules.id))
+      .where(eq(modules.courseId, courseId));
+
+    const totalLessons = Number(totalLessonsResult?.count || 0);
+
+    // 2. Course-level enrollment metrics (constant 1 query)
+    const [courseStatsResult] = await this.db
       .select({
-        enrollment: enrollments,
-        student: users,
+        totalEnrolled: count(enrollments.id),
+        completedCount: sql<number>`count(case when ${enrollments.status} = 'COMPLETED' then 1 end)`,
       })
       .from(enrollments)
-      .innerJoin(users, eq(enrollments.studentId, users.id))
-      .where(baseWhere)
-      .orderBy(desc(enrollments.enrolledAt))
-      .limit(limit)
-      .offset(offset);
+      .where(eq(enrollments.courseId, courseId));
 
-    const items = await Promise.all(
-      courseEnrollmentRows.map(async ({ enrollment, student }) => {
-        const { percentage } = await this.calculateCourseProgress(courseId, enrollment.id);
-        return {
-          enrollmentId: enrollment.id,
-          student: {
-            id: student.id,
-            name: student.name,
-            email: student.email,
-          },
-          status: enrollment.status,
-          enrolledAt: enrollment.enrolledAt.toISOString(),
-          completedAt: enrollment.completedAt ? enrollment.completedAt.toISOString() : null,
-          lastAccessedAt: enrollment.lastAccessedAt
-            ? enrollment.lastAccessedAt.toISOString()
-            : null,
-          progressPercentage: percentage,
-        };
-      })
-    );
+    const totalEnrolled = Number(courseStatsResult?.totalEnrolled || 0);
+    const completedCount = Number(courseStatsResult?.completedCount || 0);
+
+    // 3. Filtered total count for pagination metadata (only when filtered by status or search)
+    let total = totalEnrolled;
+    if (query.status || hasSearch) {
+      const [filteredCountResult] = await this.db
+        .select({ count: count(enrollments.id) })
+        .from(enrollments)
+        .innerJoin(users, eq(enrollments.studentId, users.id))
+        .where(filteredWhere);
+
+      total = Number(filteredCountResult?.count || 0);
+    }
+
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    // 4. Deterministic ordering and query execution
+    const sortOrder = query.sortOrder === 'asc' ? 'asc' : 'desc';
+    const isAsc = sortOrder === 'asc';
+
+    const completedProgressMap = new Map<string, number>();
+    let courseEnrollmentRows: Array<{
+      enrollment: typeof enrollments.$inferSelect;
+      student: typeof users.$inferSelect;
+    }> = [];
+
+    if (total > 0) {
+      if (query.sortBy === 'progressPercentage') {
+        // Fetch matching rows
+        const allMatchingRows = await this.db
+          .select({
+            enrollment: enrollments,
+            student: users,
+          })
+          .from(enrollments)
+          .innerJoin(users, eq(enrollments.studentId, users.id))
+          .where(filteredWhere);
+
+        // Batch query progress for all matching enrollments in a single grouped query
+        const allEnrollmentIds = allMatchingRows.map((r) => r.enrollment.id);
+        const progressCountMap = new Map<string, number>();
+
+        if (allEnrollmentIds.length > 0 && totalLessons > 0) {
+          const batchProgressRows = await this.db
+            .select({
+              enrollmentId: lessonProgress.enrollmentId,
+              completedCount: count(lessonProgress.id),
+            })
+            .from(lessonProgress)
+            .innerJoin(lessons, eq(lessonProgress.lessonId, lessons.id))
+            .innerJoin(modules, eq(lessons.moduleId, modules.id))
+            .where(
+              and(
+                inArray(lessonProgress.enrollmentId, allEnrollmentIds),
+                eq(modules.courseId, courseId),
+                eq(lessonProgress.status, 'COMPLETED')
+              )
+            )
+            .groupBy(lessonProgress.enrollmentId);
+
+          for (const row of batchProgressRows) {
+            progressCountMap.set(row.enrollmentId, Number(row.completedCount));
+          }
+        }
+
+        // Deterministic sort with enrollment ID as tie-breaker
+        allMatchingRows.sort((a, b) => {
+          const progA = progressCountMap.get(a.enrollment.id) ?? 0;
+          const progB = progressCountMap.get(b.enrollment.id) ?? 0;
+          if (progA !== progB) {
+            return isAsc ? progA - progB : progB - progA;
+          }
+          return isAsc
+            ? a.enrollment.id.localeCompare(b.enrollment.id)
+            : b.enrollment.id.localeCompare(a.enrollment.id);
+        });
+
+        courseEnrollmentRows = allMatchingRows.slice(offset, offset + limit);
+
+        for (const row of courseEnrollmentRows) {
+          completedProgressMap.set(
+            row.enrollment.id,
+            progressCountMap.get(row.enrollment.id) ?? 0
+          );
+        }
+      } else {
+        // Direct SQL sorting and pagination for standard column fields
+        let primaryOrder;
+        if (query.sortBy === 'name') {
+          primaryOrder = isAsc ? asc(users.name) : desc(users.name);
+        } else if (query.sortBy === 'lastAccessedAt') {
+          primaryOrder = isAsc
+            ? sql`${enrollments.lastAccessedAt} asc nulls last`
+            : sql`${enrollments.lastAccessedAt} desc nulls last`;
+        } else {
+          // Default: enrolledAt
+          primaryOrder = isAsc ? asc(enrollments.enrolledAt) : desc(enrollments.enrolledAt);
+        }
+
+        const tieBreaker = isAsc ? asc(enrollments.id) : desc(enrollments.id);
+
+        courseEnrollmentRows = await this.db
+          .select({
+            enrollment: enrollments,
+            student: users,
+          })
+          .from(enrollments)
+          .innerJoin(users, eq(enrollments.studentId, users.id))
+          .where(filteredWhere)
+          .orderBy(primaryOrder, tieBreaker)
+          .limit(limit)
+          .offset(offset);
+
+        // Batch progress calculation for current page items
+        const enrollmentIds = courseEnrollmentRows.map((r) => r.enrollment.id);
+
+        if (enrollmentIds.length > 0 && totalLessons > 0) {
+          const batchProgressRows = await this.db
+            .select({
+              enrollmentId: lessonProgress.enrollmentId,
+              completedCount: count(lessonProgress.id),
+            })
+            .from(lessonProgress)
+            .innerJoin(lessons, eq(lessonProgress.lessonId, lessons.id))
+            .innerJoin(modules, eq(lessons.moduleId, modules.id))
+            .where(
+              and(
+                inArray(lessonProgress.enrollmentId, enrollmentIds),
+                eq(modules.courseId, courseId),
+                eq(lessonProgress.status, 'COMPLETED')
+              )
+            )
+            .groupBy(lessonProgress.enrollmentId);
+
+          for (const row of batchProgressRows) {
+            completedProgressMap.set(row.enrollmentId, Number(row.completedCount));
+          }
+        }
+      }
+    }
+
+    const items = courseEnrollmentRows.map(({ enrollment, student }) => {
+      const completedLessons = completedProgressMap.get(enrollment.id) ?? 0;
+      const percentage =
+        totalLessons === 0 ? 0 : Math.min(100, Math.round((completedLessons / totalLessons) * 100));
+
+      return {
+        enrollmentId: enrollment.id,
+        student: {
+          id: student.id,
+          name: student.name,
+          email: student.email,
+        },
+        status: enrollment.status,
+        enrolledAt: enrollment.enrolledAt.toISOString(),
+        completedAt: enrollment.completedAt ? enrollment.completedAt.toISOString() : null,
+        lastAccessedAt: enrollment.lastAccessedAt
+          ? enrollment.lastAccessedAt.toISOString()
+          : null,
+        progressPercentage: percentage,
+      };
+    });
 
     return {
       courseId,
-      totalEnrolled: total,
+      totalEnrolled,
       completedCount,
       items,
       pagination: {
@@ -881,3 +1036,4 @@ export class EnrollmentsService {
     };
   }
 }
+

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -9,7 +9,7 @@ import {
   type CourseEnrollmentItem,
   type EnrollmentStatus,
 } from '@/lib/api/instructor';
-import { LearnerRosterTable } from '@/components/instructor/LearnerRosterTable';
+import { LearnerRosterTable, type RosterSortField } from '@/components/instructor/LearnerRosterTable';
 import { serializeRosterToCsv, generateRosterCsvFilename, downloadCsvFile } from '@/lib/roster-csv';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,6 +25,7 @@ import {
   FileEdit,
   Loader2,
   AlertCircle,
+  BarChart3,
 } from 'lucide-react';
 
 interface LearnerRosterClientProps {
@@ -35,10 +36,30 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
   const [page, setPage] = useState<number>(1);
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
+  const [sortBy, setSortBy] = useState<RosterSortField>('enrolledAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
   const limit = 10;
+
+  // Debounce search input by 300ms to avoid firing on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Reset pagination to page 1 whenever debounced search query changes
+  const prevDebouncedSearchRef = useRef(debouncedSearch);
+  useEffect(() => {
+    if (prevDebouncedSearchRef.current !== debouncedSearch) {
+      prevDebouncedSearchRef.current = debouncedSearch;
+      setPage(1);
+    }
+  }, [debouncedSearch]);
 
   // Query Course metadata
   const {
@@ -51,8 +72,10 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
     enabled: !!courseId,
   });
 
-  // Query Course Enrollments
+  // Query Course Enrollments with server-side filtering, searching, and sorting
   const statusParam = selectedStatus === 'ALL' ? undefined : (selectedStatus as EnrollmentStatus);
+  const searchParam = debouncedSearch.trim() || undefined;
+
   const {
     data: enrollmentsData,
     isLoading: isLoadingEnrollments,
@@ -60,10 +83,13 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
     error: enrollmentsError,
     refetch,
   } = useQuery({
-    queryKey: ['courseEnrollments', courseId, page, selectedStatus],
+    queryKey: ['courseEnrollments', courseId, page, selectedStatus, searchParam, sortBy, sortOrder],
     queryFn: () =>
       fetchCourseEnrollments(courseId, {
         status: statusParam,
+        search: searchParam,
+        sortBy,
+        sortOrder,
         page,
         limit,
       }),
@@ -85,19 +111,19 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
   const activeCount = Math.max(totalEnrolled - completedCount, 0);
   const completionRate = totalEnrolled > 0 ? Math.round((completedCount / totalEnrolled) * 100) : 0;
 
-  // Filter rawItems by client-side search query (name or email)
-  const filteredItems = rawItems.filter((item) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      item.student.name.toLowerCase().includes(q) ||
-      item.student.email.toLowerCase().includes(q)
-    );
-  });
-
   const handleStatusChange = (newStatus: string) => {
     setSelectedStatus(newStatus);
     setPage(1); // Reset page boundary when filter alters
+  };
+
+  const handleSortChange = (field: RosterSortField) => {
+    if (sortBy === field) {
+      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(field);
+      setSortOrder(field === 'name' ? 'asc' : 'desc');
+    }
+    setPage(1);
   };
 
   const handleExportCsv = async () => {
@@ -115,6 +141,9 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
         const fullFetchLimit = 100;
         const firstPageData = await fetchCourseEnrollments(courseId, {
           status: statusParam,
+          search: searchParam,
+          sortBy,
+          sortOrder,
           page: 1,
           limit: fullFetchLimit,
         });
@@ -125,21 +154,14 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
         for (let p = 2; p <= totalPagesToFetch; p++) {
           const nextPageData = await fetchCourseEnrollments(courseId, {
             status: statusParam,
+            search: searchParam,
+            sortBy,
+            sortOrder,
             page: p,
             limit: fullFetchLimit,
           });
           allExportItems = allExportItems.concat(nextPageData.items);
         }
-      }
-
-      // If user has an active search filter, apply it to the export dataset as well
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        allExportItems = allExportItems.filter(
-          (item) =>
-            item.student.name.toLowerCase().includes(q) ||
-            item.student.email.toLowerCase().includes(q)
-        );
       }
 
       const csvContent = serializeRosterToCsv(allExportItems);
@@ -195,6 +217,17 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
         </div>
 
         <div className='flex flex-wrap items-center gap-2.5 flex-shrink-0'>
+          <Link href={`/instructor/courses/${courseId}/analytics`}>
+            <Button
+              variant='outline'
+              size='sm'
+              className='flex items-center gap-1.5 text-purple-700 border-purple-200 hover:bg-purple-50'
+            >
+              <BarChart3 className='w-4 h-4' />
+              <span>Course Analytics</span>
+            </Button>
+          </Link>
+
           <Link href={`/admin/courses/${courseId}`}>
             <Button variant='outline' size='sm' className='flex items-center gap-1.5'>
               <FileEdit className='w-4 h-4' />
@@ -318,11 +351,14 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
       <div className='bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden'>
         <div className='p-4 border-b border-gray-100 flex items-center justify-between text-xs text-gray-500'>
           <span>
-            Showing <strong>{filteredItems.length}</strong> of <strong>{pagination.total}</strong> enrolled learners
+            Showing <strong>{rawItems.length}</strong> of <strong>{pagination.total}</strong> {debouncedSearch ? 'matching' : 'enrolled'} learners
           </span>
           {searchQuery && (
             <button
-              onClick={() => setSearchQuery('')}
+              onClick={() => {
+                setSearchQuery('');
+                setDebouncedSearch('');
+              }}
               className='text-primary hover:underline font-medium'
             >
               Clear Search
@@ -331,7 +367,7 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
         </div>
 
         <LearnerRosterTable
-          items={filteredItems}
+          items={rawItems}
           isLoading={isLoadingEnrollments}
           isError={isEnrollmentsError}
           errorMessage={
@@ -339,7 +375,10 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
               ?.message || null
           }
           onRetry={() => refetch()}
-          searchQuery={searchQuery}
+          searchQuery={debouncedSearch}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSortChange={handleSortChange}
         />
 
         {/* Pagination Controls */}

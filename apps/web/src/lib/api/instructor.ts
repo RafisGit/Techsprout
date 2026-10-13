@@ -4,7 +4,28 @@ import type {
   CourseDto,
   InstructorProfileDto,
   UpdateInstructorProfileRequest,
+  InstructorAnalyticsOverviewDto,
+  InstructorCourseBreakdownDto,
+  CourseAnalyticsDetailDto,
+  EnrollmentTrendDataPoint,
+  ProgressDistributionBucket,
+  LessonDropOffItemDto,
+  QuizPerformanceSummaryDto,
+  AnalyticsInterval,
+  AnalyticsDateRangeQuery,
 } from '@techsprout/contracts';
+
+export type {
+  InstructorAnalyticsOverviewDto,
+  InstructorCourseBreakdownDto,
+  CourseAnalyticsDetailDto,
+  EnrollmentTrendDataPoint,
+  ProgressDistributionBucket,
+  LessonDropOffItemDto,
+  QuizPerformanceSummaryDto,
+  AnalyticsInterval,
+  AnalyticsDateRangeQuery,
+};
 
 export interface InstructorCourseQueryParams {
   page?: number;
@@ -194,6 +215,9 @@ export interface CourseEnrollmentItem {
 
 export interface CourseEnrollmentsQueryParams {
   status?: EnrollmentStatus;
+  search?: string;
+  sortBy?: 'enrolledAt' | 'name' | 'progressPercentage' | 'lastAccessedAt';
+  sortOrder?: 'asc' | 'desc';
   page?: number;
   limit?: number;
 }
@@ -234,5 +258,21 @@ export async function updateMyInstructorProfile(
   const response = await axiosInstance.put('/api/v1/instructor/profile', payload);
   return response.data.data;
 }
+
+export async function fetchInstructorAnalyticsOverview(): Promise<InstructorAnalyticsOverviewDto> {
+  const response = await axiosInstance.get('/api/v1/instructor/analytics/overview');
+  return response.data.data;
+}
+
+export async function fetchCourseAnalytics(
+  courseId: string,
+  params?: AnalyticsDateRangeQuery
+): Promise<CourseAnalyticsDetailDto> {
+  const response = await axiosInstance.get(`/api/v1/instructor/analytics/courses/${courseId}`, {
+    params,
+  });
+  return response.data.data;
+}
+
 
 

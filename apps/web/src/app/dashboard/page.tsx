@@ -1,5 +1,12 @@
+import { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { getCurrentUser } from '@/auth';
+import { StudentEngagementCounters } from '@/components/student/StudentEngagementCounters';
+
+export const metadata: Metadata = {
+  title: 'Student Dashboard | TechSprout School',
+  description: 'Track your personal course enrollments, study progress, and certificates earned.',
+};
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
@@ -7,25 +14,18 @@ export default async function DashboardPage() {
   const user = await getCurrentUser(`techsprout_session=${sessionToken}`);
 
   return (
-    <div className='p-6 bg-white rounded-xl shadow-sm'>
-      <h2 className='text-2xl font-bold mb-4'>Welcome back, {user?.name || 'Student'}!</h2>
-      <p className='text-gray-600 mb-6'>
-        You are logged in as a <strong>{user?.role || 'student'}</strong>.
-      </p>
-      <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
-        <div className='p-4 bg-primary/10 rounded-lg'>
-          <h3 className='font-semibold text-primary'>Enrolled Courses</h3>
-          <p className='text-2xl font-bold mt-2'>0</p>
-        </div>
-        <div className='p-4 bg-accent/10 rounded-lg'>
-          <h3 className='font-semibold text-accent'>In Progress</h3>
-          <p className='text-2xl font-bold mt-2'>0</p>
-        </div>
-        <div className='p-4 bg-green-50 rounded-lg'>
-          <h3 className='font-semibold text-green-700'>Certificates</h3>
-          <p className='text-2xl font-bold mt-2'>0</p>
-        </div>
+    <div className='space-y-6 max-w-5xl mx-auto'>
+      <div className='p-6 bg-white rounded-2xl border border-gray-200 shadow-xs'>
+        <h1 className='text-2xl font-bold text-gray-900'>
+          Welcome back, {user?.name || 'Student'}!
+        </h1>
+        <p className='text-sm text-gray-600 mt-1'>
+          You are signed in as a <strong className='capitalize'>{user?.role || 'student'}</strong>. Track your active study sessions, resume your courses, and review your completion milestones.
+        </p>
       </div>
+
+      {/* Dynamic Personal Learning Engagement Counters */}
+      <StudentEngagementCounters />
     </div>
   );
 }

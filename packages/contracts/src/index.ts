@@ -1990,3 +1990,222 @@ export const updateInstructorProfileSchema = z.object({
 });
 
 export type UpdateInstructorProfileRequest = z.infer<typeof updateInstructorProfileSchema>;
+
+// =========================================================================
+// --- P6.3: LEARNING ANALYTICS & ROSTER CONTRACTS ---
+// =========================================================================
+
+// --- INSTRUCTOR ANALYTICS CONTRACTS ---
+
+export interface InstructorCourseBreakdownDto {
+  courseId: string;
+  title: string;
+  slug: string;
+  status: string;
+  totalEnrolled: number;
+  completedCount: number;
+  completionRate: number; // 0 to 100
+  averageProgressPercentage: number;
+}
+
+export interface InstructorAnalyticsOverviewDto {
+  totalUniqueStudents: number;
+  totalCourseCompletions: number;
+  portfolioCompletionRate: number; // 0 to 100
+  activeLearners30d: number;
+  courseBreakdown: InstructorCourseBreakdownDto[];
+}
+
+export interface EnrollmentTrendDataPoint {
+  date: string; // ISO date YYYY-MM-DD
+  count: number;
+}
+
+export type ProgressBracket =
+  | '0-19%'
+  | '20-39%'
+  | '40-59%'
+  | '60-79%'
+  | '80-99%'
+  | '100%';
+
+export interface ProgressDistributionBucket {
+  bracket: ProgressBracket;
+  studentCount: number;
+  percentage: number;
+}
+
+export interface LessonDropOffItemDto {
+  lessonId: string;
+  moduleId: string;
+  moduleTitle: string;
+  lessonTitle: string;
+  position: number;
+  lessonType: string;
+  completedLearnersCount: number;
+  completionRate: number; // 0 to 100
+  dropOffRateFromPrior: number; // percentage points lost from prior lesson
+}
+
+export interface QuizPerformanceSummaryDto {
+  quizId: string;
+  quizTitle: string;
+  totalAttempts: number;
+  uniqueStudents: number;
+  passRate: number; // 0 to 100
+  averageScorePercentage: number;
+}
+
+export interface CourseAnalyticsDetailDto {
+  courseId: string;
+  courseTitle: string;
+  dateRange: {
+    startDate: string;
+    endDate: string;
+  };
+  metrics: {
+    totalEnrolled: number;
+    totalCompleted: number;
+    completionRate: number;
+    averageDaysToComplete: number | null;
+    activeLearners30d: number;
+  };
+  enrollmentTrend: EnrollmentTrendDataPoint[];
+  progressDistribution: ProgressDistributionBucket[];
+  lessonDropOff: LessonDropOffItemDto[];
+  quizPerformance: QuizPerformanceSummaryDto[];
+}
+
+// --- PLATFORM ADMIN ANALYTICS CONTRACTS ---
+
+export interface AdminAnalyticsReviewQueueSummaryDto {
+  pendingReviewsCount: number;
+  averageTurnaroundHours: number | null;
+}
+
+export interface AdminAnalyticsOverviewDto {
+  totalPublishedCourses: number;
+  totalDraftCourses: number;
+  totalInReviewCourses: number;
+  totalArchivedCourses: number;
+  totalRegisteredStudents: number;
+  totalActiveInstructors: number;
+  platformWideEnrollments: number;
+  platformWideCertificates: number;
+  platformCompletionRate: number;
+  reviewQueue: AdminAnalyticsReviewQueueSummaryDto;
+}
+
+export interface AdminCourseAnalyticsItemDto {
+  courseId: string;
+  title: string;
+  slug: string;
+  instructor: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  category: {
+    id: string;
+    name: string;
+  };
+  status: string;
+  price: string;
+  currency: string;
+  totalEnrolled: number;
+  completedCount: number;
+  completionRate: number;
+  createdAt: string;
+}
+
+export interface PaginatedAdminCourseAnalyticsData {
+  items: AdminCourseAnalyticsItemDto[];
+  pagination: PaginationMetadata;
+}
+
+// --- STUDENT LEARNING ENGAGEMENT CONTRACTS ---
+
+export interface StudentLearningEngagementDto {
+  enrolledCoursesCount: number;
+  inProgressCoursesCount: number;
+  completedCertificatesCount: number;
+}
+
+// --- ENHANCED LEARNER ROSTER CONTRACTS (DEF-P6.2-UX-01) ---
+
+export const enrollmentStatusSchema = z.enum(['ACTIVE', 'COMPLETED', 'CANCELLED']);
+
+export interface CourseEnrollmentStudentDto {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface CourseEnrollmentItemDto {
+  enrollmentId: string;
+  student: CourseEnrollmentStudentDto;
+  status: EnrollmentStatus;
+  enrolledAt: string;
+  completedAt: string | null;
+  lastAccessedAt: string | null;
+  progressPercentage: number;
+}
+
+export interface PaginatedCourseEnrollmentsData {
+  items: CourseEnrollmentItemDto[];
+  totalEnrolled: number;
+  completedCount: number;
+  pagination: PaginationMetadata;
+}
+
+// --- P6.3 QUERY VALIDATION SCHEMAS ---
+
+export const analyticsIntervalSchema = z.enum(['day', 'week']);
+export type AnalyticsInterval = z.infer<typeof analyticsIntervalSchema>;
+
+export const analyticsDateRangeQuerySchema = z.object({
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  interval: analyticsIntervalSchema.optional().default('day'),
+});
+export type AnalyticsDateRangeQuery = z.infer<typeof analyticsDateRangeQuerySchema>;
+
+export const enhancedRosterQuerySchema = z.object({
+  status: enrollmentStatusSchema.optional(),
+  search: z.string().trim().max(100).optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(100).optional().default(10),
+  sortBy: z
+    .enum(['enrolledAt', 'name', 'progressPercentage', 'lastAccessedAt'])
+    .optional()
+    .default('enrolledAt'),
+  sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
+});
+export type EnhancedRosterQuery = z.infer<typeof enhancedRosterQuerySchema>;
+
+export const adminCourseAnalyticsQuerySchema = paginationQuerySchema.extend({
+  search: z.string().trim().max(100).optional(),
+  status: z.enum(['DRAFT', 'IN_REVIEW', 'PUBLISHED', 'ARCHIVED']).optional(),
+  sortBy: z
+    .enum(['enrollments', 'completionRate', 'title', 'createdAt'])
+    .optional()
+    .default('enrollments'),
+  sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
+});
+export type AdminCourseAnalyticsQuery = z.infer<typeof adminCourseAnalyticsQuerySchema>;
+
+// --- P6.3 API RESPONSE TYPE ALIASES ---
+
+export type InstructorAnalyticsOverviewResponse =
+  ApiSuccessResponse<InstructorAnalyticsOverviewDto>;
+export type CourseAnalyticsDetailResponse =
+  ApiSuccessResponse<CourseAnalyticsDetailDto>;
+export type AdminAnalyticsOverviewResponse =
+  ApiSuccessResponse<AdminAnalyticsOverviewDto>;
+export type PaginatedAdminCourseAnalyticsResponse =
+  ApiSuccessResponse<PaginatedAdminCourseAnalyticsData>;
+export type StudentLearningEngagementResponse =
+  ApiSuccessResponse<StudentLearningEngagementDto>;
+export type PaginatedCourseEnrollmentsResponse =
+  ApiSuccessResponse<PaginatedCourseEnrollmentsData>;
+
