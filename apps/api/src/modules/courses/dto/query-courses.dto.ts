@@ -11,13 +11,19 @@ export const queryCoursesSchema = z.object({
   sortBy: z.enum(['createdAt', 'price', 'title']).optional().default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
   page: z.coerce.number().int().min(1, 'page must be at least 1').optional().default(1),
-  limit: z.coerce.number().int().min(1, 'limit must be at least 1').max(100, 'limit cannot exceed 100').optional().default(12),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1, 'limit must be at least 1')
+    .max(100, 'limit cannot exceed 100')
+    .optional()
+    .default(12),
 });
 
 export type QueryCoursesDto = z.infer<typeof queryCoursesSchema>;
 
 export const adminQueryCoursesSchema = queryCoursesSchema.extend({
-  status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).optional(),
+  status: z.enum(['DRAFT', 'IN_REVIEW', 'PUBLISHED', 'ARCHIVED']).optional(),
   visibility: z.enum(['PUBLIC', 'PRIVATE']).optional(),
   instructorId: z.string().uuid('Invalid instructor ID').optional(),
 });

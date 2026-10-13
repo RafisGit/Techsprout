@@ -15,6 +15,7 @@ import { axiosInstance } from '@/lib/axiosInstance';
 import { useState } from 'react';
 import { Input } from '../ui/input';
 import { loginSchema } from '@/schemas/loginSchema';
+import { getPostLoginRedirect } from '@/lib/session';
 
 export default function Login() {
   const [serverError, setServerError] = useState('');
@@ -29,6 +30,8 @@ export default function Login() {
   });
 
   async function onSubmit(values: z.infer<typeof loginSchema>) {
+    if (isSubmitting) return;
+
     try {
       setIsSubmitting(true);
       setServerError('');
@@ -39,17 +42,24 @@ export default function Login() {
       });
 
       if (response.data.success) {
-        const user = response.data.user;
-        if (user && user.role === 'admin') {
-          window.location.href = '/dashboard/admin/overview';
-        } else {
-          window.location.href = '/dashboard';
-        }
+        const targetUrl = getPostLoginRedirect(response.data.user?.role);
+        window.location.href = targetUrl;
+      } else {
+        setServerError(response.data.message || 'Login failed. Please verify your credentials.');
       }
     } catch (err: unknown) {
-      const errorObj = err as { response?: { data?: { message?: string } } };
-      const message = errorObj.response?.data?.message || 'Invalid email or password';
-      setServerError(message);
+      const errorObj = err as {
+        response?: { data?: { message?: string } };
+        message?: string;
+      };
+
+      if (errorObj.response?.data?.message) {
+        setServerError(errorObj.response.data.message);
+      } else if (!errorObj.response) {
+        setServerError('Unable to connect to the server. Please check your connection and try again.');
+      } else {
+        setServerError('Invalid email or password');
+      }
     } finally {
       setIsSubmitting(false);
     }

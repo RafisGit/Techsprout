@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ChevronDown, Grid3X3, Menu, Search, ShoppingCart, User, BookOpen, Receipt } from 'lucide-react';
+import { ChevronDown, Grid3X3, Menu, Search, ShoppingCart, User, BookOpen, Receipt, GraduationCap, LayoutDashboard, LogOut } from 'lucide-react';
 import Image from 'next/image';
 import logo from '@/assets/img/logo.png';
 
@@ -22,6 +22,7 @@ import { DialogTitle } from '@radix-ui/react-dialog';
 import { useQuery } from '@tanstack/react-query';
 import { fetchPublicCategories } from '@/lib/api/catalog';
 import { useCurrentUser } from '@/lib/useCurrentUser';
+import { logoutUser } from '@/lib/session';
 import { NotificationBell } from './NotificationBell';
 
 const navigationItems = [
@@ -201,6 +202,24 @@ export function Header() {
           {/* User Links / Log In */}
           {currentUser ? (
             <div className='hidden items-center space-x-3 sm:flex'>
+              {currentUser.role === 'instructor' && (
+                <Link
+                  href='/instructor/dashboard'
+                  className='hover:text-primary whitespace-nowrap text-sm font-semibold text-primary flex items-center gap-1.5'
+                >
+                  <GraduationCap className='w-4 h-4' />
+                  Instructor Portal
+                </Link>
+              )}
+              {currentUser.role === 'admin' && (
+                <Link
+                  href='/admin/courses'
+                  className='hover:text-primary whitespace-nowrap text-sm font-semibold text-primary flex items-center gap-1.5'
+                >
+                  <LayoutDashboard className='w-4 h-4' />
+                  Admin Portal
+                </Link>
+              )}
               <Link
                 href='/my-courses'
                 className='hover:text-primary whitespace-nowrap text-sm font-semibold text-gray-700'
@@ -214,6 +233,14 @@ export function Header() {
                 Orders
               </Link>
               <NotificationBell />
+              <button
+                onClick={() => logoutUser()}
+                className='hover:text-red-600 whitespace-nowrap text-sm font-semibold text-gray-700 transition-colors cursor-pointer flex items-center gap-1'
+                title='Sign Out'
+              >
+                <LogOut className='w-4 h-4' />
+                <span className='hidden lg:inline'>Sign Out</span>
+              </button>
             </div>
           ) : (
             <>
@@ -346,6 +373,30 @@ export function Header() {
                 <div className='space-y-2 border-t pt-4'>
                   {currentUser ? (
                     <>
+                      {currentUser.role === 'instructor' && (
+                        <Link
+                          href='/instructor/dashboard'
+                          className='block'
+                          onClick={() => setIsMobileNavOpen(false)}
+                        >
+                          <Button variant='default' className='w-full justify-start bg-primary text-white'>
+                            <GraduationCap className='mr-2 h-4 w-4' />
+                            Instructor Portal
+                          </Button>
+                        </Link>
+                      )}
+                      {currentUser.role === 'admin' && (
+                        <Link
+                          href='/admin/courses'
+                          className='block'
+                          onClick={() => setIsMobileNavOpen(false)}
+                        >
+                          <Button variant='default' className='w-full justify-start bg-primary text-white'>
+                            <LayoutDashboard className='mr-2 h-4 w-4' />
+                            Admin Portal
+                          </Button>
+                        </Link>
+                      )}
                       <Link
                         href='/my-courses'
                         className='block'
@@ -366,6 +417,16 @@ export function Header() {
                           Orders
                         </Button>
                       </Link>
+                      <button
+                        className='flex items-center w-full px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors text-left cursor-pointer'
+                        onClick={() => {
+                          setIsMobileNavOpen(false);
+                          logoutUser();
+                        }}
+                      >
+                        <LogOut className='mr-2 h-4 w-4' />
+                        Sign Out
+                      </button>
                     </>
                   ) : (
                     <>

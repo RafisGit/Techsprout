@@ -34,6 +34,9 @@ describe('P6.1 — Pillar B: Contextual Resource Ownership & Zero-Trust Authoriz
   let question1: any;
   let option1: any;
   let media1: any;
+  let media2: any;
+  let systemMedia: any;
+  let categoryId: string;
 
   beforeAll(async () => {
     const mem = await createTestDatabase();
@@ -208,6 +211,38 @@ describe('P6.1 — Pillar B: Contextual Resource Ownership & Zero-Trust Authoriz
       })
       .returning();
     media1 = med1;
+
+    // Seed Media uploaded by Instructor 2
+    const [med2] = await testDb
+      .insert(schema.media)
+      .values({
+        storageProvider: 'CLOUDINARY',
+        storageKey: 'techsprout/images/k8s-arch',
+        publicUrl: 'https://res.cloudinary.com/test/image/upload/k8s-arch.png',
+        originalFilename: 'k8s-arch.png',
+        mimeType: 'image/png',
+        fileSize: 154200,
+        uploaderId: instructor2Id,
+      })
+      .returning();
+    media2 = med2;
+
+    // Seed System / Legacy Media (uploaderId === null)
+    const [medSys] = await testDb
+      .insert(schema.media)
+      .values({
+        storageProvider: 'CLOUDINARY',
+        storageKey: 'techsprout/images/system-default-banner',
+        publicUrl: 'https://res.cloudinary.com/test/image/upload/system-default-banner.png',
+        originalFilename: 'system-default-banner.png',
+        mimeType: 'image/png',
+        fileSize: 312000,
+        uploaderId: null,
+      })
+      .returning();
+    systemMedia = medSys;
+
+    categoryId = cat.id;
 
     // Compile TestingModule
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -534,4 +569,309 @@ describe('P6.1 — Pillar B: Contextual Resource Ownership & Zero-Trust Authoriz
       expect(latest.targetId).toBe(course1.id);
     });
   });
+
+  // =========================================================================
+  // 8. COURSE THUMBNAIL MEDIA OWNERSHIP ENFORCEMENT
+  // =========================================================================
+  describe('Course Thumbnail Media Ownership Enforcement', () => {
+    let inst1Media: any;
+    let inst2Media: any;
+    let systemThumbnail: any;
+
+    beforeAll(async () => {
+      const [m1] = await testDb
+        .insert(schema.media)
+        .values({
+          storageProvider: 'CLOUDINARY',
+          storageKey: 'techsprout/images/ownership-test-thumb-inst1',
+          publicUrl: 'https://res.cloudinary.com/test/image/upload/ownership-test-thumb-inst1.png',
+          originalFilename: 'thumb-inst1.png',
+          mimeType: 'image/png',
+          fileSize: 102400,
+          uploaderId: instructor1Id,
+        })
+        .returning();
+      inst1Media = m1;
+
+      const [m2] = await testDb
+        .insert(schema.media)
+        .values({
+          storageProvider: 'CLOUDINARY',
+          storageKey: 'techsprout/images/ownership-test-thumb-inst2',
+          publicUrl: 'https://res.cloudinary.com/test/image/upload/ownership-test-thumb-inst2.png',
+          originalFilename: 'thumb-inst2.png',
+          mimeType: 'image/png',
+          fileSize: 102400,
+          uploaderId: instructor2Id,
+        })
+        .returning();
+      inst2Media = m2;
+
+      const [mSys] = await testDb
+        .insert(schema.media)
+        .values({
+          storageProvider: 'CLOUDINARY',
+          storageKey: 'techsprout/images/ownership-test-thumb-system',
+          publicUrl: 'https://res.cloudinary.com/test/image/upload/ownership-test-thumb-system.png',
+          originalFilename: 'thumb-system.png',
+          mimeType: 'image/png',
+          fileSize: 102400,
+          uploaderId: null,
+        })
+        .returning();
+      systemThumbnail = mSys;
+    });
+
+    it('8.1 allows an instructor to attach their own uploaded media asset on course creation', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/admin/courses')
+        .set('Cookie', instructor1Cookies)
+        .send({
+          title: 'Instructor 1 Self-Owned Thumbnail Course',
+          slug: 'inst1-self-thumbnail-course',
+          description: 'Testing valid thumbnail attachment by uploader.',
+          categoryId,
+          thumbnailMediaId: inst1Media.id,
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.thumbnailMediaId).toBe(inst1Media.id);
+      expect(res.body.data.instructorId).toBe(instructor1Id);
+    });
+
+    it('8.2 allows an instructor to attach their own uploaded media asset on course update', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/courses/${course1.id}`)
+        .set('Cookie', instructor1Cookies)
+        .send({
+          thumbnailMediaId: inst1Media.id,
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.thumbnailMediaId).toBe(inst1Media.id);
+    });
+
+    it('8.3 rejects Instructor A attempting to attach Instructor B media on course creation (403 MEDIA_OWNERSHIP_DENIED)', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/admin/courses')
+        .set('Cookie', instructor2Cookies)
+        .send({
+          title: 'Instructor 2 Tampered Course Creation',
+          slug: 'inst2-tampered-thumbnail-creation',
+          description: 'Testing IDOR prevention on course creation.',
+          categoryId,
+          thumbnailMediaId: inst1Media.id, // inst1Media belongs to instructor 1!
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.errorCode).toBe('MEDIA_OWNERSHIP_DENIED');
+      expect(res.body.message).toContain('Cannot attach a media asset owned by another user');
+    });
+
+    it('8.4 rejects Instructor A attempting to attach Instructor B media on course update (403 MEDIA_OWNERSHIP_DENIED)', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/courses/${course2.id}`)
+        .set('Cookie', instructor2Cookies)
+        .send({
+          thumbnailMediaId: inst1Media.id, // inst1Media belongs to instructor 1!
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.errorCode).toBe('MEDIA_OWNERSHIP_DENIED');
+      expect(res.body.message).toContain('Cannot attach a media asset owned by another user');
+    });
+
+    it('8.5 allows Administrator to attach any instructor media on course creation', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/admin/courses')
+        .set('Cookie', adminCookies)
+        .send({
+          title: 'Admin Created Course with Inst1 Media',
+          slug: 'admin-created-inst1-media',
+          description: 'Testing admin override on course creation.',
+          categoryId,
+          instructorId: instructor2Id,
+          thumbnailMediaId: inst1Media.id, // Admin attaches inst1Media to instructor2 course
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.thumbnailMediaId).toBe(inst1Media.id);
+    });
+
+    it('8.6 allows Administrator to attach any instructor media on course update', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/courses/${course2.id}`)
+        .set('Cookie', adminCookies)
+        .send({
+          thumbnailMediaId: inst1Media.id, // Admin attaches inst1Media to course2
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.thumbnailMediaId).toBe(inst1Media.id);
+    });
+
+    it('8.7 rejects nonexistent thumbnailMediaId on course creation with 404 MEDIA_NOT_FOUND', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/admin/courses')
+        .set('Cookie', instructor1Cookies)
+        .send({
+          title: 'Nonexistent Thumbnail Course',
+          slug: 'nonexistent-thumb-course',
+          description: 'Testing 404 for missing media.',
+          categoryId,
+          thumbnailMediaId: '00000000-0000-0000-0000-000000000099',
+        });
+
+      expect(res.status).toBe(404);
+      expect(res.body.errorCode).toBe('MEDIA_NOT_FOUND');
+      expect(res.body.message).toContain('not found');
+    });
+
+    it('8.8 rejects nonexistent thumbnailMediaId on course update with 404 MEDIA_NOT_FOUND', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/courses/${course1.id}`)
+        .set('Cookie', instructor1Cookies)
+        .send({
+          thumbnailMediaId: '00000000-0000-0000-0000-000000000099',
+        });
+
+      expect(res.status).toBe(404);
+      expect(res.body.errorCode).toBe('MEDIA_NOT_FOUND');
+      expect(res.body.message).toContain('not found');
+    });
+
+    it('8.9 permits instructors to attach system/legacy media (uploaderId is null) on course creation', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/admin/courses')
+        .set('Cookie', instructor2Cookies)
+        .send({
+          title: 'Instructor 2 System Media Course',
+          slug: 'inst2-system-media-course',
+          description: 'Testing system/legacy media attachment.',
+          categoryId,
+          thumbnailMediaId: systemThumbnail.id,
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.thumbnailMediaId).toBe(systemThumbnail.id);
+    });
+
+    it('8.10 permits instructors to attach system/legacy media (uploaderId is null) on course update', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/courses/${course1.id}`)
+        .set('Cookie', instructor1Cookies)
+        .send({
+          thumbnailMediaId: systemThumbnail.id,
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.thumbnailMediaId).toBe(systemThumbnail.id);
+    });
+
+    it('8.11 allows unlinking course thumbnail by setting thumbnailMediaId to null', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/courses/${course1.id}`)
+        .set('Cookie', instructor1Cookies)
+        .send({
+          thumbnailMediaId: null,
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.thumbnailMediaId).toBeNull();
+    });
+
+    it('8.12 derives identity strictly from server-side authenticated principal ignoring forged body fields', async () => {
+      // Instructor 2 attempts to forge instructorId: instructor1Id in request body to claim Instructor 1's media
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/admin/courses')
+        .set('Cookie', instructor2Cookies)
+        .send({
+          title: 'Forged Identity Course Attempt',
+          slug: 'forged-identity-course-attempt',
+          description: 'Attempting to spoof instructorId in body.',
+          categoryId,
+          instructorId: instructor1Id, // Spoofed body field!
+          thumbnailMediaId: inst1Media.id, // Media owned by Instructor 1
+        });
+
+      // Must be rejected because authenticated principal is Instructor 2, not Instructor 1
+      expect(res.status).toBe(403);
+      expect(res.body.errorCode).toBe('MEDIA_OWNERSHIP_DENIED');
+    });
+
+    it('8.13 maintains course review preflight completeness validation for thumbnail', async () => {
+      // Create draft course without thumbnail
+      const draftRes = await request(app.getHttpServer())
+        .post('/api/v1/admin/courses')
+        .set('Cookie', instructor1Cookies)
+        .send({
+          title: 'Preflight Thumbnail Test Course',
+          slug: 'preflight-thumb-test-course',
+          description: 'Testing review preflight requires thumbnail.',
+          categoryId,
+        });
+
+      expect(draftRes.status).toBe(201);
+      const draftId = draftRes.body.data.id;
+
+      // Add a module and lesson
+      const modRes = await request(app.getHttpServer())
+        .post(`/api/v1/admin/courses/${draftId}/modules`)
+        .set('Cookie', instructor1Cookies)
+        .send({
+          title: 'Module 1',
+          position: 1,
+        });
+      expect(modRes.status).toBe(201);
+
+      const lesRes = await request(app.getHttpServer())
+        .post(`/api/v1/admin/modules/${modRes.body.data.id}/lessons`)
+        .set('Cookie', instructor1Cookies)
+        .send({
+          title: 'Lesson 1',
+          lessonType: 'TEXT',
+          content: 'Curriculum text content',
+          position: 1,
+        });
+      expect(lesRes.status).toBe(201);
+
+      // Attempt submit-for-review without thumbnail
+      const submitRes = await request(app.getHttpServer())
+        .post(`/api/v1/instructor/courses/${draftId}/submit-for-review`)
+        .set('Cookie', instructor1Cookies)
+        .send();
+
+      expect(submitRes.status).toBe(400);
+      expect(submitRes.body.errorCode).toBe('INCOMPLETE_CURRICULUM');
+      const missing = submitRes.body.details?.missingRequirements || submitRes.body.errors?.missingRequirements;
+      expect(missing).toContain('Course thumbnail image is required');
+
+      // Attach valid owned thumbnail
+      const attachRes = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/courses/${draftId}`)
+        .set('Cookie', instructor1Cookies)
+        .send({
+          thumbnailMediaId: inst1Media.id,
+        });
+      expect(attachRes.status).toBe(200);
+
+      // Submit-for-review again -> should now succeed and transition to IN_REVIEW
+      const submitAgainRes = await request(app.getHttpServer())
+        .post(`/api/v1/instructor/courses/${draftId}/submit-for-review`)
+        .set('Cookie', instructor1Cookies)
+        .send();
+
+      expect(submitAgainRes.status).toBe(200);
+      expect(submitAgainRes.body.success).toBe(true);
+      expect(submitAgainRes.body.data.course.status).toBe('IN_REVIEW');
+    });
+  });
 });
+

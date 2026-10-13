@@ -31,6 +31,10 @@ import { ApiException } from '../../common/errors/api-error';
 import { createCourseSchema } from './dto/create-course.dto';
 import { updateCourseSchema } from './dto/update-course.dto';
 import { adminQueryCoursesSchema } from './dto/query-courses.dto';
+import {
+  queryReviewQueueSchema,
+  rejectCourseReviewSchema,
+} from './dto/review-course.dto';
 
 const uuidSchema = z.string().uuid('Invalid course ID');
 
@@ -95,6 +99,33 @@ export class CoursesController {
     return {
       success: true,
       message: 'Courses retrieved successfully',
+      data,
+    };
+  }
+
+  @Get('review-queue')
+  @Roles('admin')
+  @ApiOperation({ summary: 'List pending course review requests (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Review queue retrieved successfully' })
+  async getReviewQueue(@Query() query: unknown, @Req() req: AuthenticatedRequest) {
+    const parseResult = queryReviewQueueSchema.safeParse(query);
+    if (!parseResult.success) {
+      throw new ApiException(
+        'Validation failed',
+        HttpStatus.BAD_REQUEST,
+        'VALIDATION_ERROR',
+        parseResult.error.flatten().fieldErrors
+      );
+    }
+
+    const data = await this.coursesService.getReviewQueue(parseResult.data, {
+      id: req.user!.id,
+      role: req.user!.role,
+    });
+
+    return {
+      success: true,
+      message: 'Review queue retrieved successfully',
       data,
     };
   }
@@ -262,6 +293,73 @@ export class CoursesController {
     return {
       success: true,
       message: 'Course archived successfully',
+      data,
+    };
+  }
+
+  @Post(':id/approve-review')
+  @HttpCode(HttpStatus.OK)
+  @Roles('admin')
+  @ApiOperation({ summary: 'Approve course review request and publish course (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Course review approved successfully' })
+  async approveReview(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    const parseId = uuidSchema.safeParse(id);
+    if (!parseId.success) {
+      throw new ApiException('Invalid course ID format', HttpStatus.BAD_REQUEST, 'INVALID_ID');
+    }
+
+    const data = await this.coursesService.approveReview(
+      id,
+      { id: req.user!.id, role: req.user!.role },
+      req.ip,
+      req.headers['user-agent'],
+      req.id
+    );
+
+    return {
+      success: true,
+      message: 'Course review approved successfully',
+      data,
+    };
+  }
+
+  @Post(':id/reject-review')
+  @HttpCode(HttpStatus.OK)
+  @Roles('admin')
+  @ApiOperation({ summary: 'Reject course review request with feedback (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Course review rejected with feedback' })
+  async rejectReview(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @Req() req: AuthenticatedRequest
+  ) {
+    const parseId = uuidSchema.safeParse(id);
+    if (!parseId.success) {
+      throw new ApiException('Invalid course ID format', HttpStatus.BAD_REQUEST, 'INVALID_ID');
+    }
+
+    const parseResult = rejectCourseReviewSchema.safeParse(body);
+    if (!parseResult.success) {
+      throw new ApiException(
+        'Validation failed: feedback is required when rejecting a review',
+        HttpStatus.BAD_REQUEST,
+        'VALIDATION_ERROR',
+        parseResult.error.flatten().fieldErrors
+      );
+    }
+
+    const data = await this.coursesService.rejectReview(
+      id,
+      { id: req.user!.id, role: req.user!.role },
+      parseResult.data,
+      req.ip,
+      req.headers['user-agent'],
+      req.id
+    );
+
+    return {
+      success: true,
+      message: 'Course review rejected with feedback',
       data,
     };
   }

@@ -17,6 +17,8 @@ import { z } from 'zod';
 import { EnrollmentsService } from './enrollments.service';
 import { Roles } from '../../common/auth/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { ResourceOwnershipGuard } from '../../common/guards/resource-ownership.guard';
+import { RequireOwnership } from '../../common/auth/decorators/resource-ownership.decorator';
 import { AuthenticatedRequest } from '../../common/http/correlation-id.middleware';
 import { ApiException } from '../../common/errors/api-error';
 import { adminAssignEnrollmentSchema } from './dto/admin-assign-enrollment.dto';
@@ -27,7 +29,7 @@ const uuidSchema = z.string().uuid('Invalid ID format');
 @ApiTags('Admin Enrollments')
 @ApiBearerAuth()
 @ApiCookieAuth('techsprout_session')
-@UseGuards(RolesGuard)
+@UseGuards(RolesGuard, ResourceOwnershipGuard)
 @Controller('admin/courses')
 export class AdminEnrollmentsController {
   constructor(
@@ -80,6 +82,7 @@ export class AdminEnrollmentsController {
 
   @Get(':id/enrollments')
   @Roles('admin', 'instructor')
+  @RequireOwnership('course', 'id')
   @ApiOperation({ summary: 'List course enrollments roster (Admin or Course Instructor)' })
   @ApiResponse({ status: 200, description: 'Course enrollments retrieved successfully' })
   async getCourseEnrollments(

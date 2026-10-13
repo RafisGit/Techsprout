@@ -238,7 +238,11 @@ export class IdentityController {
       await this.identityService.logout(token, req.user?.id, req.id);
     }
 
-    res.clearCookie('techsprout_session', { path: '/' });
+    res.clearCookie('techsprout_session', {
+      path: '/',
+      secure: env.NODE_ENV === 'production' || env.NODE_ENV === 'staging',
+      sameSite: 'lax',
+    });
 
     return {
       success: true,

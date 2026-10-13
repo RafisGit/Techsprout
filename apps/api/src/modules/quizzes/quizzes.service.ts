@@ -41,7 +41,7 @@ export class QuizzesService {
   ): Promise<{
     quiz: Quiz;
     module: { id: string; title: string; courseId: string };
-    course: { id: string; title: string; instructorId: string };
+    course: { id: string; title: string; instructorId: string; status: string };
   }> {
     const [result] = await this.db
       .select({
@@ -55,6 +55,7 @@ export class QuizzesService {
           id: courses.id,
           title: courses.title,
           instructorId: courses.instructorId,
+          status: courses.status,
         },
       })
       .from(quizzes)
@@ -90,11 +91,19 @@ export class QuizzesService {
     userAgent?: string,
     requestId?: string
   ): Promise<Quiz> {
-    // 1. Verify module ownership
-    const { module: modRecord } = await this.modulesService.resolveModuleOwnership(
+    // 1. Verify module ownership and check course lock
+    const { module: modRecord, courseStatus } = await this.modulesService.resolveModuleOwnership(
       moduleId,
       user
     );
+
+    if (courseStatus === 'IN_REVIEW') {
+      throw new ApiException(
+        'Course is under review and cannot be modified',
+        HttpStatus.BAD_REQUEST,
+        'COURSE_LOCKED_FOR_REVIEW'
+      );
+    }
 
     // 2. Enforce single FINAL_EXAM constraint per course
     if (dto.quizType === 'FINAL_EXAM') {
@@ -233,7 +242,15 @@ export class QuizzesService {
     userAgent?: string,
     requestId?: string
   ): Promise<Quiz> {
-    const { quiz: existing, module: mod } = await this.resolveQuizOwnership(id, user);
+    const { quiz: existing, module: mod, course } = await this.resolveQuizOwnership(id, user);
+
+    if (course.status === 'IN_REVIEW') {
+      throw new ApiException(
+        'Course is under review and cannot be modified',
+        HttpStatus.BAD_REQUEST,
+        'COURSE_LOCKED_FOR_REVIEW'
+      );
+    }
 
     if (existing.status === 'ARCHIVED') {
       throw new ApiException(
@@ -364,7 +381,15 @@ export class QuizzesService {
     userAgent?: string,
     requestId?: string
   ): Promise<{ deleted: true; id: string }> {
-    const { quiz: existing } = await this.resolveQuizOwnership(id, user);
+    const { quiz: existing, course } = await this.resolveQuizOwnership(id, user);
+
+    if (course.status === 'IN_REVIEW') {
+      throw new ApiException(
+        'Course is under review and cannot be modified',
+        HttpStatus.BAD_REQUEST,
+        'COURSE_LOCKED_FOR_REVIEW'
+      );
+    }
 
     // Guard: quiz cannot be deleted if any student attempts exist
     const [attemptCountRes] = await this.db

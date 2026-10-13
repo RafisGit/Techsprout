@@ -13,6 +13,7 @@ services:
     runtime: node
     plan: free
     region: oregon
+    branch: release/p6.2-candidate
     buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm --filter @techsprout/contracts build && pnpm --filter @techsprout/api build
     startCommand: node apps/api/dist/database/migrate.js && node apps/api/dist/database/seed/seed.js && node apps/api/dist/main.js
     healthCheckPath: /api/v1/health

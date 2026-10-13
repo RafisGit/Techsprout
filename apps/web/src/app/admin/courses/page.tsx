@@ -26,6 +26,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
+  ClipboardCheck,
 } from 'lucide-react';
 import type { CourseDto } from '@techsprout/contracts';
 
@@ -147,13 +148,25 @@ export default function AdminCoursesPage() {
           </p>
         </div>
 
-        <Link
-          href='/admin/courses/new'
-          className='inline-flex items-center justify-center space-x-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary/90 transition shadow-xs'
-        >
-          <Plus className='w-4 h-4' />
-          <span>Create Course</span>
-        </Link>
+        <div className='flex flex-wrap items-center gap-3'>
+          {isAdmin && (
+            <Link
+              href='/admin/courses/review-queue'
+              className='inline-flex items-center justify-center space-x-2 px-4 py-2.5 bg-blue-50 text-blue-700 border border-blue-200 text-sm font-semibold rounded-xl hover:bg-blue-100 transition shadow-xs'
+            >
+              <ClipboardCheck className='w-4 h-4' />
+              <span>Review Queue</span>
+            </Link>
+          )}
+
+          <Link
+            href='/admin/courses/new'
+            className='inline-flex items-center justify-center space-x-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary/90 transition shadow-xs'
+          >
+            <Plus className='w-4 h-4' />
+            <span>Create Course</span>
+          </Link>
+        </div>
       </div>
 
       {deleteError && (

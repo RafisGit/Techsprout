@@ -22,11 +22,12 @@ export class ModulesService {
   async resolveModuleOwnership(
     moduleId: string,
     user: UserContext
-  ): Promise<{ module: CourseModule; courseInstructorId: string }> {
+  ): Promise<{ module: CourseModule; courseInstructorId: string; courseStatus: string }> {
     const [result] = await this.db
       .select({
         module: modules,
         courseInstructorId: courses.instructorId,
+        courseStatus: courses.status,
       })
       .from(modules)
       .innerJoin(courses, eq(modules.courseId, courses.id))
@@ -60,8 +61,15 @@ export class ModulesService {
     userAgent?: string,
     requestId?: string
   ): Promise<CourseModule> {
-    // 1. Verify caller owns the course (or is admin)
-    await this.coursesService.verifyCourseOwnership(courseId, user);
+    // 1. Verify caller owns the course (or is admin) and course is not locked
+    const course = await this.coursesService.verifyCourseOwnership(courseId, user);
+    if (course.status === 'IN_REVIEW') {
+      throw new ApiException(
+        'Course is under review and cannot be modified',
+        HttpStatus.BAD_REQUEST,
+        'COURSE_LOCKED_FOR_REVIEW'
+      );
+    }
 
     // 2. Check position uniqueness within this course
     const [existingPosition] = await this.db
@@ -116,7 +124,15 @@ export class ModulesService {
     userAgent?: string,
     requestId?: string
   ): Promise<CourseModule> {
-    const { module: existing } = await this.resolveModuleOwnership(id, user);
+    const { module: existing, courseStatus } = await this.resolveModuleOwnership(id, user);
+
+    if (courseStatus === 'IN_REVIEW') {
+      throw new ApiException(
+        'Course is under review and cannot be modified',
+        HttpStatus.BAD_REQUEST,
+        'COURSE_LOCKED_FOR_REVIEW'
+      );
+    }
 
     const updatedFields: string[] = [];
     const updates: Partial<typeof modules.$inferInsert> = {
@@ -191,7 +207,15 @@ export class ModulesService {
     userAgent?: string,
     requestId?: string
   ): Promise<{ deleted: true; id: string }> {
-    const { module: existing } = await this.resolveModuleOwnership(id, user);
+    const { module: existing, courseStatus } = await this.resolveModuleOwnership(id, user);
+
+    if (courseStatus === 'IN_REVIEW') {
+      throw new ApiException(
+        'Course is under review and cannot be modified',
+        HttpStatus.BAD_REQUEST,
+        'COURSE_LOCKED_FOR_REVIEW'
+      );
+    }
 
     await this.db.delete(modules).where(eq(modules.id, id));
 

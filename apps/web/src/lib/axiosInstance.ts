@@ -1,15 +1,21 @@
 import axios from 'axios';
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  (typeof window !== 'undefined' ? 'http://localhost:3001' : 'http://localhost:3001');
+export function getApiBaseUrl(isBrowser: boolean = typeof window !== 'undefined'): string {
+  return isBrowser
+    ? ''
+    : process.env.INTERNAL_API_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      'http://localhost:3001';
+}
+
+const API_BASE_URL = getApiBaseUrl();
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true, // Send and receive secure HttpOnly cookies
+  withCredentials: true, // Send same-origin HttpOnly cookies
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-export { axiosInstance };
+export { axiosInstance, API_BASE_URL };
