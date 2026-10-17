@@ -85,7 +85,7 @@ Scope accounting is strictly partitioned to avoid conflating the core data/intel
 2. **Media Storage Isolation:**  
    - Phase 7.4 assignment submissions (student ZIP/PDF uploads) will require Cloudinary or S3 bucket authorization. This dependency is completely deferred to Phase 7.4.
 3. **OutboxService Independence:**  
-   - Telemetry ingestion in Phase 7.1 does not rely on the best-effort [`OutboxService`](file:///d:/Work/2026/techsprout-main/apps/api/src/modules/outbox/outbox.service.ts). Discussion notifications in Phase 7.4 will interface with notification pipelines once Outbox transactional durability is resolved.
+   - Telemetry ingestion in Phase 7.1 does not rely on the best-effort [`OutboxService`](file:///d:/Work/2026/techsprout-main/apps/api/src/modules/events/outbox.service.ts). Discussion notifications in Phase 7.4 will interface with notification pipelines once Outbox transactional durability is resolved.
 
 ---
 
