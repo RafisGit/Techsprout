@@ -11,6 +11,10 @@ import {
   ilike,
   isNotNull,
   isNull,
+  sql,
+  gte,
+  lte,
+  lt,
 } from 'drizzle-orm';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import {
@@ -27,6 +31,7 @@ import {
   quizAttempts,
   certificates,
   courseReviewRequests,
+  learningEvents,
 } from '../../database/schema';
 import { ApiException } from '../../common/errors/api-error';
 import { AnalyticsCacheService } from './analytics.cache.service';
@@ -40,6 +45,9 @@ import type {
   EnrollmentTrendDataPoint,
   ProgressDistributionBucket,
   LessonDropOffItemDto,
+  VideoRetentionCurveDto,
+  VideoRetentionIntervalDto,
+  QueryRetentionAnalyticsDto,
 } from '@techsprout/contracts';
 import type { QueryAnalyticsDateRangeDto } from './dto/analytics-date-range.dto';
 import type { QueryAdminCourseAnalyticsDto } from './dto/admin-course-analytics-query.dto';
@@ -947,5 +955,264 @@ export class AnalyticsService {
         averageScorePercentage,
       };
     });
+  }
+
+  // =========================================================================
+  // 6. VIDEO PLAYBACK RETENTION CURVE & REWIND HEATMAP (WP-P7-02)
+  // =========================================================================
+
+  async getCourseVideoRetention(
+    courseId: string,
+    query?: QueryRetentionAnalyticsDto
+  ): Promise<VideoRetentionCurveDto> {
+    // 1. Kill Switch Check (TELEMETRY_ENABLED=false)
+    const isTelemetryEnabled = process.env.TELEMETRY_ENABLED !== 'false';
+    const isSingleDay = Boolean(
+      query?.startDate && query?.endDate && query.startDate === query.endDate
+    );
+    const viewerMetricLabel = isSingleDay ? 'Unique Viewers' : 'Viewer-days';
+
+    if (!isTelemetryEnabled) {
+      return {
+        courseId,
+        lessonId: query?.lessonId || null,
+        lessonTitle: null,
+        totalUniqueViewers: 0,
+        viewerMetricLabel,
+        totalCheckpoints: 0,
+        averageCompletionPercentage: 0,
+        intervals: Array.from({ length: 10 }, (_, i) => ({
+          intervalIndex: i,
+          intervalRange: `${i * 10}-${(i + 1) * 10}%`,
+          viewerCount: 0,
+          retentionPercentage: 0,
+          rewindCount: 0,
+        })),
+        telemetryEnabled: false,
+        isPartial: false,
+        totalEventsScanned: 0,
+        sampleNotice: null,
+      };
+    }
+
+    // 2. Cache Lookup (10-minute TTL)
+    const rangeHash = `${query?.lessonId || 'all'}:${query?.startDate || ''}:${query?.endDate || ''}`;
+    const cacheKey = this.cacheService.buildCourseRetentionKey(courseId, rangeHash);
+    const cached = await this.cacheService.get<VideoRetentionCurveDto>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // 3. Verify Course Existence
+    const [course] = await this.db
+      .select({ id: courses.id, title: courses.title })
+      .from(courses)
+      .where(eq(courses.id, courseId))
+      .limit(1);
+
+    if (!course) {
+      throw new ApiException('Course not found', HttpStatus.NOT_FOUND, 'COURSE_NOT_FOUND');
+    }
+
+    // 4. Resolve Target Lesson(s) and Duration
+    let targetLessonTitle: string | null = null;
+    let targetLessonDuration = 0;
+    const courseLessonsMap = new Map<string, { durationSeconds: number; title: string }>();
+
+    const courseLessons = await this.db
+      .select({
+        lessonId: lessons.id,
+        title: lessons.title,
+        durationSeconds: lessons.durationSeconds,
+      })
+      .from(lessons)
+      .innerJoin(modules, eq(lessons.moduleId, modules.id))
+      .where(eq(modules.courseId, courseId));
+
+    for (const l of courseLessons) {
+      courseLessonsMap.set(l.lessonId, {
+        durationSeconds: l.durationSeconds || 0,
+        title: l.title,
+      });
+    }
+
+    if (query?.lessonId) {
+      const lessonInfo = courseLessonsMap.get(query.lessonId);
+      if (!lessonInfo) {
+        throw new ApiException(
+          'Lesson not found in the specified course',
+          HttpStatus.NOT_FOUND,
+          'LESSON_NOT_FOUND'
+        );
+      }
+      targetLessonTitle = lessonInfo.title;
+      targetLessonDuration = lessonInfo.durationSeconds;
+    }
+
+    // 5. Query learning_events bounded by courseId and optional filters
+    const conditions = [
+      eq(learningEvents.courseId, courseId),
+      inArray(learningEvents.eventType, [
+        'VIDEO_STARTED',
+        'VIDEO_CHECKPOINT',
+        'VIDEO_SEEKED',
+        'VIDEO_COMPLETED',
+      ]),
+    ];
+
+    if (query?.lessonId) {
+      conditions.push(eq(learningEvents.lessonId, query.lessonId));
+    }
+
+    if (query?.startDate) {
+      conditions.push(gte(learningEvents.occurredAt, new Date(`${query.startDate}T00:00:00.000Z`)));
+    }
+
+    if (query?.endDate) {
+      // Fix C: Exclusive next-day upper bound at 00:00:00.000Z covers entire UTC end day without missing late events
+      const endUtc = new Date(`${query.endDate}T00:00:00.000Z`);
+      const nextDayUtc = new Date(endUtc.getTime() + 24 * 60 * 60 * 1000);
+      conditions.push(lt(learningEvents.occurredAt, nextDayUtc));
+    }
+
+    // Fix C: Deterministic bounded scan prioritizing recent events (ORDER BY occurredAt DESC, id DESC)
+    // Fetch LIMIT + 1 to detect whether additional events exist in the reporting window
+    const RETENTION_EVENT_SCAN_LIMIT = 20_000;
+    const rawEvents = await this.db
+      .select({
+        id: learningEvents.id,
+        userId: learningEvents.userId,
+        lessonId: learningEvents.lessonId,
+        eventType: learningEvents.eventType,
+        metadata: learningEvents.metadata,
+        occurredAt: learningEvents.occurredAt,
+      })
+      .from(learningEvents)
+      .where(and(...conditions))
+      .orderBy(desc(learningEvents.occurredAt), desc(learningEvents.id))
+      .limit(RETENTION_EVENT_SCAN_LIMIT + 1);
+
+    const isPartial = rawEvents.length > RETENTION_EVENT_SCAN_LIMIT;
+    const events = isPartial ? rawEvents.slice(0, RETENTION_EVENT_SCAN_LIMIT) : rawEvents;
+    const totalEventsScanned = events.length;
+    const sampleNotice = isPartial
+      ? `Retention analytics are calculated from a bounded sample of the most recent ${RETENTION_EVENT_SCAN_LIMIT.toLocaleString()} events. More matching events exist in this time window; narrow your date or lesson filter for complete data.`
+      : null;
+
+    // 6. Aggregate retention intervals and rewind hotspots
+    const learnerSessions = new Map<string, { maxPosition: number; duration: number }>();
+    const uniqueViewerIds = new Set<string>();
+    let totalCheckpoints = 0;
+    const intervalRewindCounts = new Array(10).fill(0);
+
+    for (const event of events) {
+      if (event.eventType === 'VIDEO_CHECKPOINT') {
+        totalCheckpoints++;
+      }
+
+      uniqueViewerIds.add(event.userId);
+
+      const lId = event.lessonId;
+      const lessonDuration =
+        (lId ? courseLessonsMap.get(lId)?.durationSeconds : targetLessonDuration) ||
+        (event.metadata as any)?.totalDurationSeconds ||
+        0;
+
+      const sessionKey = `${event.userId}:${lId || 'course'}`;
+      const currentSession = learnerSessions.get(sessionKey) || {
+        maxPosition: 0,
+        duration: lessonDuration,
+      };
+
+      const watchPos = Number((event.metadata as any)?.watchPositionSeconds ?? 0);
+      if (event.eventType === 'VIDEO_COMPLETED') {
+        currentSession.maxPosition = Math.max(currentSession.maxPosition, lessonDuration || watchPos);
+      } else if (watchPos > currentSession.maxPosition) {
+        currentSession.maxPosition = watchPos;
+      }
+      if (lessonDuration > currentSession.duration) {
+        currentSession.duration = lessonDuration;
+      }
+      learnerSessions.set(sessionKey, currentSession);
+
+      // Track rewinds into intervals
+      // Fix B: True Backward-Seek Detection:
+      // Only increment rewind heatmap when previousPositionSeconds is present and > watchPositionSeconds.
+      // Forward seeks must NOT count as rewinds. Missing previous-position metadata must NOT count as rewinds.
+      if (event.eventType === 'VIDEO_SEEKED' && lessonDuration > 0) {
+        const metadata = event.metadata as any;
+        const prevPos = metadata?.previousPositionSeconds;
+        if (typeof prevPos === 'number' && prevPos > watchPos) {
+          const seekPct = Math.min(100, Math.max(0, (watchPos / lessonDuration) * 100));
+          const intervalIndex = Math.min(9, Math.floor(seekPct / 10));
+          intervalRewindCounts[intervalIndex]++;
+        }
+      }
+    }
+
+    const totalUniqueViewers = uniqueViewerIds.size;
+
+    // Calculate reach count for each 10% interval (0-10%, 10-20%, ... 90-100%)
+    const intervalViewerCounts = new Array(10).fill(0);
+    let totalCompletionPercentages = 0;
+    let completedSessionsCount = 0;
+
+    for (const session of learnerSessions.values()) {
+      if (session.duration <= 0) {
+        intervalViewerCounts[0]++;
+        continue;
+      }
+
+      const completionPct = Math.min(100, (session.maxPosition / session.duration) * 100);
+      totalCompletionPercentages += completionPct;
+      completedSessionsCount++;
+
+      // A learner reaching completionPct is retained across all intervals up to floor(pct / 10)
+      const maxIntervalReached = Math.min(9, Math.floor(completionPct / 10));
+      for (let i = 0; i <= maxIntervalReached; i++) {
+        intervalViewerCounts[i]++;
+      }
+    }
+
+    const averageCompletionPercentage =
+      completedSessionsCount > 0
+        ? Number((totalCompletionPercentages / completedSessionsCount).toFixed(1))
+        : 0;
+
+    const baseViewers = Math.max(totalUniqueViewers, intervalViewerCounts[0]);
+
+    const intervals: VideoRetentionIntervalDto[] = Array.from({ length: 10 }, (_, i) => {
+      const viewerCount = intervalViewerCounts[i];
+      const retentionPercentage =
+        baseViewers > 0 ? Number(((viewerCount / baseViewers) * 100).toFixed(1)) : 0;
+
+      return {
+        intervalIndex: i,
+        intervalRange: `${i * 10}-${(i + 1) * 10}%`,
+        viewerCount,
+        retentionPercentage,
+        rewindCount: intervalRewindCounts[i],
+      };
+    });
+
+    const result: VideoRetentionCurveDto = {
+      courseId,
+      lessonId: query?.lessonId || null,
+      lessonTitle: targetLessonTitle,
+      totalUniqueViewers,
+      viewerMetricLabel,
+      totalCheckpoints,
+      averageCompletionPercentage,
+      intervals,
+      telemetryEnabled: true,
+      isPartial,
+      totalEventsScanned,
+      sampleNotice,
+    };
+
+    // 7. Cache in Redis/memory with 10-minute TTL
+    await this.cacheService.set(cacheKey, result, 600);
+
+    return result;
   }
 }

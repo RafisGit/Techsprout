@@ -28,6 +28,8 @@ import { FinanceModule } from './modules/finance/finance.module';
 import { EventsModule } from './modules/events/events.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { TelemetryModule } from './modules/telemetry/telemetry.module';
+import { TextBodyParserMiddleware } from './common/http/text-body-parser.middleware';
 
 import { HealthController } from './common/health/health.controller';
 import { CorrelationIdMiddleware } from './common/http/correlation-id.middleware';
@@ -68,6 +70,7 @@ import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
     EventsModule,
     NotificationsModule,
     AnalyticsModule,
+    TelemetryModule,
   ],
   controllers: [HealthController],
   providers: [
@@ -87,6 +90,8 @@ import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+    consumer
+      .apply(CorrelationIdMiddleware, TextBodyParserMiddleware)
+      .forRoutes('*');
   }
 }

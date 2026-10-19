@@ -27,6 +27,8 @@ export const envSchema = z.object({
   SSLCOMMERZ_IS_SANDBOX: z.coerce.boolean().default(true),
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().default('notifications@techsprout.io'),
+  TELEMETRY_ENABLED: z.coerce.boolean().default(true),
+  TELEMETRY_SALT_KEY: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.WEB_PUBLIC_ORIGIN?.includes(',')) {
     ctx.addIssue({

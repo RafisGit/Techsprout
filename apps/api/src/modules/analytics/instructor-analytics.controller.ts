@@ -18,6 +18,7 @@ import { RequireOwnership } from '../../common/auth/decorators/resource-ownershi
 import { AuthenticatedRequest } from '../../common/http/correlation-id.middleware';
 import { ApiException } from '../../common/errors/api-error';
 import { queryAnalyticsDateRangeSchema } from './dto/analytics-date-range.dto';
+import { queryRetentionAnalyticsSchema } from '@techsprout/contracts';
 import { ValidateCourseIdGuard } from './guards/validate-course-id.guard';
 
 const uuidSchema = z.string().uuid('Invalid course ID format');
@@ -84,6 +85,46 @@ export class InstructorAnalyticsController {
     return {
       success: true,
       message: 'Course analytics details retrieved successfully',
+      data,
+    };
+  }
+
+  @Get(['courses/:id/retention', 'courses/:courseId/retention'])
+  @Roles('instructor', 'admin')
+  @RequireOwnership('course', 'courseId')
+  @ApiOperation({ summary: 'Get course video retention analytics and rewind heatmap' })
+  @ApiResponse({ status: 200, description: 'Course video retention retrieved successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid course ID or query parameter format' })
+  @ApiResponse({ status: 401, description: 'Unauthenticated' })
+  @ApiResponse({ status: 403, description: 'Forbidden: access denied for unowned course' })
+  @ApiResponse({ status: 404, description: 'Course or lesson not found' })
+  async getCourseRetention(
+    @Param('id') paramId: string | undefined,
+    @Param('courseId') paramCourseId: string | undefined,
+    @Query() query: unknown,
+    @Req() req: AuthenticatedRequest
+  ) {
+    const courseId = paramId || paramCourseId;
+    const parseId = uuidSchema.safeParse(courseId);
+    if (!parseId.success) {
+      throw new ApiException('Invalid course ID format', HttpStatus.BAD_REQUEST, 'INVALID_ID');
+    }
+
+    const parseQuery = queryRetentionAnalyticsSchema.safeParse(query);
+    if (!parseQuery.success) {
+      throw new ApiException(
+        'Validation failed for query parameters',
+        HttpStatus.BAD_REQUEST,
+        'VALIDATION_ERROR',
+        parseQuery.error.flatten().fieldErrors
+      );
+    }
+
+    const data = await this.analyticsService.getCourseVideoRetention(courseId!, parseQuery.data);
+
+    return {
+      success: true,
+      message: 'Course video retention retrieved successfully',
       data,
     };
   }

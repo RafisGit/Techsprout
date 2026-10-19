@@ -8,7 +8,7 @@ const uuidSchema = z.string().uuid();
 export class ValidateCourseIdGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest();
-    const courseId = req.params?.courseId;
+    const courseId = req.params?.courseId ?? req.params?.id;
     if (courseId !== undefined) {
       const parseResult = uuidSchema.safeParse(courseId);
       if (!parseResult.success) {

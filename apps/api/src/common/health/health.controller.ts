@@ -5,6 +5,10 @@ import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import { sql } from 'drizzle-orm';
 import { env } from '../../config/env.config';
 import { QueueService } from '../../modules/queue/queue.service';
+import {
+  TelemetryPruningWorker,
+  RetentionWorkerHealthDetails,
+} from '../../modules/telemetry/telemetry-pruning.worker';
 
 @ApiTags('Health')
 @Controller('health')
@@ -13,7 +17,10 @@ export class HealthController {
 
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
-    @Optional() @Inject(QueueService) private readonly queueService?: QueueService
+    @Optional() @Inject(QueueService) private readonly queueService?: QueueService,
+    @Optional()
+    @Inject(TelemetryPruningWorker)
+    private readonly telemetryPruningWorker?: TelemetryPruningWorker
   ) {}
 
   @Public()
@@ -39,6 +46,18 @@ export class HealthController {
       }
     }
 
+    let retentionWorkerStatus: 'ready' | 'degraded' | 'disabled' | 'unknown' = 'unknown';
+    let retentionWorkerDetails: RetentionWorkerHealthDetails | undefined;
+
+    if (this.telemetryPruningWorker) {
+      try {
+        retentionWorkerStatus = this.telemetryPruningWorker.getStatus();
+        retentionWorkerDetails = this.telemetryPruningWorker.getHealthDetails();
+      } catch {
+        retentionWorkerStatus = 'degraded';
+      }
+    }
+
     return {
       status: dbStatus === 'up' ? 'ok' : 'degraded',
       timestamp: new Date().toISOString(),
@@ -47,7 +66,9 @@ export class HealthController {
       services: {
         database: dbStatus,
         redis: redisStatus,
+        retentionWorker: retentionWorkerStatus,
       },
+      retentionWorker: retentionWorkerDetails,
     };
   }
 

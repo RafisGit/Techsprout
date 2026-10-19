@@ -6,12 +6,14 @@ import { useQuery } from '@tanstack/react-query';
 import {
   fetchInstructorCourseById,
   fetchCourseAnalytics,
+  fetchCourseRetentionAnalytics,
   type CourseAnalyticsDetailDto,
 } from '@/lib/api/instructor';
 import { TrendLineChart } from '@/components/analytics/TrendLineChart';
 import { ProgressDistributionBar } from '@/components/analytics/ProgressDistributionBar';
 import { DropOffTable } from '@/components/analytics/DropOffTable';
 import { QuizSummaryCard } from '@/components/analytics/QuizSummaryCard';
+import { VideoRetentionCurve } from '@/components/analytics/VideoRetentionCurve';
 import {
   AnalyticsDateRangeControls,
   type DateRangeFilterState,
@@ -93,6 +95,18 @@ export function CourseAnalyticsClient({ courseId }: CourseAnalyticsClientProps) 
       }),
     enabled: !!courseId,
     staleTime: 30 * 1000,
+  });
+
+  // Fetch video retention analytics (WP-P7-02)
+  const { data: retentionData } = useQuery({
+    queryKey: ['courseRetention', courseId, filterState.startDate, filterState.endDate],
+    queryFn: () =>
+      fetchCourseRetentionAnalytics(courseId, {
+        startDate: filterState.startDate,
+        endDate: filterState.endDate,
+      }),
+    enabled: !!courseId,
+    staleTime: 60 * 1000,
   });
 
   // Error Status Code Check
@@ -349,6 +363,11 @@ export function CourseAnalyticsClient({ courseId }: CourseAnalyticsClientProps) 
 
           {/* Section 4: Quiz & Assessment Performance */}
           <QuizSummaryCard quizzes={analytics.quizPerformance} />
+
+          {/* Section 5: Video Engagement Retention Curve & Rewind Heatmap (WP-P7-02) */}
+          {retentionData && (
+            <VideoRetentionCurve data={retentionData} />
+          )}
         </div>
       )}
     </div>
