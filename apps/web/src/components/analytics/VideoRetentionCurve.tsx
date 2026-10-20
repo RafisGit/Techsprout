@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { VideoRetentionCurveDto } from '@techsprout/contracts';
 import { Video, RotateCcw, Users, TrendingDown, Eye, ShieldAlert, BarChart2 } from 'lucide-react';
 
@@ -27,6 +27,60 @@ export function VideoRetentionCurve({
     sampleNotice,
     viewerMetricLabel = 'Viewer-days',
   } = data || {};
+
+  // Deep-link handling: automatically reveal and scroll to accessible table when requested via URL fragment
+  useEffect(() => {
+    if (typeof window === 'undefined' || !telemetryEnabled) return;
+
+    const targetId = 'retention-accessible-table';
+    let animationFrameId: number | null = null;
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    const scrollToTarget = () => {
+      const el = document.getElementById(targetId);
+      if (el && typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+
+    const handleHash = () => {
+      const currentHash = window.location.hash;
+      if (
+        currentHash === `#${targetId}` ||
+        currentHash === targetId ||
+        currentHash === '#retention'
+      ) {
+        setShowTable(true);
+
+        // Allow React to flush the DOM update for the conditionally rendered table before scrolling
+        if (typeof window.requestAnimationFrame === 'function') {
+          animationFrameId = window.requestAnimationFrame(() => {
+            timeoutId = setTimeout(scrollToTarget, 50);
+          });
+        } else {
+          timeoutId = setTimeout(scrollToTarget, 50);
+        }
+      }
+    };
+
+    // Check fragment on initial mount
+    handleHash();
+
+    // Listen for client-side hash changes
+    window.addEventListener('hashchange', handleHash);
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('hashchange', handleHash);
+        if (animationFrameId !== null && typeof window.cancelAnimationFrame === 'function') {
+          window.cancelAnimationFrame(animationFrameId);
+        }
+      }
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [telemetryEnabled]);
 
   // Dimensions for SVG viewport
   const svgWidth = 600;

@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import React from 'react';
+import { renderToString } from 'react-dom/server';
 import axios from 'axios';
 import {
   useLearningTelemetry,
@@ -11,6 +13,7 @@ import {
   fetchCourseRetentionAnalytics,
   type VideoRetentionCurveDto,
 } from '@/lib/api/instructor';
+import { VideoRetentionCurve } from '@/components/analytics/VideoRetentionCurve';
 import { axiosInstance } from '@/lib/axiosInstance';
 import type { TelemetryEventDto } from '@techsprout/contracts';
 
@@ -28,11 +31,18 @@ vi.mock('@/lib/axiosInstance', () => ({
   },
 }));
 
-// Custom lightweight React hook runner supporting multiple concurrent hook instances
+// Custom lightweight React hook runner supporting multiple concurrent hook instances and useState
 interface HookContext {
   refs: Array<{ current: any }>;
   refIdx: number;
+  states: Array<any>;
+  stateSetters: Array<(val: any) => void>;
+  stateIdx: number;
+  effectDeps: Array<any[] | undefined>;
+  effectCleanups: Array<(() => void) | undefined>;
+  effectIdx: number;
   cleanups: Array<() => void>;
+  dirty: boolean;
 }
 let currentContext: HookContext | null = null;
 const allActiveContexts: HookContext[] = [];
@@ -50,11 +60,46 @@ vi.mock('react', async (importOriginal) => {
       }
       return { current: initial };
     },
+    useState: (initial: any) => {
+      if (currentContext) {
+        const ctx = currentContext;
+        const idx = ctx.stateIdx++;
+        if (ctx.states[idx] === undefined) {
+          ctx.states[idx] = typeof initial === 'function' ? initial() : initial;
+        }
+        if (!ctx.stateSetters[idx]) {
+          ctx.stateSetters[idx] = (newVal: any) => {
+            const nextVal = typeof newVal === 'function' ? newVal(ctx.states[idx]) : newVal;
+            ctx.states[idx] = nextVal;
+            ctx.dirty = true;
+          };
+        }
+        return [ctx.states[idx], ctx.stateSetters[idx]];
+      }
+      return actual.useState(initial);
+    },
     useCallback: (fn: any) => fn,
-    useEffect: (fn: () => any) => {
-      const cleanup = fn();
-      if (typeof cleanup === 'function' && currentContext) {
-        currentContext.cleanups.push(cleanup);
+    useEffect: (fn: () => any, deps?: any[]) => {
+      if (currentContext) {
+        const ctx = currentContext;
+        const idx = ctx.effectIdx++;
+        const prevDeps = ctx.effectDeps[idx];
+        const shouldRun =
+          prevDeps === undefined ||
+          deps === undefined ||
+          deps.some((d, i) => !Object.is(d, prevDeps[i]));
+
+        if (shouldRun) {
+          if (typeof ctx.effectCleanups[idx] === 'function') {
+            ctx.effectCleanups[idx]!();
+          }
+          const cleanup = fn();
+          ctx.effectDeps[idx] = deps;
+          ctx.effectCleanups[idx] = typeof cleanup === 'function' ? cleanup : undefined;
+          if (typeof cleanup === 'function') {
+            ctx.cleanups.push(cleanup);
+          }
+        }
       }
     },
   };
@@ -64,26 +109,56 @@ function renderHook<T>(hookFn: () => T) {
   const context: HookContext = {
     refs: [],
     refIdx: 0,
+    states: [],
+    stateSetters: [],
+    stateIdx: 0,
+    effectDeps: [],
+    effectCleanups: [],
+    effectIdx: 0,
     cleanups: [],
+    dirty: false,
   };
   currentContext = context;
   const result = { current: hookFn() };
   currentContext = null;
   allActiveContexts.push(context);
 
+  const rerender = () => {
+    context.refIdx = 0;
+    context.stateIdx = 0;
+    context.effectIdx = 0;
+    context.dirty = false;
+    currentContext = context;
+    result.current = hookFn();
+    currentContext = null;
+  };
+
+  if (context.dirty) {
+    rerender();
+  }
+
   return {
     result,
-    rerender: () => {
-      context.refIdx = 0;
-      currentContext = context;
-      result.current = hookFn();
-      currentContext = null;
-    },
+    rerender,
     unmount: () => {
       context.cleanups.forEach((c) => c());
       context.cleanups = [];
     },
   };
+}
+
+function findNode(node: any, predicate: (n: any) => boolean): any {
+  if (!node) return null;
+  if (predicate(node)) return node;
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findNode(child, predicate);
+      if (found) return found;
+    }
+  } else if (node.props?.children) {
+    return findNode(node.props.children, predicate);
+  }
+  return null;
 }
 
 const act = async (fn: () => any) => {
@@ -1408,6 +1483,262 @@ describe('WP-P7-02: Video Playback Telemetry & Retention Analytics (Frontend Sui
 
       tab1.unmount();
       tab2.unmount();
+    });
+  });
+
+  // =========================================================================
+  // 7. VIDEO RETENTION ACCESSIBLE TABLE DEEP-LINK SUITE (P7.1 FIX)
+  // =========================================================================
+
+  describe('7. Video Retention Accessible Table Deep-Link Suite', () => {
+    const mockRetentionDto: VideoRetentionCurveDto = {
+      courseId: 'ff8d0ddc-38cd-459e-ad3a-32be557a8053',
+      lessonId: null,
+      lessonTitle: null,
+      totalUniqueViewers: 1,
+      viewerMetricLabel: 'Viewer-days',
+      totalCheckpoints: 16,
+      averageCompletionPercentage: 17.9,
+      intervals: [
+        { intervalIndex: 0, intervalRange: '0-10%', viewerCount: 4, retentionPercentage: 100, rewindCount: 0 },
+        { intervalIndex: 1, intervalRange: '10-20%', viewerCount: 3, retentionPercentage: 75, rewindCount: 0 },
+        { intervalIndex: 2, intervalRange: '20-30%', viewerCount: 2, retentionPercentage: 50, rewindCount: 0 },
+        { intervalIndex: 3, intervalRange: '30-40%', viewerCount: 0, retentionPercentage: 0, rewindCount: 0 },
+        { intervalIndex: 4, intervalRange: '40-50%', viewerCount: 0, retentionPercentage: 0, rewindCount: 0 },
+        { intervalIndex: 5, intervalRange: '50-60%', viewerCount: 0, retentionPercentage: 0, rewindCount: 0 },
+        { intervalIndex: 6, intervalRange: '60-70%', viewerCount: 0, retentionPercentage: 0, rewindCount: 0 },
+        { intervalIndex: 7, intervalRange: '70-80%', viewerCount: 0, retentionPercentage: 0, rewindCount: 0 },
+        { intervalIndex: 8, intervalRange: '80-90%', viewerCount: 0, retentionPercentage: 0, rewindCount: 0 },
+        { intervalIndex: 9, intervalRange: '90-100%', viewerCount: 0, retentionPercentage: 0, rewindCount: 0 },
+      ],
+      telemetryEnabled: true,
+      isPartial: false,
+      totalEventsScanned: 20,
+      sampleNotice: null,
+    };
+
+    let originalWindow: any;
+    let originalDocument: any;
+    let mockHash = '';
+    let mockScrollIntoView: any;
+    let mockTableElement: any;
+    let mockWindow: any;
+    let mockDocument: any;
+
+    beforeEach(() => {
+      originalWindow = (globalThis as any).window;
+      originalDocument = (globalThis as any).document;
+
+      mockHash = '';
+      mockScrollIntoView = vi.fn();
+      mockTableElement = {
+        id: 'retention-accessible-table',
+        scrollIntoView: mockScrollIntoView,
+      };
+
+      const listeners: Record<string, Array<() => void>> = {};
+      mockWindow = {
+        get location() {
+          return {
+            get hash() {
+              return mockHash;
+            },
+            set hash(val: string) {
+              mockHash = val;
+            },
+          };
+        },
+        addEventListener: vi.fn((event: string, cb: () => void) => {
+          if (!listeners[event]) listeners[event] = [];
+          listeners[event].push(cb);
+        }),
+        removeEventListener: vi.fn((event: string, cb: () => void) => {
+          if (!listeners[event]) return;
+          listeners[event] = listeners[event].filter((l) => l !== cb);
+        }),
+        dispatchEvent: vi.fn((event: { type: string }) => {
+          if (listeners[event.type]) {
+            listeners[event.type].forEach((cb) => cb());
+          }
+          return true;
+        }),
+        requestAnimationFrame: vi.fn((cb: any) => {
+          return setTimeout(cb, 0) as any;
+        }),
+        cancelAnimationFrame: vi.fn((id: any) => {
+          clearTimeout(id);
+        }),
+      };
+
+      mockDocument = {
+        getElementById: vi.fn((id: string) => {
+          if (id === 'retention-accessible-table') {
+            return mockTableElement;
+          }
+          return null;
+        }),
+      };
+
+      (globalThis as any).window = mockWindow;
+      (globalThis as any).document = mockDocument;
+    });
+
+    afterEach(() => {
+      if (originalWindow !== undefined) {
+        (globalThis as any).window = originalWindow;
+      } else {
+        delete (globalThis as any).window;
+      }
+      if (originalDocument !== undefined) {
+        (globalThis as any).document = originalDocument;
+      } else {
+        delete (globalThis as any).document;
+      }
+    });
+
+    it('7.1 should automatically reveal the accessible table when mounted with #retention-accessible-table fragment', () => {
+      mockHash = '#retention-accessible-table';
+
+      const hook = renderHook(() => VideoRetentionCurve({ data: mockRetentionDto }));
+
+      const table = findNode(hook.result.current, (n) => n?.props?.id === 'retention-accessible-table');
+      expect(table).not.toBeNull();
+      expect(table.props.id).toBe('retention-accessible-table');
+
+      const button = findNode(hook.result.current, (n) => n?.props?.['aria-controls'] === 'retention-accessible-table');
+      expect(button.props['aria-expanded']).toBe(true);
+      expect(JSON.stringify(button)).toContain('Hide Tabular Data');
+
+      hook.unmount();
+    });
+
+    it('7.2 should scroll the rendered table into view after it becomes available in the DOM', async () => {
+      mockHash = '#retention-accessible-table';
+      vi.useFakeTimers();
+
+      const hook = renderHook(() => VideoRetentionCurve({ data: mockRetentionDto }));
+
+      vi.runAllTimers();
+
+      expect(mockDocument.getElementById).toHaveBeenCalledWith('retention-accessible-table');
+      expect(mockScrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+
+      hook.unmount();
+      expect(mockWindow.removeEventListener).toHaveBeenCalledWith('hashchange', expect.any(Function));
+      vi.useRealTimers();
+    });
+
+    it('7.3 should keep the accessible table collapsed when loaded without the fragment or with unrelated fragment', () => {
+      mockHash = '';
+      const hookEmpty = renderHook(() => VideoRetentionCurve({ data: mockRetentionDto }));
+      expect(findNode(hookEmpty.result.current, (n) => n?.props?.id === 'retention-accessible-table')).toBeNull();
+      const buttonEmpty = findNode(hookEmpty.result.current, (n) => n?.props?.['aria-controls'] === 'retention-accessible-table');
+      expect(buttonEmpty.props['aria-expanded']).toBe(false);
+      expect(JSON.stringify(buttonEmpty)).toContain('View Accessible Table');
+      hookEmpty.unmount();
+
+      mockHash = '#kpi-section';
+      const hookOther = renderHook(() => VideoRetentionCurve({ data: mockRetentionDto }));
+      expect(findNode(hookOther.result.current, (n) => n?.props?.id === 'retention-accessible-table')).toBeNull();
+      hookOther.unmount();
+    });
+
+    it('7.4 should allow manually expanding and collapsing the table via the toggle button', () => {
+      mockHash = '';
+      const hook = renderHook(() => VideoRetentionCurve({ data: mockRetentionDto }));
+
+      // 1. Initially closed
+      let button = findNode(hook.result.current, (n) => n?.props?.['aria-controls'] === 'retention-accessible-table');
+      expect(button.props['aria-expanded']).toBe(false);
+      expect(findNode(hook.result.current, (n) => n?.props?.id === 'retention-accessible-table')).toBeNull();
+
+      // 2. Click to expand
+      button.props.onClick();
+      hook.rerender();
+
+      button = findNode(hook.result.current, (n) => n?.props?.['aria-controls'] === 'retention-accessible-table');
+      expect(button.props['aria-expanded']).toBe(true);
+      expect(findNode(hook.result.current, (n) => n?.props?.id === 'retention-accessible-table')).not.toBeNull();
+
+      // 3. Click to collapse
+      button.props.onClick();
+      hook.rerender();
+
+      button = findNode(hook.result.current, (n) => n?.props?.['aria-controls'] === 'retention-accessible-table');
+      expect(button.props['aria-expanded']).toBe(false);
+      expect(findNode(hook.result.current, (n) => n?.props?.id === 'retention-accessible-table')).toBeNull();
+
+      // 4. If table was opened via hash, clicking toggle collapses it
+      mockHash = '#retention-accessible-table';
+      const hookHash = renderHook(() => VideoRetentionCurve({ data: mockRetentionDto }));
+      let hashButton = findNode(hookHash.result.current, (n) => n?.props?.['aria-controls'] === 'retention-accessible-table');
+      expect(hashButton.props['aria-expanded']).toBe(true);
+
+      hashButton.props.onClick();
+      hookHash.rerender();
+      hashButton = findNode(hookHash.result.current, (n) => n?.props?.['aria-controls'] === 'retention-accessible-table');
+      expect(hashButton.props['aria-expanded']).toBe(false);
+      expect(findNode(hookHash.result.current, (n) => n?.props?.id === 'retention-accessible-table')).toBeNull();
+
+      hook.unmount();
+      hookHash.unmount();
+    });
+
+    it('7.5 should preserve existing chart, metrics, 10-interval SVG labels, and disabled states', () => {
+      const hook = renderHook(() => VideoRetentionCurve({ data: mockRetentionDto }));
+      const renderedStr = JSON.stringify(hook.result.current);
+
+      expect(renderedStr).toContain('Viewer-days');
+      expect(renderedStr).toContain('Avg. Completion');
+      expect(renderedStr).toContain('Terminal Retention');
+      expect(renderedStr).toContain('Backward Rewinds');
+      expect(renderedStr).toContain('17.9');
+      expect(renderedStr).toContain('0-10%');
+      expect(renderedStr).toContain('90-100%');
+
+      // Verify disabled state
+      const disabledHook = renderHook(() =>
+        VideoRetentionCurve({
+          data: { ...mockRetentionDto, telemetryEnabled: false },
+        })
+      );
+      const disabledStr = JSON.stringify(disabledHook.result.current);
+      expect(disabledStr).toContain('Telemetry collection is currently disabled');
+      expect(disabledStr).not.toContain('retention-accessible-table');
+
+      hook.unmount();
+      disabledHook.unmount();
+    });
+
+    it('7.6 should safely render on the server via renderToString without window access or hydration mismatches', () => {
+      delete (globalThis as any).window;
+      delete (globalThis as any).document;
+
+      const html = renderToString(React.createElement(VideoRetentionCurve, { data: mockRetentionDto }));
+
+      expect(html).toContain('Video Engagement Retention Curve &amp; Rewind Heatmap');
+      expect(html).toContain('Viewer-days');
+      expect(html).toContain('17.9');
+      expect(html).toContain('aria-expanded="false"');
+      expect(html).toContain('View Accessible Table');
+      expect(html).not.toContain('id="retention-accessible-table"');
+    });
+
+    it('7.7 should dynamically reveal the table when hashchange event fires after initial mount', () => {
+      mockHash = '';
+      const hook = renderHook(() => VideoRetentionCurve({ data: mockRetentionDto }));
+
+      expect(findNode(hook.result.current, (n) => n?.props?.id === 'retention-accessible-table')).toBeNull();
+
+      mockHash = '#retention-accessible-table';
+      mockWindow.dispatchEvent({ type: 'hashchange' });
+
+      hook.rerender();
+
+      const table = findNode(hook.result.current, (n) => n?.props?.id === 'retention-accessible-table');
+      expect(table).not.toBeNull();
+
+      hook.unmount();
     });
   });
 });
