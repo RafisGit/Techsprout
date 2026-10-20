@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { saveProgressCheckpoint } from '@/lib/api/learning';
+import { useLearningTelemetry } from '@/hooks/useLearningTelemetry';
 import { AlertCircle, CheckCircle2, Play, Volume2 } from 'lucide-react';
 
 interface VideoPlayerProps {
@@ -27,10 +28,26 @@ export function VideoPlayer({
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastCheckpointTimeRef = useRef<number>(initialWatchPosition);
+  const lastKnownPositionRef = useRef<number>(initialWatchPosition);
+  const preSeekPositionRef = useRef<number>(initialWatchPosition);
+  const isSeekingRef = useRef<boolean>(false);
   const isSavingRef = useRef<boolean>(false);
   const completedRef = useRef<boolean>(isCompleted);
   const [loadError, setLoadError] = useState<boolean>(false);
   const [showCompletionBanner, setShowCompletionBanner] = useState<boolean>(isCompleted);
+
+  // Initialize learning telemetry hook with 60-second throttling and exit beacon transport
+  const {
+    recordVideoStarted,
+    recordVideoCheckpoint,
+    recordVideoPaused,
+    recordVideoSeeked,
+    recordVideoCompleted,
+  } = useLearningTelemetry({
+    courseId,
+    lessonId,
+    totalDurationSeconds: durationSeconds,
+  });
 
   // Sync completion state
   useEffect(() => {
@@ -46,14 +63,18 @@ export function VideoPlayer({
       if (duration > 0 && initialWatchPosition >= 0.95 * duration) {
         videoRef.current.currentTime = 0;
         lastCheckpointTimeRef.current = 0;
+        lastKnownPositionRef.current = 0;
+        preSeekPositionRef.current = 0;
       } else {
         videoRef.current.currentTime = initialWatchPosition;
         lastCheckpointTimeRef.current = initialWatchPosition;
+        lastKnownPositionRef.current = initialWatchPosition;
+        preSeekPositionRef.current = initialWatchPosition;
       }
     }
   };
 
-  // Checkpoint persistence function
+  // Checkpoint persistence function (Authoritative lesson progress)
   const sendCheckpoint = useCallback(
     async (currentTime: number, force = false) => {
       if (isSavingRef.current && !force) return;
@@ -89,13 +110,29 @@ export function VideoPlayer({
     [courseId, lessonId, onCompleted, onProgressUpdate]
   );
 
-  // Throttled timeupdate listener (~15 seconds interval)
+  // Video playback lifecycle handlers
+  const handlePlay = () => {
+    if (videoRef.current) {
+      recordVideoStarted(videoRef.current.currentTime, videoRef.current.playbackRate);
+    }
+  };
+
+  // Throttled timeupdate listener (telemetry: 60s, progress: ~15s)
   const handleTimeUpdate = () => {
     if (!videoRef.current) return;
     const currentTime = videoRef.current.currentTime;
     const duration = videoRef.current.duration || durationSeconds;
 
-    // Check if 90% threshold reached
+    // Track normal continuous playback progression
+    if (!isSeekingRef.current) {
+      lastKnownPositionRef.current = currentTime;
+      preSeekPositionRef.current = currentTime;
+    }
+
+    // Record observational telemetry checkpoint (internally 60s throttled)
+    recordVideoCheckpoint(currentTime, videoRef.current.playbackRate);
+
+    // Check if 90% threshold reached for authoritative progress
     if (duration > 0 && currentTime >= 0.9 * duration && !completedRef.current) {
       sendCheckpoint(currentTime, true);
     } else if (Math.abs(currentTime - lastCheckpointTimeRef.current) >= 15) {
@@ -103,21 +140,42 @@ export function VideoPlayer({
     }
   };
 
-  // Event handlers for pause, seeked, and ended
+  // Event handlers for pause, seeking, seeked, and ended
   const handlePause = () => {
     if (videoRef.current) {
+      recordVideoPaused(videoRef.current.currentTime, videoRef.current.playbackRate);
       sendCheckpoint(videoRef.current.currentTime, true);
+    }
+  };
+
+  // Handle seeking start (captures true pre-seek source position)
+  const handleSeeking = () => {
+    if (!isSeekingRef.current) {
+      isSeekingRef.current = true;
+      // preSeekPositionRef locks the last known position before seek started
     }
   };
 
   const handleSeeked = () => {
     if (videoRef.current) {
-      sendCheckpoint(videoRef.current.currentTime, true);
+      const targetTime = videoRef.current.currentTime;
+      const previousTime = preSeekPositionRef.current;
+      isSeekingRef.current = false;
+      lastKnownPositionRef.current = targetTime;
+      preSeekPositionRef.current = targetTime;
+
+      // Only dispatch if position actually changed
+      if (Math.abs(targetTime - previousTime) >= 0.5) {
+        recordVideoSeeked(targetTime, previousTime, videoRef.current.playbackRate);
+        sendCheckpoint(targetTime, true);
+      }
     }
   };
 
   const handleEnded = () => {
     if (videoRef.current) {
+      const duration = videoRef.current.duration || durationSeconds;
+      recordVideoCompleted(duration);
       sendCheckpoint(videoRef.current.currentTime, true);
       if (!completedRef.current) {
         completedRef.current = true;
@@ -133,7 +191,7 @@ export function VideoPlayer({
       if (videoRef.current) {
         const time = videoRef.current.currentTime;
         if (Math.abs(time - lastCheckpointTimeRef.current) >= 1) {
-          // Best-effort send on unmount
+          // Best-effort send on unmount for authoritative progress
           saveProgressCheckpoint(courseId, lessonId, Math.floor(time)).catch(() => {});
         }
       }
@@ -179,8 +237,10 @@ export function VideoPlayer({
         playsInline
         className='w-full aspect-video object-contain bg-black'
         onLoadedMetadata={handleLoadedMetadata}
+        onPlay={handlePlay}
         onTimeUpdate={handleTimeUpdate}
         onPause={handlePause}
+        onSeeking={handleSeeking}
         onSeeked={handleSeeked}
         onEnded={handleEnded}
         onError={() => setLoadError(true)}

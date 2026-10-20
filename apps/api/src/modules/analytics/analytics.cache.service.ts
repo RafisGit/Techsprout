@@ -116,6 +116,10 @@ export class AnalyticsCacheService implements OnModuleInit, OnModuleDestroy {
     return `course:analytics:${courseId}:${rangeHash}`;
   }
 
+  buildCourseRetentionKey(courseId: string, rangeHash: string): string {
+    return `course:retention:${courseId}:${rangeHash}`;
+  }
+
   buildAdminOverviewKey(): string {
     return 'admin:analytics:overview';
   }

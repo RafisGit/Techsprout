@@ -646,6 +646,18 @@ export async function createTestDatabase() {
       created_at timestamp with time zone DEFAULT now() NOT NULL,
       updated_at timestamp with time zone DEFAULT now() NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS learning_events (
+      id uuid PRIMARY KEY NOT NULL,
+      user_id varchar(64) NOT NULL,
+      course_id uuid NOT NULL REFERENCES courses(id) ON DELETE cascade,
+      module_id uuid REFERENCES modules(id) ON DELETE set null,
+      lesson_id uuid REFERENCES lessons(id) ON DELETE set null,
+      event_type varchar(50) NOT NULL,
+      metadata jsonb,
+      occurred_at timestamp with time zone NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL
+    );
   `);
 
   // Seed baseline roles

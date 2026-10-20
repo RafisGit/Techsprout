@@ -73,6 +73,7 @@ export class ResourceOwnershipGuard implements CanActivate {
     const { resourceType, idParamKey } = metadata;
     const resourceId =
       req.params?.[idParamKey] ||
+      (idParamKey === 'courseId' ? req.params?.['id'] : idParamKey === 'id' ? req.params?.['courseId'] : undefined) ||
       (req.query as Record<string, string>)?.[idParamKey] ||
       (req.body as Record<string, string>)?.[idParamKey];
 

@@ -13,6 +13,9 @@ import type {
   QuizPerformanceSummaryDto,
   AnalyticsInterval,
   AnalyticsDateRangeQuery,
+  VideoRetentionCurveDto,
+  VideoRetentionIntervalDto,
+  QueryRetentionAnalyticsDto,
 } from '@techsprout/contracts';
 
 export type {
@@ -25,6 +28,9 @@ export type {
   QuizPerformanceSummaryDto,
   AnalyticsInterval,
   AnalyticsDateRangeQuery,
+  VideoRetentionCurveDto,
+  VideoRetentionIntervalDto,
+  QueryRetentionAnalyticsDto,
 };
 
 export interface InstructorCourseQueryParams {
@@ -271,6 +277,19 @@ export async function fetchCourseAnalytics(
   const response = await axiosInstance.get(`/api/v1/instructor/analytics/courses/${courseId}`, {
     params,
   });
+  return response.data.data;
+}
+
+export async function fetchCourseRetentionAnalytics(
+  courseId: string,
+  params?: QueryRetentionAnalyticsDto
+): Promise<VideoRetentionCurveDto> {
+  const response = await axiosInstance.get(
+    `/api/v1/instructor/analytics/courses/${courseId}/retention`,
+    {
+      params,
+    }
+  );
   return response.data.data;
 }
 

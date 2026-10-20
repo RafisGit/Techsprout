@@ -63,6 +63,7 @@ async function bootstrap() {
     .addTag('Admin')
     .addTag('Health')
     .addTag('Media')
+    .addTag('Learning Telemetry')
     .addCookieAuth('techsprout_session')
     .addBearerAuth()
     .build();

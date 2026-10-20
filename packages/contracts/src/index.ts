@@ -2209,3 +2209,123 @@ export type StudentLearningEngagementResponse =
 export type PaginatedCourseEnrollmentsResponse =
   ApiSuccessResponse<PaginatedCourseEnrollmentsData>;
 
+// ============================================================================
+// PHASE 7.1 LEARNING TELEMETRY FOUNDATION CONTRACTS (WP-P7-01)
+// ============================================================================
+
+export const approvedEventTypeEnum = z.enum([
+  'COURSE_OPENED',
+  'LESSON_STARTED',
+  'VIDEO_STARTED',
+  'VIDEO_PAUSED',
+  'VIDEO_SEEKED',
+  'VIDEO_CHECKPOINT',
+  'VIDEO_COMPLETED',
+  'LESSON_COMPLETED',
+  'QUIZ_ATTEMPTED',
+  'CERTIFICATE_EARNED',
+]);
+export type ApprovedEventType = z.infer<typeof approvedEventTypeEnum>;
+
+export const telemetryMetadataSchema = z
+  .object({
+    watchPositionSeconds: z.number().nonnegative().max(86400).optional(),
+    previousPositionSeconds: z.number().nonnegative().max(86400).optional(),
+    totalDurationSeconds: z.number().nonnegative().max(86400).optional(),
+    playbackRate: z.number().min(0.1).max(5.0).optional(),
+    score: z.number().min(0).max(100).optional(),
+    passed: z.boolean().optional(),
+    checkpointIndex: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+export type TelemetryMetadataDto = z.infer<typeof telemetryMetadataSchema>;
+
+export const telemetryEventSchema = z
+  .object({
+    eventId: z.string().uuid({ message: 'eventId must be a valid UUID' }),
+    courseId: z.string().uuid({ message: 'courseId must be a valid UUID' }),
+    moduleId: z.string().uuid({ message: 'moduleId must be a valid UUID' }).optional().nullable(),
+    lessonId: z.string().uuid({ message: 'lessonId must be a valid UUID' }).optional().nullable(),
+    eventType: approvedEventTypeEnum,
+    metadata: telemetryMetadataSchema.optional().nullable(),
+    occurredAt: z.string().datetime({ message: 'occurredAt must be a valid ISO 8601 datetime string' }),
+    sessionId: z.string().max(64).optional().nullable(),
+  })
+  .strict();
+export type TelemetryEventDto = z.infer<typeof telemetryEventSchema>;
+
+export const ingestTelemetryBatchSchema = z
+  .object({
+    events: z
+      .array(telemetryEventSchema)
+      .min(1, 'Batch must contain at least 1 event')
+      .max(50, 'Batch payload exceeds maximum ceiling of 50 events'),
+  })
+  .strict();
+export type IngestTelemetryBatchDto = z.infer<typeof ingestTelemetryBatchSchema>;
+
+export interface IngestionResultDto {
+  ingestedCount: number;
+  deduplicatedCount: number;
+  message?: string;
+}
+
+export type IngestTelemetryBatchResponse = ApiSuccessResponse<IngestionResultDto>;
+
+// ============================================================================
+// PHASE 7.1 VIDEO RETENTION ANALYTICS CONTRACTS (WP-P7-02)
+// ============================================================================
+
+export interface VideoRetentionIntervalDto {
+  intervalIndex: number; // 0 to 9 (representing 0-10%, 10-20%, ... 90-100%)
+  intervalRange: string; // "0-10%", "10-20%", ... "90-100%"
+  viewerCount: number; // Viewers or viewer-days reaching this interval
+  retentionPercentage: number; // 0 to 100 (% of starting viewers)
+  rewindCount: number; // Count of backward-seek (rewind) events landing in this interval
+}
+
+export interface VideoRetentionCurveDto {
+  courseId: string;
+  lessonId?: string | null;
+  lessonTitle?: string | null;
+  /**
+   * Total unique pseudonymous viewer count.
+   * Under ADR-P7-001 daily rotating salt privacy, for multi-day date ranges this represents
+   * aggregate viewer-days rather than unique individual learners.
+   */
+  totalUniqueViewers: number;
+  /**
+   * User-facing label clarifying viewer count semantics:
+   * "Viewer-days" for multi-day queries, "Unique Viewers" for single-day queries.
+   */
+  viewerMetricLabel?: string;
+  totalCheckpoints: number;
+  averageCompletionPercentage: number;
+  intervals: VideoRetentionIntervalDto[];
+  telemetryEnabled: boolean;
+  /**
+   * Indicates whether the retention curve is based on a bounded sample
+   * when event volume reaches or exceeds the configured query limit.
+   */
+  isPartial?: boolean;
+  totalEventsScanned?: number;
+  sampleNotice?: string | null;
+}
+
+export const queryRetentionAnalyticsSchema = z
+  .object({
+    lessonId: z.string().uuid({ message: 'lessonId must be a valid UUID' }).optional(),
+    startDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'startDate must be in YYYY-MM-DD format')
+      .optional(),
+    endDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'endDate must be in YYYY-MM-DD format')
+      .optional(),
+  })
+  .strict();
+export type QueryRetentionAnalyticsDto = z.infer<typeof queryRetentionAnalyticsSchema>;
+
+export type CourseRetentionAnalyticsResponse = ApiSuccessResponse<VideoRetentionCurveDto>;
+
