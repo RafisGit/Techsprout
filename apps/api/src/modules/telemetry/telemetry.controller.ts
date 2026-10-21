@@ -38,8 +38,17 @@ export class TelemetryController {
   @ApiResponse({ status: 429, description: 'Rate limit exceeded' })
   async ingestEvents(@Body() body: unknown, @Req() req: AuthenticatedRequest) {
     // 1. Measure and enforce raw payload size ceiling (32KB)
-    const rawPayloadString = typeof body === 'string' ? body : JSON.stringify(body);
-    const rawPayloadBytes = Buffer.byteLength(rawPayloadString, 'utf8');
+    const contentLength = req.headers['content-length']
+      ? parseInt(req.headers['content-length'] as string, 10)
+      : undefined;
+
+    let rawPayloadBytes: number;
+    if (contentLength !== undefined && !isNaN(contentLength)) {
+      rawPayloadBytes = contentLength;
+    } else {
+      const rawPayloadString = typeof body === 'string' ? body : JSON.stringify(body);
+      rawPayloadBytes = Buffer.byteLength(rawPayloadString, 'utf8');
+    }
 
     if (rawPayloadBytes > 32 * 1024) {
       throw new ApiException(

@@ -14,8 +14,10 @@ import {
   lessonProgress,
   quizzes,
   quizAttempts,
+  learningEvents,
 } from '../database/schema';
 import * as schema from '../database/schema';
+import * as crypto from 'crypto';
 import { eq, and, desc } from 'drizzle-orm';
 import {
   analyticsDateRangeQuerySchema,
@@ -553,9 +555,49 @@ describe('P6.3 — WP-01: Shared Contracts & Analytics Foundation Test Suite', (
   // =========================================================================
 
   describe('4. Scope Boundary Discipline & Prerequisite Integrity', () => {
-    it('4.1 should confirm learning_events table is absent (deferred to Phase 7)', () => {
-      // Asserts that learning_events is not registered in the P6.3 schema
-      expect((schema as any).learningEvents).toBeUndefined();
+    it('4.1 should confirm learning_events table conforms to approved Phase 7.1 schema and privacy invariants', async () => {
+      // Asserts that learning_events is registered in the Phase 7.1 schema (ADR-P7-001 / WP-P7-01)
+      expect(learningEvents).toBeDefined();
+      expect(schema.learningEvents).toBeDefined();
+
+      // Verify approved column definitions
+      expect(learningEvents.id).toBeDefined();
+      expect(learningEvents.userId).toBeDefined();
+      expect(learningEvents.courseId).toBeDefined();
+      expect(learningEvents.moduleId).toBeDefined();
+      expect(learningEvents.lessonId).toBeDefined();
+      expect(learningEvents.eventType).toBeDefined();
+      expect(learningEvents.metadata).toBeDefined();
+      expect(learningEvents.occurredAt).toBeDefined();
+      expect(learningEvents.createdAt).toBeDefined();
+
+      // Verify privacy invariant (ADR-P7-001): user_id is a 64-char pseudonymous hash with no FK to users
+      const sampleEventId = crypto.randomUUID();
+      const sampleHashedUserId = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+      const [inserted] = await db
+        .insert(learningEvents)
+        .values({
+          id: sampleEventId,
+          userId: sampleHashedUserId,
+          courseId: testCourseId,
+          eventType: 'VIDEO_STARTED',
+          metadata: { watchPositionSeconds: 0, playbackRate: 1.0 },
+          occurredAt: new Date(),
+        })
+        .returning();
+
+      expect(inserted).toBeDefined();
+      expect(inserted.id).toBe(sampleEventId);
+      expect(inserted.userId).toBe(sampleHashedUserId);
+      expect(inserted.eventType).toBe('VIDEO_STARTED');
+      expect(inserted.courseId).toBe(testCourseId);
+
+      const queried = await db
+        .select()
+        .from(learningEvents)
+        .where(eq(learningEvents.id, sampleEventId));
+      expect(queried).toHaveLength(1);
+      expect(queried[0].userId).toBe(sampleHashedUserId);
     });
 
     it('4.2 should maintain full compatibility with prerequisite P6.2 entities', () => {

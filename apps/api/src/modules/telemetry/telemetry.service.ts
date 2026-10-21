@@ -36,6 +36,12 @@ export class TelemetryService {
   // Per-user/per-lesson sliding window rate limit store: Map<"userId:targetId", timestamps[]>
   private rateLimitStore = new Map<string, number[]>();
 
+  // In-memory cache for course instructor IDs: Map<courseId, instructorId>
+  private courseInstructorCache = new Map<string, string>();
+
+  // In-memory cache for lesson durations: Map<lessonId, number>
+  private lessonDurationCache = new Map<string, number>();
+
   // In-memory override for TELEMETRY_ENABLED kill switch (useful for tests)
   private telemetryEnabledOverride: boolean | null = null;
 
@@ -79,6 +85,8 @@ export class TelemetryService {
    */
   public resetRateLimits(): void {
     this.rateLimitStore.clear();
+    this.courseInstructorCache.clear();
+    this.lessonDurationCache.clear();
   }
 
   /**
@@ -111,26 +119,35 @@ export class TelemetryService {
    * AC-P7-01-SEC-06: Submissions lacking active enrollment/entitlement return HTTP 403 Forbidden.
    */
   private async verifyCourseAccess(courseId: string, user: TelemetryUserContext): Promise<void> {
-    const [course] = await this.db.select().from(courses).where(eq(courses.id, courseId)).limit(1);
+    let instructorId = this.courseInstructorCache.get(courseId);
+    if (instructorId === undefined) {
+      const [course] = await this.db
+        .select({ id: courses.id, instructorId: courses.instructorId })
+        .from(courses)
+        .where(eq(courses.id, courseId))
+        .limit(1);
 
-    if (!course) {
-      throw new ApiException('Course not found', HttpStatus.NOT_FOUND, 'COURSE_NOT_FOUND');
+      if (!course) {
+        throw new ApiException('Course not found', HttpStatus.NOT_FOUND, 'COURSE_NOT_FOUND');
+      }
+      instructorId = course.instructorId;
+      this.courseInstructorCache.set(courseId, instructorId);
     }
 
     // Admins and owning instructors have institutional access
-    if (user.role === 'admin' || (user.role === 'instructor' && course.instructorId === user.id)) {
+    if (user.role === 'admin' || (user.role === 'instructor' && instructorId === user.id)) {
       return;
     }
 
     // Students / learner instructors must possess an active or completed enrollment
     const [enrollment] = await this.db
-      .select()
+      .select({ id: enrollments.id })
       .from(enrollments)
       .where(
         and(
           eq(enrollments.studentId, user.id),
           eq(enrollments.courseId, courseId),
-          sql`${enrollments.status} IN ('ACTIVE', 'COMPLETED')`
+          inArray(enrollments.status, ['ACTIVE', 'COMPLETED'])
         )
       )
       .limit(1);
@@ -210,7 +227,33 @@ export class TelemetryService {
     let deduplicatedCount = 0;
 
     // Cache lesson durations to minimize database lookups within a single batch
-    const lessonDurationCache = new Map<string, number>();
+    const uniqueLessonIds = Array.from(
+      new Set(
+        events
+          .map((e) => e.lessonId)
+          .filter((id): id is string => !!id && !this.lessonDurationCache.has(id))
+      )
+    );
+    if (uniqueLessonIds.length > 0) {
+      const dbLessons = await this.db
+        .select({ id: lessons.id, durationSeconds: lessons.durationSeconds })
+        .from(lessons)
+        .where(inArray(lessons.id, uniqueLessonIds));
+      for (const les of dbLessons) {
+        this.lessonDurationCache.set(les.id, les.durationSeconds);
+      }
+    }
+
+    // Batch pre-fetch existing event IDs to eliminate N+1 queries during idempotency checks
+    const incomingEventIds = events.map((e) => e.eventId);
+    const existingRecords = await this.db
+      .select()
+      .from(learningEvents)
+      .where(inArray(learningEvents.id, incomingEventIds));
+    const existingMap = new Map(existingRecords.map((r) => [r.id, r]));
+
+    // In-batch cache for hashed user ID across same-day events
+    const userDateHashCache = new Map<string, string>();
 
     for (const event of events) {
       // 6. Temporal Bounding: not > 30s in future, not > 24 hours in past (AC-P7-01-SEC-04)
@@ -243,7 +286,7 @@ export class TelemetryService {
         (event.metadata?.watchPositionSeconds !== undefined ||
           event.metadata?.previousPositionSeconds !== undefined)
       ) {
-        let lessonDuration = lessonDurationCache.get(event.lessonId);
+        let lessonDuration = this.lessonDurationCache.get(event.lessonId);
         if (lessonDuration === undefined) {
           const [lesson] = await this.db
             .select({ durationSeconds: lessons.durationSeconds })
@@ -255,7 +298,7 @@ export class TelemetryService {
             throw new ApiException('Lesson not found', HttpStatus.NOT_FOUND, 'LESSON_NOT_FOUND');
           }
           lessonDuration = lesson.durationSeconds;
-          lessonDurationCache.set(event.lessonId, lessonDuration);
+          this.lessonDurationCache.set(event.lessonId, lessonDuration);
         }
 
         if (
@@ -284,35 +327,33 @@ export class TelemetryService {
       }
 
       // 8. Rotating daily salt pseudonymous hashing (Fail-Closed)
-      let hashedUserId: string;
-      try {
-        hashedUserId = this.privacyService.hashIdentifier(user.id, new Date(event.occurredAt));
-      } catch (err) {
-        this.logger.error('Failed to hash telemetry identifier: fail-closed triggered', err);
-        throw new ApiException(
-          'Telemetry service temporarily unavailable',
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          'TELEMETRY_SALT_UNAVAILABLE'
-        );
+      const dateKey = event.occurredAt.slice(0, 10);
+      let hashedUserId = userDateHashCache.get(dateKey);
+      if (!hashedUserId) {
+        try {
+          hashedUserId = this.privacyService.hashIdentifier(user.id, new Date(event.occurredAt));
+          userDateHashCache.set(dateKey, hashedUserId);
+        } catch (err) {
+          this.logger.error('Failed to hash telemetry identifier: fail-closed triggered', err);
+          throw new ApiException(
+            'Telemetry service temporarily unavailable',
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            'TELEMETRY_SALT_UNAVAILABLE'
+          );
+        }
       }
 
       // 9. Duplicate-Event Idempotency & Conflict Check (AC-P7-01-SEC-01 & AC-P7-01-SEC-02)
-      const existing = await this.db
-        .select()
-        .from(learningEvents)
-        .where(eq(learningEvents.id, event.eventId))
-        .limit(1);
-
-      if (existing.length > 0) {
-        const record = existing[0];
+      const existing = existingMap.get(event.eventId);
+      if (existing) {
         const isSamePayload =
-          record.courseId === event.courseId &&
-          record.userId === hashedUserId &&
-          (record.moduleId || null) === (event.moduleId || null) &&
-          (record.lessonId || null) === (event.lessonId || null) &&
-          record.eventType === event.eventType &&
-          new Date(record.occurredAt).getTime() === eventTime &&
-          JSON.stringify(record.metadata || null) === JSON.stringify(event.metadata || null);
+          existing.courseId === event.courseId &&
+          existing.userId === hashedUserId &&
+          (existing.moduleId || null) === (event.moduleId || null) &&
+          (existing.lessonId || null) === (event.lessonId || null) &&
+          existing.eventType === event.eventType &&
+          new Date(existing.occurredAt).getTime() === eventTime &&
+          JSON.stringify(existing.metadata || null) === JSON.stringify(event.metadata || null);
 
         if (isSamePayload) {
           // Exact duplicate: idempotent ignore (AC-P7-01-SEC-01)
@@ -320,6 +361,30 @@ export class TelemetryService {
           continue;
         } else {
           // Altered payload with existing event ID: conflict (AC-P7-01-SEC-02)
+          throw new ApiException(
+            `Idempotency conflict: Event with ID ${event.eventId} already exists with differing attributes`,
+            HttpStatus.CONFLICT,
+            'IDEMPOTENCY_CONFLICT'
+          );
+        }
+      }
+
+      // Intra-batch duplicate check
+      const alreadyInBatch = toInsert.find((item) => item.id === event.eventId);
+      if (alreadyInBatch) {
+        const isSamePayload =
+          alreadyInBatch.courseId === event.courseId &&
+          alreadyInBatch.userId === hashedUserId &&
+          (alreadyInBatch.moduleId || null) === (event.moduleId || null) &&
+          (alreadyInBatch.lessonId || null) === (event.lessonId || null) &&
+          alreadyInBatch.eventType === event.eventType &&
+          new Date(alreadyInBatch.occurredAt).getTime() === eventTime &&
+          JSON.stringify(alreadyInBatch.metadata || null) === JSON.stringify(event.metadata || null);
+
+        if (isSamePayload) {
+          deduplicatedCount++;
+          continue;
+        } else {
           throw new ApiException(
             `Idempotency conflict: Event with ID ${event.eventId} already exists with differing attributes`,
             HttpStatus.CONFLICT,
