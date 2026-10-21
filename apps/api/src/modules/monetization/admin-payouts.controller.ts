@@ -61,6 +61,19 @@ export class AdminPayoutsController {
     };
   }
 
+  @Post('escrow/settle')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Trigger settlement of matured 14-day escrow funds into instructor available balances (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Matured escrow settled successfully' })
+  async triggerEscrowSettlement() {
+    const settledCount = await this.ledgerService.settleMaturedEscrow();
+    return {
+      success: true,
+      message: `Successfully settled matured escrow for ${settledCount} order(s)`,
+      data: { settledCount },
+    };
+  }
+
   @Get()
   @ApiOperation({ summary: 'List all instructor payout requests with filtering (Admin only)' })
   @ApiResponse({ status: 200, description: 'Payout requests retrieved successfully' })
