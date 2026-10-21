@@ -222,6 +222,7 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
     app.setGlobalPrefix('api/v1');
     app.use(cookieParser());
     await app.init();
+    await app.listen(0);
 
     telemetryService = moduleRef.get<TelemetryService>(TelemetryService);
     privacyService = moduleRef.get<TelemetryPrivacyService>(TelemetryPrivacyService);
