@@ -1,4 +1,4 @@
-import { Injectable, Inject, HttpStatus } from '@nestjs/common';
+import { Injectable, Inject, Optional, HttpStatus } from '@nestjs/common';
 import { eq, and } from 'drizzle-orm';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import { lessons, modules, courses, enrollments } from '../../database/schema';
@@ -8,7 +8,10 @@ import {
   TutorCitationDto,
   TutorRetrievalResultDto,
   ContextChunkDto,
+  IndexedChunkDto,
 } from '@techsprout/contracts';
+import { TutorIndexingService } from './tutor-indexing.service';
+import { TutorEmbeddingService } from './tutor-embedding.service';
 
 interface ScoredChunk {
   chunk: ContextChunkDto;
@@ -17,7 +20,11 @@ interface ScoredChunk {
 
 @Injectable()
 export class TutorRetrievalService {
-  constructor(@Inject(DRIZZLE_DB) private readonly db: DrizzleDB) {}
+  constructor(
+    @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
+    @Optional() @Inject(TutorIndexingService) private readonly indexingService?: TutorIndexingService,
+    @Optional() @Inject(TutorEmbeddingService) private readonly embeddingService?: TutorEmbeddingService
+  ) {}
 
   /**
    * Technical token normalizer:
@@ -167,35 +174,48 @@ export class TutorRetrievalService {
       await this.verifyAccess(courseId, user);
     }
 
-    // Strict course boundary: fetch ONLY lessons from modules belonging to courseId
-    const courseLessons = await this.db
-      .select({
-        id: lessons.id,
-        title: lessons.title,
-        description: lessons.description,
-        content: lessons.content,
-        moduleId: lessons.moduleId,
-        moduleTitle: modules.title,
-      })
-      .from(lessons)
-      .innerJoin(modules, eq(lessons.moduleId, modules.id))
-      .where(eq(modules.courseId, courseId));
+    // 1. Fetch pre-indexed chunks from TutorIndexingService if available
+    let allChunks: (ContextChunkDto | IndexedChunkDto)[] = [];
 
-    if (courseLessons.length === 0) {
-      return {
-        courseId,
-        query: question,
-        citations: [],
-        totalCandidateCount: 0,
-        isGrounded: false,
-        groundingNotice: 'This concept is not covered in this course curriculum',
-      };
+    if (this.indexingService) {
+      allChunks = await this.indexingService.getCourseChunks(courseId);
+      if (allChunks.length === 0) {
+        // Cold start: auto-index on first query
+        const indexResult = await this.indexingService.indexCourse(courseId, 'MANUAL_REFRESH');
+        if (indexResult.totalActiveChunks > 0) {
+          allChunks = await this.indexingService.getCourseChunks(courseId);
+        }
+      }
     }
 
-    // Chunk all lessons in the course
-    const allChunks: ContextChunkDto[] = courseLessons.flatMap((l) =>
-      this.chunkLesson(courseId, l)
-    );
+    // 2. Fallback to direct DB query if indexingService is not injected or empty
+    if (allChunks.length === 0) {
+      const courseLessons = await this.db
+        .select({
+          id: lessons.id,
+          title: lessons.title,
+          description: lessons.description,
+          content: lessons.content,
+          moduleId: lessons.moduleId,
+          moduleTitle: modules.title,
+        })
+        .from(lessons)
+        .innerJoin(modules, eq(lessons.moduleId, modules.id))
+        .where(eq(modules.courseId, courseId));
+
+      if (courseLessons.length === 0) {
+        return {
+          courseId,
+          query: question,
+          citations: [],
+          totalCandidateCount: 0,
+          isGrounded: false,
+          groundingNotice: 'This concept is not covered in this course curriculum',
+        };
+      }
+
+      allChunks = courseLessons.flatMap((l) => this.chunkLesson(courseId, l));
+    }
 
     const queryTokens = this.tokenize(question);
     if (queryTokens.length === 0) {
@@ -209,25 +229,46 @@ export class TutorRetrievalService {
       };
     }
 
-    // Score chunks against query tokens
+    let queryEmbedding: number[] | null = null;
+    if (this.embeddingService) {
+      queryEmbedding = await this.embeddingService.generateEmbedding(question);
+    }
+
+    // 3. Score chunks against query tokens and semantic embeddings
     const scoredChunks: ScoredChunk[] = allChunks
       .map((chunk) => {
-        let score = 0;
+        let lexicalScore = 0;
         const chunkTokenSet = new Set(chunk.tokens);
 
         for (const token of queryTokens) {
           if (chunkTokenSet.has(token)) {
             // Title exact match weight boost
             const titleMatch = chunk.lessonTitle.toLowerCase().includes(token);
-            score += titleMatch ? 2.0 : 1.0;
+            lexicalScore += titleMatch ? 2.0 : 1.0;
           }
         }
 
         // Normalize score between 0.0 and 1.0
         const maxPossible = queryTokens.length * 2.0;
-        const normalizedScore = maxPossible > 0 ? Math.min(1.0, score / maxPossible) : 0;
+        const normalizedLexical = maxPossible > 0 ? Math.min(1.0, lexicalScore / maxPossible) : 0;
 
-        return { chunk, score: normalizedScore };
+        let finalScore = normalizedLexical;
+        const indexedChunk = chunk as IndexedChunkDto;
+        if (
+          queryEmbedding &&
+          indexedChunk.embedding &&
+          indexedChunk.embedding.length > 0 &&
+          this.embeddingService
+        ) {
+          const semanticScore = this.embeddingService.cosineSimilarity(
+            queryEmbedding,
+            indexedChunk.embedding
+          );
+          // Hybrid blending: 0.6 lexical + 0.4 semantic
+          finalScore = 0.6 * normalizedLexical + 0.4 * semanticScore;
+        }
+
+        return { chunk, score: finalScore };
       })
       .filter((item) => item.score > 0)
       .sort((a, b) => b.score - a.score);

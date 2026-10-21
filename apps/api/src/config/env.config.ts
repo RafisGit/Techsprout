@@ -31,6 +31,7 @@ export const envSchema = z.object({
   TELEMETRY_SALT_KEY: z.string().optional(),
   TUTOR_LLM_PROVIDER: z.enum(['mock', 'gemini', 'openai']).optional().default('mock'),
   TUTOR_LLM_API_KEY: z.string().optional(),
+  TUTOR_EMBEDDING_PROVIDER: z.enum(['mock', 'gemini', 'openai']).optional().default('mock'),
 }).superRefine((data, ctx) => {
   if (data.WEB_PUBLIC_ORIGIN?.includes(',')) {
     ctx.addIssue({

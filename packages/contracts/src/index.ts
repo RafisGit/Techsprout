@@ -2391,3 +2391,41 @@ export const tutorChatRequestSchema = z
   .strict();
 export type TutorChatRequestDto = z.infer<typeof tutorChatRequestSchema>;
 
+// ============================================================================
+// PHASE 7.2 AUTOMATED CHUNK INDEXING & EMBEDDING CONTRACTS (WP-P7-05)
+// ============================================================================
+
+export type ChunkIndexingTrigger =
+  | 'COURSE_PUBLISHED'
+  | 'COURSE_UNPUBLISHED'
+  | 'COURSE_ARCHIVED'
+  | 'MODULE_UPDATED'
+  | 'LESSON_UPDATED'
+  | 'MANUAL_REFRESH';
+
+export interface ChunkIndexingJobPayload {
+  jobId?: string;
+  courseId: string;
+  lessonId?: string;
+  trigger: ChunkIndexingTrigger;
+  timestamp: string;
+  attempt?: number;
+}
+
+export interface IndexedChunkDto extends ContextChunkDto {
+  chunkIndex: number;
+  contentHash: string;
+  embedding?: number[];
+  updatedAt: string;
+}
+
+export interface ChunkIndexingResultDto {
+  courseId: string;
+  trigger: ChunkIndexingTrigger;
+  chunksCreated: number;
+  chunksUpdated: number;
+  chunksDeleted: number;
+  totalActiveChunks: number;
+  durationMs: number;
+}
+

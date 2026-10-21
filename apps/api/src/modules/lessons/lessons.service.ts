@@ -1,4 +1,4 @@
-import { Injectable, Inject, HttpStatus } from '@nestjs/common';
+import { Injectable, Inject, Optional, HttpStatus } from '@nestjs/common';
 import { eq, and, not, sql } from 'drizzle-orm';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import {
@@ -13,6 +13,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { ModulesService } from '../modules/modules.service';
 import { UserContext } from '../courses/courses.service';
+import { TutorIndexingQueueService } from '../learning/tutor-indexing-queue.service';
 import { ApiException } from '../../common/errors/api-error';
 import { CreateLessonDto } from './dto/create-lesson.dto';
 import { UpdateLessonDto } from './dto/update-lesson.dto';
@@ -22,7 +23,8 @@ export class LessonsService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     @Inject(AuditService) private readonly auditService: AuditService,
-    @Inject(ModulesService) private readonly modulesService: ModulesService
+    @Inject(ModulesService) private readonly modulesService: ModulesService,
+    @Optional() @Inject(TutorIndexingQueueService) private readonly tutorIndexingQueueService?: TutorIndexingQueueService
   ) {}
 
   /**
@@ -168,6 +170,10 @@ export class LessonsService {
       },
     });
 
+    if (this.tutorIndexingQueueService && mod && courseStatus === 'PUBLISHED') {
+      await this.tutorIndexingQueueService.enqueueIndexLesson(mod.courseId, created.id, 'LESSON_UPDATED');
+    }
+
     return created;
   }
 
@@ -292,6 +298,17 @@ export class LessonsService {
       },
     });
 
+    if (
+      this.tutorIndexingQueueService &&
+      courseStatus === 'PUBLISHED' &&
+      (updatedFields.includes('title') ||
+        updatedFields.includes('description') ||
+        updatedFields.includes('content'))
+    ) {
+      const { courseId } = await this.resolveLessonOwnership(id, user);
+      await this.tutorIndexingQueueService.enqueueIndexLesson(courseId, id, 'LESSON_UPDATED');
+    }
+
     return updated;
   }
 
@@ -344,6 +361,11 @@ export class LessonsService {
         position: existing.position,
       },
     });
+
+    if (this.tutorIndexingQueueService && courseStatus === 'PUBLISHED') {
+      const { courseId } = await this.resolveLessonOwnership(id, user);
+      await this.tutorIndexingQueueService.enqueueIndexLesson(courseId, id, 'LESSON_UPDATED');
+    }
 
     return { deleted: true, id };
   }
