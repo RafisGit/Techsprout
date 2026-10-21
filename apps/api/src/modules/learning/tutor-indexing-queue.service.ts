@@ -80,7 +80,7 @@ export class TutorIndexingQueueService implements OnModuleInit, OnModuleDestroy 
             delay: 1500,
           },
           removeOnComplete: 100,
-          removeOnFail: false, // Retain failed jobs in dead letter for inspection
+          removeOnFail: 50, // Bounded dead-letter retention prevents unbounded Redis memory growth on 25MB Free ceiling
         },
       });
 
@@ -251,5 +251,27 @@ export class TutorIndexingQueueService implements OnModuleInit, OnModuleDestroy 
       isConnected: this.isConnected,
       hasWorker: !!this.worker,
     };
+  }
+
+  public async getQueueMetrics(): Promise<{
+    waiting: number;
+    active: number;
+    completed: number;
+    failed: number;
+  }> {
+    if (this.queue && this.isConnected) {
+      try {
+        const [waiting, active, completed, failed] = await Promise.all([
+          this.queue.getWaitingCount(),
+          this.queue.getActiveCount(),
+          this.queue.getCompletedCount(),
+          this.queue.getFailedCount(),
+        ]);
+        return { waiting, active, completed, failed };
+      } catch {
+        // Fallback
+      }
+    }
+    return { waiting: 0, active: 0, completed: 0, failed: 0 };
   }
 }

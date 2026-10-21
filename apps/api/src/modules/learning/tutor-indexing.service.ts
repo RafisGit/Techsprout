@@ -293,7 +293,8 @@ export class TutorIndexingService implements OnModuleInit, OnModuleDestroy {
     if (this.isRedisConnected && this.redisClient) {
       try {
         const serialized = JSON.stringify(Object.fromEntries(newChunksMap));
-        await this.redisClient.set(`tutor:index:course:${courseId}`, serialized);
+        // Enforce 7-day TTL to prevent unbounded cache growth on 25MB Free Redis
+        await this.redisClient.set(`tutor:index:course:${courseId}`, serialized, 'EX', 604800);
       } catch (err: any) {
         this.logger.warn(`Failed persisting chunks to Redis for course ${courseId}: ${err.message}`);
       }
@@ -388,7 +389,8 @@ export class TutorIndexingService implements OnModuleInit, OnModuleDestroy {
     if (this.isRedisConnected && this.redisClient) {
       try {
         const serialized = JSON.stringify(Object.fromEntries(courseMap));
-        await this.redisClient.set(`tutor:index:course:${courseId}`, serialized);
+        // Enforce 7-day TTL to prevent unbounded cache growth on 25MB Free Redis
+        await this.redisClient.set(`tutor:index:course:${courseId}`, serialized, 'EX', 604800);
       } catch (err: any) {
         this.logger.warn(`Failed writing Redis chunks for lesson ${lessonId}: ${err.message}`);
       }
