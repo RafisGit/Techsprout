@@ -2378,3 +2378,16 @@ export interface TutorRetrievalResultDto {
 
 export type TutorRetrievalResponse = ApiSuccessResponse<TutorRetrievalResultDto>;
 
+export const tutorChatRequestSchema = z
+  .object({
+    courseId: z.string().uuid({ message: 'courseId must be a valid UUID' }),
+    lessonId: z.string().uuid({ message: 'lessonId must be a valid UUID' }).optional().nullable(),
+    question: z
+      .string()
+      .min(3, 'Question must be at least 3 characters')
+      .max(500, 'Question cannot exceed 500 characters')
+      .trim(),
+  })
+  .strict();
+export type TutorChatRequestDto = z.infer<typeof tutorChatRequestSchema>;
+

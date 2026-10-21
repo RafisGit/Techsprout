@@ -14,6 +14,7 @@ import { useCurrentUser } from '@/lib/useCurrentUser';
 import { CurriculumSidebar } from '@/components/learning/CurriculumSidebar';
 import { LessonViewer } from '@/components/learning/LessonViewer';
 import { LessonNavigation } from '@/components/learning/LessonNavigation';
+import { AITutorDrawer } from '@/components/learning/AITutorDrawer';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { DialogTitle } from '@radix-ui/react-dialog';
@@ -310,6 +311,16 @@ export default function LessonLearningWorkspacePage() {
                 />
               </div>
             </div>
+
+            {/* AI Tutor Chat Drawer */}
+            {course && (
+              <AITutorDrawer
+                courseId={course.id}
+                courseSlug={courseSlug}
+                currentLessonId={lessonId}
+                currentLessonTitle={lesson?.title}
+              />
+            )}
 
             {/* Mobile Curriculum Trigger Sheet */}
             <Sheet open={isMobileCurriculumOpen} onOpenChange={setIsMobileCurriculumOpen}>
