@@ -63,6 +63,10 @@ export const payoutRequests = pgTable(
     index('payout_requests_reviewed_by_idx').on(table.reviewedBy),
     check('payout_requests_amount_cents_positive', sql`"amount_cents" > 0`),
     check('payout_requests_currency_bdt', sql`"currency" = 'BDT'`),
+    check(
+      'payout_requests_settled_reference_required',
+      sql`"status" != 'SETTLED' OR ("settlement_reference" IS NOT NULL AND length(trim("settlement_reference")) >= 3)`
+    ),
   ]
 );
 

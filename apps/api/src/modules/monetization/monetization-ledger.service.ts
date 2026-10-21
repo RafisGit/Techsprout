@@ -10,6 +10,7 @@ import {
   courses,
   refunds,
   users,
+  payoutRequests,
   InstructorWallet,
   LedgerTransaction,
   LedgerEntry,
@@ -735,15 +736,100 @@ export class MonetizationLedgerService {
         });
       }
 
-      // Reverse instructor earnings from pending escrow or available balance
+      // Reverse instructor earnings from pending escrow, available balance, payout hold, or platform absorption
       if (instructorShareCents > 0) {
-        entries.push({
-          accountType: isSettled ? 'INSTRUCTOR_AVAILABLE' : 'INSTRUCTOR_PENDING',
-          instructorId: row.instructorId,
-          direction: 'DEBIT',
-          amountCents: instructorShareCents,
-          description: `Clawback of instructor earnings on refunded course "${row.item.courseTitle}" (${isSettled ? 'settled' : 'escrow'})`,
-        });
+        let remainingClawback = instructorShareCents;
+        const wallet = await this.getOrCreateWallet(row.instructorId, executor);
+
+        // 1. Escrow hold: if not yet settled, debit pending escrow first
+        if (!isSettled && wallet.pendingBalanceCents > 0) {
+          const fromPending = Math.min(remainingClawback, wallet.pendingBalanceCents);
+          if (fromPending > 0) {
+            entries.push({
+              accountType: 'INSTRUCTOR_PENDING',
+              instructorId: row.instructorId,
+              direction: 'DEBIT',
+              amountCents: fromPending,
+              description: `Clawback of instructor earnings on refunded course "${row.item.courseTitle}" (escrow hold)`,
+            });
+            remainingClawback -= fromPending;
+          }
+        }
+
+        // 2. Available balance: debit available balance if settled or pending was insufficient
+        if (remainingClawback > 0 && wallet.balanceCents > 0) {
+          const fromAvailable = Math.min(remainingClawback, wallet.balanceCents);
+          entries.push({
+            accountType: 'INSTRUCTOR_AVAILABLE',
+            instructorId: row.instructorId,
+            direction: 'DEBIT',
+            amountCents: fromAvailable,
+            description: `Clawback of instructor earnings on refunded course "${row.item.courseTitle}" (available balance)`,
+          });
+          remainingClawback -= fromAvailable;
+        }
+
+        // 3. Payout hold: if funds are reserved for pending/approved payout
+        if (remainingClawback > 0 && wallet.payoutHoldCents > 0) {
+          const fromHold = Math.min(remainingClawback, wallet.payoutHoldCents);
+          entries.push({
+            accountType: 'PAYOUT_CLEARING',
+            instructorId: row.instructorId,
+            direction: 'DEBIT',
+            amountCents: fromHold,
+            description: `Clawback of instructor earnings on refunded course "${row.item.courseTitle}" (payout hold)`,
+          });
+          remainingClawback -= fromHold;
+
+          // Adjust in-flight payout requests to keep them in sync with reduced hold
+          const activePayouts = await executor
+            .select()
+            .from(payoutRequests)
+            .where(
+              and(
+                eq(payoutRequests.instructorId, row.instructorId),
+                inArray(payoutRequests.status, ['PENDING', 'APPROVED'])
+              )
+            )
+            .orderBy(desc(payoutRequests.createdAt));
+
+          let unappliedHold = fromHold;
+          for (const po of activePayouts) {
+            if (unappliedHold <= 0) break;
+            if (po.amountCents <= unappliedHold) {
+              unappliedHold -= po.amountCents;
+              await executor
+                .update(payoutRequests)
+                .set({
+                  status: 'REJECTED',
+                  rejectionReason: `Cancelled: funds clawed back due to customer refund #${refund.refundNumber} on Order #${order.orderNumber}`,
+                  updatedAt: new Date(),
+                })
+                .where(eq(payoutRequests.id, po.id));
+            } else {
+              const newAmount = po.amountCents - unappliedHold;
+              unappliedHold = 0;
+              await executor
+                .update(payoutRequests)
+                .set({
+                  amountCents: newAmount,
+                  adminNotes: `Amount adjusted from ${po.amountCents} to ${newAmount} poisha due to refund #${refund.refundNumber}`,
+                  updatedAt: new Date(),
+                })
+                .where(eq(payoutRequests.id, po.id));
+            }
+          }
+        }
+
+        // 4. Platform absorption: if instructor already withdrew/settled funds and balance is 0
+        if (remainingClawback > 0) {
+          entries.push({
+            accountType: 'PLATFORM_REVENUE',
+            direction: 'DEBIT',
+            amountCents: remainingClawback,
+            description: `Platform absorption of uncollectible refund clawback for course "${row.item.courseTitle}" (instructor earnings already disbursed)`,
+          });
+        }
       }
     }
 
@@ -801,6 +887,8 @@ export class MonetizationLedgerService {
         .innerJoin(courses, eq(orderItems.courseId, courses.id))
         .where(eq(orderItems.orderId, ord.id));
 
+      const entries: PostEntryInput[] = [];
+
       for (const row of items) {
         const payable = row.item.payableCents;
         if (payable <= 0) continue;
@@ -808,30 +896,33 @@ export class MonetizationLedgerService {
         const commissionCents = Math.round((payable * DEFAULT_PLATFORM_COMMISSION_PERCENT) / 100);
         const instructorShareCents = payable - commissionCents;
 
+        entries.push({
+          accountType: 'INSTRUCTOR_PENDING',
+          instructorId: row.instructorId,
+          direction: 'DEBIT',
+          amountCents: instructorShareCents,
+          description: `Release pending escrow for course "${row.item.courseTitle}" (Order #${ord.orderNumber})`,
+        });
+
+        entries.push({
+          accountType: 'INSTRUCTOR_AVAILABLE',
+          instructorId: row.instructorId,
+          direction: 'CREDIT',
+          amountCents: instructorShareCents,
+          description: `Credit available balance for course "${row.item.courseTitle}" (Order #${ord.orderNumber})`,
+        });
+      }
+
+      if (entries.length >= 2) {
         await this.postTransaction(
           {
             transactionType: 'ESCROW_SETTLEMENT',
-            idempotencyKey: `escrow:settle:${ord.id}:${row.item.id}`,
+            idempotencyKey,
             referenceType: 'ORDER',
             referenceId: ord.id,
-            description: `14-day escrow hold matured for course "${row.item.courseTitle}" (Order #${ord.orderNumber})`,
+            description: `14-day escrow hold matured for Order #${ord.orderNumber}`,
             currency: ord.currency as Currency,
-            entries: [
-              {
-                accountType: 'INSTRUCTOR_PENDING',
-                instructorId: row.instructorId,
-                direction: 'DEBIT',
-                amountCents: instructorShareCents,
-                description: `Release pending escrow for course "${row.item.courseTitle}"`,
-              },
-              {
-                accountType: 'INSTRUCTOR_AVAILABLE',
-                instructorId: row.instructorId,
-                direction: 'CREDIT',
-                amountCents: instructorShareCents,
-                description: `Credit available balance for course "${row.item.courseTitle}"`,
-              },
-            ],
+            entries,
           },
           txHandle
         );
@@ -906,6 +997,84 @@ export class MonetizationLedgerService {
       recentTransactions: ledger.entries,
       pendingPayoutsCount: wallet.payoutHoldCents > 0 ? 1 : 0,
       settledPayoutsTotalCents: Number(settledAgg?.totalSettled || 0),
+    };
+  }
+
+  /**
+   * Reconcile instructor wallet materialized balances with immutable ledger entries.
+   * Calculates ground-truth balance sums across all posted transactions and verifies
+   * zero discrepancy against instructor_wallets table.
+   */
+  async reconcileWallet(instructorId: string, txHandle?: any): Promise<{
+    reconciled: boolean;
+    wallet: InstructorWallet;
+    calculated: {
+      pendingBalanceCents: number;
+      balanceCents: number;
+      payoutHoldCents: number;
+    };
+    discrepancies: {
+      pendingDiff: number;
+      balanceDiff: number;
+      payoutHoldDiff: number;
+    };
+  }> {
+    const executor = txHandle || this.db;
+    const wallet = await this.getOrCreateWallet(instructorId, executor);
+
+    const rows = await executor
+      .select({
+        accountType: ledgerEntries.accountType,
+        direction: ledgerEntries.direction,
+        totalCents: sql<string>`COALESCE(SUM("amount_cents"), 0)`,
+      })
+      .from(ledgerEntries)
+      .where(eq(ledgerEntries.instructorId, instructorId))
+      .groupBy(ledgerEntries.accountType, ledgerEntries.direction);
+
+    let pendingCredits = 0;
+    let pendingDebits = 0;
+    let availableCredits = 0;
+    let availableDebits = 0;
+    let holdCredits = 0;
+    let holdDebits = 0;
+
+    for (const row of rows) {
+      const amount = Number(row.totalCents || 0);
+      if (row.accountType === 'INSTRUCTOR_PENDING') {
+        if (row.direction === 'CREDIT') pendingCredits += amount;
+        else if (row.direction === 'DEBIT') pendingDebits += amount;
+      } else if (row.accountType === 'INSTRUCTOR_AVAILABLE') {
+        if (row.direction === 'CREDIT') availableCredits += amount;
+        else if (row.direction === 'DEBIT') availableDebits += amount;
+      } else if (row.accountType === 'PAYOUT_CLEARING') {
+        if (row.direction === 'CREDIT') holdCredits += amount;
+        else if (row.direction === 'DEBIT') holdDebits += amount;
+      }
+    }
+
+    const calculated = {
+      pendingBalanceCents: pendingCredits - pendingDebits,
+      balanceCents: availableCredits - availableDebits,
+      payoutHoldCents: holdCredits - holdDebits,
+    };
+
+    const discrepancies = {
+      pendingDiff: wallet.pendingBalanceCents - calculated.pendingBalanceCents,
+      balanceDiff: wallet.balanceCents - calculated.balanceCents,
+      payoutHoldDiff: wallet.payoutHoldCents - calculated.payoutHoldCents,
+    };
+
+    const reconciled =
+      discrepancies.pendingDiff === 0 &&
+      discrepancies.balanceDiff === 0 &&
+      discrepancies.payoutHoldDiff === 0;
+
+    return {
+      reconciled,
+      wallet,
+      calculated,
+      discrepancies,
     };
   }
 }

@@ -25,6 +25,8 @@ import {
   settlePayoutSchema,
 } from '@techsprout/contracts';
 
+import { MonetizationLedgerService } from './monetization-ledger.service';
+
 const uuidSchema = z.string().uuid('Invalid payout ID format');
 
 @ApiTags('Admin Payouts')
@@ -34,7 +36,30 @@ const uuidSchema = z.string().uuid('Invalid payout ID format');
 @Roles('admin')
 @Controller('admin/payouts')
 export class AdminPayoutsController {
-  constructor(@Inject(PayoutsService) private readonly payoutsService: PayoutsService) {}
+  constructor(
+    @Inject(PayoutsService) private readonly payoutsService: PayoutsService,
+    @Inject(MonetizationLedgerService) private readonly ledgerService: MonetizationLedgerService
+  ) {}
+
+  @Get('instructors/:instructorId/reconcile')
+  @ApiOperation({ summary: 'Reconcile instructor wallet balance against immutable ledger entries (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Reconciliation completed successfully' })
+  async reconcileInstructor(@Param('instructorId') instructorId: string) {
+    const parseId = uuidSchema.safeParse(instructorId);
+    if (!parseId.success) {
+      throw new ApiException('Invalid instructor ID format', HttpStatus.BAD_REQUEST, 'VALIDATION_ERROR');
+    }
+
+    const data = await this.ledgerService.reconcileWallet(parseId.data);
+
+    return {
+      success: true,
+      message: data.reconciled
+        ? 'Wallet reconciled with 0 discrepancies'
+        : 'Wallet discrepancy detected',
+      data,
+    };
+  }
 
   @Get()
   @ApiOperation({ summary: 'List all instructor payout requests with filtering (Admin only)' })

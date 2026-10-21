@@ -78,7 +78,7 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
         'categories', 'media', 'courses', 'modules', 'lessons', 'enrollments', 'lesson_progress',
         'quizzes', 'quiz_questions', 'quiz_question_options', 'quiz_attempts', 'quiz_attempt_answers', 'certificates',
         'coupons', 'orders', 'order_items', 'payments', 'coupon_redemptions', 'invoices', 'refunds',
-        'refund_requests'
+        'refund_requests', 'instructor_wallets', 'ledger_transactions', 'ledger_entries', 'payout_requests'
       );
     `);
 
@@ -111,6 +111,10 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
     expect(tableNames).toContain('invoices');
     expect(tableNames).toContain('refunds');
     expect(tableNames).toContain('refund_requests');
+    expect(tableNames).toContain('instructor_wallets');
+    expect(tableNames).toContain('ledger_transactions');
+    expect(tableNames).toContain('ledger_entries');
+    expect(tableNames).toContain('payout_requests');
   });
 
   it('2. Real PostgreSQL: Enforces unique database constraints on users', async () => {
@@ -246,5 +250,54 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
 
     // Replay attempt must fail
     await expect(otpService.verifyOtp(phone, code)).rejects.toThrow();
+  });
+
+  it('7. Real PostgreSQL: Enforces ledger immutability trigger and payout check constraint', async () => {
+    if (!isPostgresAvailable) {
+      expect(true).toBe(true);
+      return;
+    }
+
+    // 1. Verify ledger_transactions immutability trigger prevents UPDATE and DELETE
+    const txNumber = `LTX-TEST-${Date.now()}`;
+    const insertRes = await pool.query(`
+      INSERT INTO ledger_transactions (id, transaction_number, transaction_type, idempotency_key, currency, total_amount_cents, reference_type, reference_id, description)
+      VALUES (gen_random_uuid(), $1, 'ADJUSTMENT', $2, 'BDT', 5000, 'TEST', 'test-1', 'Test ledger transaction')
+      RETURNING id;
+    `, [txNumber, `idemp-${Date.now()}`]);
+    const txId = insertRes.rows[0].id;
+
+    // Direct UPDATE must fail due to prevent_ledger_mutation trigger
+    await expect(
+      pool.query('UPDATE ledger_transactions SET total_amount_cents = 9999 WHERE id = $1', [txId])
+    ).rejects.toThrow();
+
+    // Direct DELETE must fail due to prevent_ledger_mutation trigger
+    await expect(
+      pool.query('DELETE FROM ledger_transactions WHERE id = $1', [txId])
+    ).rejects.toThrow();
+
+    // 2. Verify payout_requests check constraint: SETTLED requires settlement_reference >= 3 chars
+    const userRes = await pool.query(`
+      INSERT INTO users (id, name, username, email, is_active, is_verified)
+      VALUES (gen_random_uuid(), 'Payout Test User', $1, $2, true, true)
+      RETURNING id;
+    `, [`payout_u_${Date.now()}`, `payout_${Date.now()}@techsprout.edu`]);
+    const userId = userRes.rows[0].id;
+
+    const walletRes = await pool.query(`
+      INSERT INTO instructor_wallets (id, instructor_id, balance_cents, pending_balance_cents, payout_hold_cents, lifetime_earnings_cents, currency)
+      VALUES (gen_random_uuid(), $1, 10000, 0, 0, 10000, 'BDT')
+      RETURNING id;
+    `, [userId]);
+    const walletId = walletRes.rows[0].id;
+
+    // Inserting SETTLED with NULL settlement_reference must violate check constraint
+    await expect(
+      pool.query(`
+        INSERT INTO payout_requests (id, request_number, instructor_id, wallet_id, amount_cents, currency, payout_method, account_details, status, settlement_reference)
+        VALUES (gen_random_uuid(), $1, $2, $3, 5000, 'BDT', 'BKASH', '01700000000', 'SETTLED', NULL);
+      `, [`PR-TEST-${Date.now()}`, userId, walletId])
+    ).rejects.toThrow();
   });
 });

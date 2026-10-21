@@ -97,7 +97,8 @@ CREATE TABLE IF NOT EXISTS "payout_requests" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "payout_requests_amount_cents_positive" CHECK ("amount_cents" > 0),
-	CONSTRAINT "payout_requests_currency_bdt" CHECK ("currency" = 'BDT')
+	CONSTRAINT "payout_requests_currency_bdt" CHECK ("currency" = 'BDT'),
+	CONSTRAINT "payout_requests_settled_reference_required" CHECK ("status" != 'SETTLED' OR ("settlement_reference" IS NOT NULL AND length(trim("settlement_reference")) >= 3))
 );
 --> statement-breakpoint
 DO $$ BEGIN
@@ -159,4 +160,18 @@ CREATE INDEX IF NOT EXISTS "payout_requests_instructor_status_idx" ON "payout_re
 CREATE INDEX IF NOT EXISTS "payout_requests_wallet_id_idx" ON "payout_requests" USING btree ("wallet_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "payout_requests_status_idx" ON "payout_requests" USING btree ("status");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "payout_requests_created_at_idx" ON "payout_requests" USING btree ("created_at");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "payout_requests_reviewed_by_idx" ON "payout_requests" USING btree ("reviewed_by");
+CREATE INDEX IF NOT EXISTS "payout_requests_reviewed_by_idx" ON "payout_requests" USING btree ("reviewed_by");--> statement-breakpoint
+CREATE OR REPLACE FUNCTION prevent_ledger_mutation()
+RETURNS TRIGGER AS $$
+BEGIN
+  RAISE EXCEPTION 'Financial invariant violation: posted ledger transactions and entries are strictly immutable';
+END;
+$$ LANGUAGE plpgsql;--> statement-breakpoint
+DROP TRIGGER IF EXISTS trg_immutable_ledger_transactions ON "ledger_transactions";--> statement-breakpoint
+CREATE TRIGGER trg_immutable_ledger_transactions
+BEFORE UPDATE OR DELETE ON "ledger_transactions"
+FOR EACH ROW EXECUTE FUNCTION prevent_ledger_mutation();--> statement-breakpoint
+DROP TRIGGER IF EXISTS trg_immutable_ledger_entries ON "ledger_entries";--> statement-breakpoint
+CREATE TRIGGER trg_immutable_ledger_entries
+BEFORE UPDATE OR DELETE ON "ledger_entries"
+FOR EACH ROW EXECUTE FUNCTION prevent_ledger_mutation();

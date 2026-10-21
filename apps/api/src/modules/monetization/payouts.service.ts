@@ -383,11 +383,23 @@ export class PayoutsService {
         );
       }
 
-      if (payout.status !== 'APPROVED' && payout.status !== 'PENDING') {
+      if (payout.status !== 'APPROVED') {
         throw new ApiException(
-          `Invalid state transition. Cannot settle payout with status: ${payout.status}`,
+          `Invalid state transition. Payout must be in APPROVED status to settle (current: ${payout.status})`,
           HttpStatus.BAD_REQUEST,
           'INVALID_PAYOUT_STATE_TRANSITION'
+        );
+      }
+
+      if (
+        !input.settlementReference ||
+        typeof input.settlementReference !== 'string' ||
+        input.settlementReference.trim().length < 3
+      ) {
+        throw new ApiException(
+          'A valid external settlement reference (at least 3 characters) is required to settle a payout',
+          HttpStatus.BAD_REQUEST,
+          'INVALID_SETTLEMENT_REFERENCE'
         );
       }
 

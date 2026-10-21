@@ -735,7 +735,8 @@ export async function createTestDatabase() {
       created_at timestamp with time zone DEFAULT now() NOT NULL,
       updated_at timestamp with time zone DEFAULT now() NOT NULL,
       CONSTRAINT payout_requests_amount_cents_positive CHECK (amount_cents > 0),
-      CONSTRAINT payout_requests_currency_bdt CHECK (currency = 'BDT')
+      CONSTRAINT payout_requests_currency_bdt CHECK (currency = 'BDT'),
+      CONSTRAINT payout_requests_settled_reference_required CHECK (status != 'SETTLED' OR (settlement_reference IS NOT NULL AND length(trim(settlement_reference)) >= 3))
     );
   `);
 

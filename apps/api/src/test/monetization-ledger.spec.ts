@@ -780,4 +780,328 @@ describe('Phase 7.3 / WP-P7-06: Instructor Monetization & Marketplace Ledger', (
       expect(summary.recentTransactions.length).toBeGreaterThanOrEqual(2);
     });
   });
+
+  describe('6. Hardened Multi-Source Refund Clawbacks & Platform Absorption', () => {
+    it('claws back from both available balance and in-flight payout hold when refund exceeds available balance', async () => {
+      // 1. Order of 10,000 poisha (100 BDT)
+      const orderId = crypto.randomUUID();
+      const orderItemId = crypto.randomUUID();
+      const paymentId = crypto.randomUUID();
+      const refundId = crypto.randomUUID();
+      const fifteenDaysAgo = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000);
+
+      await db.insert(orders).values({
+        id: orderId,
+        orderNumber: 'TSP-ORD-CLAWBACK-MULTI',
+        studentId: mockStudentId,
+        status: 'PAID',
+        subtotalCents: 10000,
+        discountCents: 0,
+        payableCents: 10000,
+        currency: 'BDT',
+        expiresAt: new Date(Date.now() + 86400000),
+        paidAt: fifteenDaysAgo,
+      });
+
+      await db.insert(orderItems).values({
+        id: orderItemId,
+        orderId,
+        courseId: courseAId,
+        courseTitle: 'Full-Stack TypeScript & Financial Systems',
+        unitPriceCents: 10000,
+        discountCents: 0,
+        payableCents: 10000,
+      });
+
+      await ledgerService.postCoursePurchase(orderId);
+      await ledgerService.settleMaturedEscrow(new Date());
+
+      // Alice has 7,000 available balance
+      const walletBefore = await ledgerService.getOrCreateWallet(mockInstructorAId);
+      expect(walletBefore.balanceCents).toBe(7000);
+
+      // Alice requests payout of 5,000 poisha -> 2,000 available, 5,000 payout hold
+      const payout = await payoutsService.requestPayout(mockInstructorAId, {
+        amountCents: 5000,
+        payoutMethod: 'BKASH',
+        accountDetails: '01711111111',
+      });
+      expect(payout.status).toBe('PENDING');
+
+      const walletWithHold = await ledgerService.getOrCreateWallet(mockInstructorAId);
+      expect(walletWithHold.balanceCents).toBe(2000);
+      expect(walletWithHold.payoutHoldCents).toBe(5000);
+
+      // Now student requests full refund of 10,000 poisha (7,000 instructor share + 3,000 platform share)
+      await db.insert(payments).values({
+        id: paymentId,
+        orderId,
+        merchantTranId: `MTX-CLAWBACK-MULTI-${Date.now()}`,
+        amountCents: 10000,
+        currency: 'BDT',
+        status: 'VALIDATED',
+      });
+
+      await db.insert(refunds).values({
+        id: refundId,
+        refundNumber: 'TSP-REF-CLAWBACK-MULTI',
+        orderId,
+        paymentId,
+        amountCents: 10000,
+        currency: 'BDT',
+        reason: 'Refund with pending payout in-flight',
+        status: 'PROCESSED',
+      });
+
+      const clawbackTx = await ledgerService.postRefundClawback(refundId);
+      expect(clawbackTx).not.toBeNull();
+      expect(clawbackTx!.transactionType).toBe('REFUND_CLAWBACK');
+
+      // Verify wallet state: available balance reduced to 0, hold reduced to 0
+      const walletAfter = await ledgerService.getOrCreateWallet(mockInstructorAId);
+      expect(walletAfter.balanceCents).toBe(0);
+      expect(walletAfter.payoutHoldCents).toBe(0);
+
+      // Verify in-flight payout request was cancelled because hold was clawed back
+      const [updatedPayout] = await db
+        .select()
+        .from(payoutRequests)
+        .where(eq(payoutRequests.id, payout.id));
+      expect(updatedPayout.status).toBe('REJECTED');
+      expect(updatedPayout.rejectionReason).toContain('clawed back');
+
+      // Verify accounting integrity: sum of debits === sum of credits === 10,000 poisha
+      expect(clawbackTx!.totalAmountCents).toBe(10000);
+      const totalDebits = clawbackTx!.entries
+        .filter((e) => e.direction === 'DEBIT')
+        .reduce((sum, e) => sum + e.amountCents, 0);
+      const totalCredits = clawbackTx!.entries
+        .filter((e) => e.direction === 'CREDIT')
+        .reduce((sum, e) => sum + e.amountCents, 0);
+      expect(totalDebits).toBe(10000);
+      expect(totalCredits).toBe(10000);
+    });
+
+    it('absorbs instructor share via platform revenue when instructor has already withdrawn all earnings', async () => {
+      // 1. Order of 10,000 poisha
+      const orderId = crypto.randomUUID();
+      const orderItemId = crypto.randomUUID();
+      const paymentId = crypto.randomUUID();
+      const refundId = crypto.randomUUID();
+      const twentyDaysAgo = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000);
+
+      await db.insert(orders).values({
+        id: orderId,
+        orderNumber: 'TSP-ORD-WITHDRAWN-REFUND',
+        studentId: mockStudentId,
+        status: 'PAID',
+        subtotalCents: 10000,
+        discountCents: 0,
+        payableCents: 10000,
+        currency: 'BDT',
+        expiresAt: new Date(Date.now() + 86400000),
+        paidAt: twentyDaysAgo,
+      });
+
+      await db.insert(orderItems).values({
+        id: orderItemId,
+        orderId,
+        courseId: courseBId, // Instructor Bob
+        courseTitle: 'Distributed Systems & Database Transactions',
+        unitPriceCents: 10000,
+        discountCents: 0,
+        payableCents: 10000,
+      });
+
+      await ledgerService.postCoursePurchase(orderId);
+      await ledgerService.settleMaturedEscrow(new Date());
+
+      // Bob withdraws all 7,000 poisha
+      const po = await payoutsService.requestPayout(mockInstructorBId, {
+        amountCents: 7000,
+        payoutMethod: 'BANK_TRANSFER',
+        accountDetails: 'DBBL 123456789',
+      });
+      await payoutsService.approvePayout(po.id, mockAdminId, {});
+      await payoutsService.settlePayout(po.id, mockAdminId, {
+        settlementReference: 'EFT-BANK-REF-999',
+      });
+
+      const walletBob = await ledgerService.getOrCreateWallet(mockInstructorBId);
+      expect(walletBob.balanceCents).toBe(0);
+      expect(walletBob.payoutHoldCents).toBe(0);
+
+      // Student gets exception refund
+      await db.insert(payments).values({
+        id: paymentId,
+        orderId,
+        merchantTranId: `MTX-WITHDRAWN-${Date.now()}`,
+        amountCents: 10000,
+        currency: 'BDT',
+        status: 'VALIDATED',
+      });
+
+      await db.insert(refunds).values({
+        id: refundId,
+        refundNumber: 'TSP-REF-WITHDRAWN',
+        orderId,
+        paymentId,
+        amountCents: 10000,
+        currency: 'BDT',
+        reason: 'Legal exception refund post-withdrawal',
+        status: 'PROCESSED',
+      });
+
+      // Post refund clawback: instructor has 0 balance, so platform absorbs the 7,000 deficit
+      const clawbackTx = await ledgerService.postRefundClawback(refundId);
+      expect(clawbackTx).not.toBeNull();
+      expect(clawbackTx!.totalAmountCents).toBe(10000);
+
+      // Verify wallet did NOT go negative and is still 0
+      const walletBobAfter = await ledgerService.getOrCreateWallet(mockInstructorBId);
+      expect(walletBobAfter.balanceCents).toBe(0);
+
+      // Verify debits: PLATFORM_REVENUE (10,000 = 3,000 fee + 7,000 absorption), Credit: PLATFORM_CASH (10,000)
+      const platformRevenueDebits = clawbackTx!.entries
+        .filter((e) => e.accountType === 'PLATFORM_REVENUE' && e.direction === 'DEBIT')
+        .reduce((sum, e) => sum + e.amountCents, 0);
+      expect(platformRevenueDebits).toBe(10000);
+    });
+  });
+
+  describe('7. Two-Phase Payout State Machine & Settlement Safeguards', () => {
+    beforeEach(async () => {
+      // Seed Instructor A with 20,000 poisha (200.00 BDT) available balance
+      await ledgerService.postTransaction({
+        transactionType: 'ADJUSTMENT',
+        idempotencyKey: `seed:funds:payouts:${mockInstructorAId}:${Date.now()}`,
+        referenceType: 'SYSTEM',
+        referenceId: 'init',
+        description: 'Seed 200 BDT',
+        entries: [
+          {
+            accountType: 'PLATFORM_CASH',
+            direction: 'DEBIT',
+            amountCents: 20000,
+            description: 'Platform cash deposit',
+          },
+          {
+            accountType: 'INSTRUCTOR_AVAILABLE',
+            instructorId: mockInstructorAId,
+            direction: 'CREDIT',
+            amountCents: 20000,
+            description: 'Credit Alice available balance',
+          },
+        ],
+      });
+    });
+
+    it('rejects direct settlement from PENDING status without prior approval', async () => {
+      const payout = await payoutsService.requestPayout(mockInstructorAId, {
+        amountCents: 5000,
+        payoutMethod: 'BKASH',
+        accountDetails: '01700000000',
+      });
+      expect(payout.status).toBe('PENDING');
+
+      // Attempting to settle directly from PENDING must fail
+      await expect(
+        payoutsService.settlePayout(payout.id, mockAdminId, {
+          settlementReference: 'MFS_TXN_VALID_REF',
+        })
+      ).rejects.toThrow(/Payout must be in APPROVED status to settle/);
+    });
+
+    it('rejects settlement with missing, null, or short (< 3 chars) settlement reference', async () => {
+      const payout = await payoutsService.requestPayout(mockInstructorAId, {
+        amountCents: 2000,
+        payoutMethod: 'BKASH',
+        accountDetails: '01700000000',
+      });
+      await payoutsService.approvePayout(payout.id, mockAdminId, {});
+
+      await expect(
+        payoutsService.settlePayout(payout.id, mockAdminId, {
+          settlementReference: 'AB', // < 3 chars
+        })
+      ).rejects.toThrow(/valid external settlement reference/);
+
+      await expect(
+        payoutsService.settlePayout(payout.id, mockAdminId, {
+          settlementReference: '   ', // whitespace only
+        })
+      ).rejects.toThrow(/valid external settlement reference/);
+    });
+
+    it('prevents instructors from approving or settling their own payouts even with admin credentials', async () => {
+      const payout = await payoutsService.requestPayout(mockInstructorAId, {
+        amountCents: 1000,
+        payoutMethod: 'NAGAD',
+        accountDetails: '01800000000',
+      });
+
+      // Self-approval attempt
+      await expect(
+        payoutsService.approvePayout(payout.id, mockInstructorAId, {})
+      ).rejects.toThrow(/Instructors cannot approve their own payout requests/);
+
+      // Self-rejection attempt
+      await expect(
+        payoutsService.rejectPayout(payout.id, mockInstructorAId, { rejectionReason: 'Cancel myself' })
+      ).rejects.toThrow(/Instructors cannot reject their own payout requests/);
+
+      // Approve by real admin
+      await payoutsService.approvePayout(payout.id, mockAdminId, {});
+
+      // Self-settlement attempt
+      await expect(
+        payoutsService.settlePayout(payout.id, mockInstructorAId, { settlementReference: 'TXN_123' })
+      ).rejects.toThrow(/Instructors cannot settle their own payout requests/);
+    });
+  });
+
+  describe('8. Wallet Balance Reconciliation & Discrepancy Detection', () => {
+    it('verifies that wallet materialized balances reconcile 100% with double-entry ledger entries', async () => {
+      // Verify initial reconciliation
+      const recBefore = await ledgerService.reconcileWallet(mockInstructorAId);
+      expect(recBefore.reconciled).toBe(true);
+      expect(recBefore.discrepancies.pendingDiff).toBe(0);
+      expect(recBefore.discrepancies.balanceDiff).toBe(0);
+      expect(recBefore.discrepancies.payoutHoldDiff).toBe(0);
+
+      // Add a course purchase and escrow maturity
+      const ordId = crypto.randomUUID();
+      const ordItemId = crypto.randomUUID();
+      await db.insert(orders).values({
+        id: ordId,
+        orderNumber: 'TSP-ORD-RECONCILE',
+        studentId: mockStudentId,
+        status: 'PAID',
+        subtotalCents: 10000,
+        discountCents: 0,
+        payableCents: 10000,
+        currency: 'BDT',
+        expiresAt: new Date(Date.now() + 86400000),
+        paidAt: new Date(Date.now() - 16 * 24 * 60 * 60 * 1000),
+      });
+      await db.insert(orderItems).values({
+        id: ordItemId,
+        orderId: ordId,
+        courseId: courseAId,
+        courseTitle: 'Full-Stack TypeScript & Financial Systems',
+        unitPriceCents: 10000,
+        discountCents: 0,
+        payableCents: 10000,
+      });
+
+      await ledgerService.postCoursePurchase(ordId);
+      await ledgerService.settleMaturedEscrow(new Date());
+
+      const recAfter = await ledgerService.reconcileWallet(mockInstructorAId);
+      expect(recAfter.reconciled).toBe(true);
+      expect(recAfter.discrepancies.pendingDiff).toBe(0);
+      expect(recAfter.discrepancies.balanceDiff).toBe(0);
+      expect(recAfter.discrepancies.payoutHoldDiff).toBe(0);
+    });
+  });
 });
