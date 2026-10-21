@@ -26,3 +26,5 @@ export * from './telemetry';
 export * from './instructor-wallets';
 export * from './ledger';
 export * from './payout-requests';
+export * from './discussions';
+export * from './assignments';

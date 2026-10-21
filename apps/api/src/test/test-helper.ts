@@ -738,6 +738,92 @@ export async function createTestDatabase() {
       CONSTRAINT payout_requests_currency_bdt CHECK (currency = 'BDT'),
       CONSTRAINT payout_requests_settled_reference_required CHECK (status != 'SETTLED' OR (settlement_reference IS NOT NULL AND length(trim(settlement_reference)) >= 3))
     );
+
+    CREATE TYPE discussion_status AS ENUM('ACTIVE', 'RESOLVED', 'HIDDEN', 'DELETED');
+    CREATE TYPE discussion_reply_status AS ENUM('ACTIVE', 'HIDDEN', 'DELETED');
+    CREATE TYPE discussion_vote_target AS ENUM('DISCUSSION', 'REPLY');
+    CREATE TYPE assignment_status AS ENUM('DRAFT', 'PUBLISHED', 'CLOSED');
+    CREATE TYPE submission_status AS ENUM('SUBMITTED', 'GRADED', 'RESUBMITTED');
+
+    CREATE TABLE IF NOT EXISTS discussions (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      course_id uuid NOT NULL REFERENCES courses(id) ON DELETE cascade,
+      lesson_id uuid NOT NULL REFERENCES lessons(id) ON DELETE cascade,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      title varchar(255) NOT NULL,
+      content text NOT NULL,
+      status discussion_status DEFAULT 'ACTIVE' NOT NULL,
+      upvote_count integer DEFAULT 0 NOT NULL,
+      reply_count integer DEFAULT 0 NOT NULL,
+      is_pinned boolean DEFAULT false NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS discussion_replies (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      discussion_id uuid NOT NULL REFERENCES discussions(id) ON DELETE cascade,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      parent_reply_id uuid REFERENCES discussion_replies(id) ON DELETE cascade,
+      content text NOT NULL,
+      status discussion_reply_status DEFAULT 'ACTIVE' NOT NULL,
+      upvote_count integer DEFAULT 0 NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS discussion_votes (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE cascade,
+      target_type discussion_vote_target NOT NULL,
+      target_id uuid NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT discussion_votes_user_target_uq UNIQUE(user_id, target_type, target_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS assignments (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      course_id uuid NOT NULL REFERENCES courses(id) ON DELETE cascade,
+      lesson_id uuid REFERENCES lessons(id) ON DELETE set null,
+      title varchar(255) NOT NULL,
+      description text NOT NULL,
+      instructions text,
+      rubric jsonb,
+      max_score integer DEFAULT 100 NOT NULL,
+      due_date timestamp with time zone,
+      status assignment_status DEFAULT 'DRAFT' NOT NULL,
+      allow_resubmission boolean DEFAULT true NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS assignment_submissions (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      assignment_id uuid NOT NULL REFERENCES assignments(id) ON DELETE cascade,
+      student_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      version integer DEFAULT 1 NOT NULL,
+      file_url text NOT NULL,
+      file_storage_key varchar(255) NOT NULL,
+      original_filename varchar(255) NOT NULL,
+      mime_type varchar(100) NOT NULL,
+      file_size_bytes integer NOT NULL,
+      student_notes text,
+      status submission_status DEFAULT 'SUBMITTED' NOT NULL,
+      submitted_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS assignment_grades (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      submission_id uuid NOT NULL REFERENCES assignment_submissions(id) ON DELETE cascade,
+      grader_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      score integer NOT NULL,
+      feedback text,
+      rubric_evaluation jsonb,
+      graded_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT assignment_grades_submission_id_uq UNIQUE(submission_id)
+    );
   `);
 
   // Seed baseline roles

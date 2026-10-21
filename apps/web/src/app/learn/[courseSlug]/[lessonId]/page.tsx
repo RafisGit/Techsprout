@@ -15,6 +15,9 @@ import { CurriculumSidebar } from '@/components/learning/CurriculumSidebar';
 import { LessonViewer } from '@/components/learning/LessonViewer';
 import { LessonNavigation } from '@/components/learning/LessonNavigation';
 import { AITutorDrawer } from '@/components/learning/AITutorDrawer';
+import { LessonDiscussions } from '@/components/learning/LessonDiscussions';
+import { LessonAssignments } from '@/components/learning/LessonAssignments';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { DialogTitle } from '@radix-ui/react-dialog';
@@ -28,6 +31,8 @@ import {
   RotateCcw,
   Archive,
   Menu,
+  MessageSquare,
+  FileText,
 } from 'lucide-react';
 
 export default function LessonLearningWorkspacePage() {
@@ -388,6 +393,48 @@ export default function LessonLearningWorkspacePage() {
               curriculum={curriculum}
               currentLessonId={lessonId}
             />
+
+            {/* Interactive Lesson Workspace: Discussions & Project Assignments */}
+            <div className='mt-8 pt-6 border-t border-gray-200/80 space-y-6'>
+              <Tabs defaultValue='discussions' className='w-full'>
+                <TabsList className='bg-gray-100/90 p-1 rounded-2xl h-11 w-full sm:w-auto grid grid-cols-2 sm:inline-flex'>
+                  <TabsTrigger
+                    value='discussions'
+                    className='rounded-xl text-xs font-bold px-4 py-2 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-xs'
+                  >
+                    <MessageSquare className='w-4 h-4' />
+                    <span>Discussions & Q&A</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value='assignments'
+                    className='rounded-xl text-xs font-bold px-4 py-2 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-xs'
+                  >
+                    <FileText className='w-4 h-4' />
+                    <span>Project Assignments</span>
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value='discussions' className='mt-4'>
+                  <LessonDiscussions
+                    courseId={course.id}
+                    lessonId={lessonId}
+                    currentUserId={currentUser?.id}
+                    isInstructor={currentUser?.role === 'instructor' && course.instructorId === currentUser?.id}
+                    isAdmin={currentUser?.role === 'admin'}
+                  />
+                </TabsContent>
+
+                <TabsContent value='assignments' className='mt-4'>
+                  <LessonAssignments
+                    courseId={course.id}
+                    lessonId={lessonId}
+                    currentUserId={currentUser?.id}
+                    isInstructor={currentUser?.role === 'instructor' && course.instructorId === currentUser?.id}
+                    isAdmin={currentUser?.role === 'admin'}
+                  />
+                </TabsContent>
+              </Tabs>
+            </div>
           </div>
 
           {/* Desktop Right Column: Sticky Curriculum Sidebar */}
