@@ -12,10 +12,12 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiCookieAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 import { LearningService } from './learning.service';
+import { TutorRetrievalService } from './tutor-retrieval.service';
 import { AuthenticatedRequest } from '../../common/http/correlation-id.middleware';
 import { ApiException } from '../../common/errors/api-error';
 import { updateProgressCheckpointSchema } from './dto/update-progress.dto';
 import { toggleLessonCompleteSchema } from './dto/toggle-complete.dto';
+import { tutorQuerySchema } from '@techsprout/contracts';
 
 const uuidSchema = z.string().uuid('Invalid ID format');
 
@@ -24,7 +26,10 @@ const uuidSchema = z.string().uuid('Invalid ID format');
 @ApiCookieAuth('techsprout_session')
 @Controller('learn/courses')
 export class LearningController {
-  constructor(@Inject(LearningService) private readonly learningService: LearningService) {}
+  constructor(
+    @Inject(LearningService) private readonly learningService: LearningService,
+    @Inject(TutorRetrievalService) private readonly tutorRetrievalService: TutorRetrievalService
+  ) {}
 
   @Get(':courseId/curriculum')
   @ApiOperation({ summary: 'Get course learning curriculum with progress markers' })
@@ -192,6 +197,45 @@ export class LearningController {
     return {
       success: true,
       message,
+      data,
+    };
+  }
+
+  @Post(':courseId/tutor/context')
+  @ApiOperation({ summary: 'Retrieve grounded lesson context and citations for AI tutoring' })
+  @ApiResponse({ status: 200, description: 'Grounded citations retrieved successfully' })
+  async getTutorContext(
+    @Param('courseId') courseId: string,
+    @Body() body: unknown,
+    @Req() req: AuthenticatedRequest
+  ) {
+    const parseCourseId = uuidSchema.safeParse(courseId);
+    if (!parseCourseId.success) {
+      throw new ApiException('Invalid course ID format', HttpStatus.BAD_REQUEST, 'INVALID_ID');
+    }
+
+    const parseBody = tutorQuerySchema.safeParse({ ...((body as any) || {}), courseId });
+    if (!parseBody.success) {
+      throw new ApiException(
+        parseBody.error.errors[0]?.message || 'Invalid tutor query payload',
+        HttpStatus.BAD_REQUEST,
+        'VALIDATION_FAILED'
+      );
+    }
+
+    const data = await this.tutorRetrievalService.retrieveContext(
+      courseId,
+      parseBody.data.question,
+      parseBody.data.maxCitations,
+      {
+        id: req.user!.id,
+        role: req.user!.role,
+      }
+    );
+
+    return {
+      success: true,
+      message: 'Tutor contextual citations retrieved successfully',
       data,
     };
   }

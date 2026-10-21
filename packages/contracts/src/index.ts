@@ -2329,3 +2329,52 @@ export type QueryRetentionAnalyticsDto = z.infer<typeof queryRetentionAnalyticsS
 
 export type CourseRetentionAnalyticsResponse = ApiSuccessResponse<VideoRetentionCurveDto>;
 
+// ============================================================================
+// PHASE 7.2 AI TUTORING & CONTEXTUAL RETRIEVAL CONTRACTS (WP-P7-04)
+// ============================================================================
+
+export interface TutorCitationDto {
+  lessonId: string;
+  lessonTitle: string;
+  moduleId?: string | null;
+  moduleTitle?: string | null;
+  chunkSnippet: string;
+  relevanceScore: number; // Normalized 0.0 - 1.0
+}
+
+export interface ContextChunkDto {
+  id: string;
+  courseId: string;
+  moduleId?: string | null;
+  moduleTitle?: string | null;
+  lessonId: string;
+  lessonTitle: string;
+  content: string;
+  tokens: string[];
+}
+
+export const tutorQuerySchema = z
+  .object({
+    courseId: z.string().uuid({ message: 'courseId must be a valid UUID' }),
+    lessonId: z.string().uuid({ message: 'lessonId must be a valid UUID' }).optional().nullable(),
+    question: z
+      .string()
+      .min(3, 'Question must be at least 3 characters')
+      .max(500, 'Question cannot exceed 500 characters')
+      .trim(),
+    maxCitations: z.number().int().min(1).max(10).optional().default(5),
+  })
+  .strict();
+export type TutorQueryDto = z.infer<typeof tutorQuerySchema>;
+
+export interface TutorRetrievalResultDto {
+  courseId: string;
+  query: string;
+  citations: TutorCitationDto[];
+  totalCandidateCount: number;
+  isGrounded: boolean;
+  groundingNotice?: string | null;
+}
+
+export type TutorRetrievalResponse = ApiSuccessResponse<TutorRetrievalResultDto>;
+
