@@ -23,3 +23,6 @@ export * from './notifications';
 export * from './course-reviews';
 export * from './instructor-profiles';
 export * from './telemetry';
+export * from './instructor-wallets';
+export * from './ledger';
+export * from './payout-requests';

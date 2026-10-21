@@ -2429,3 +2429,168 @@ export interface ChunkIndexingResultDto {
   durationMs: number;
 }
 
+// ============================================================================
+// PHASE 7.3 INSTRUCTOR MONETIZATION & MARKETPLACE LEDGER (WP-P7-06)
+// ============================================================================
+
+export type LedgerTransactionType =
+  | 'COURSE_PURCHASE'
+  | 'ESCROW_SETTLEMENT'
+  | 'REFUND_CLAWBACK'
+  | 'PAYOUT_REQUEST'
+  | 'PAYOUT_SETTLED'
+  | 'PAYOUT_REJECTED'
+  | 'ADJUSTMENT';
+
+export type LedgerAccountType =
+  | 'PLATFORM_CASH'
+  | 'PLATFORM_REVENUE'
+  | 'INSTRUCTOR_PENDING'
+  | 'INSTRUCTOR_AVAILABLE'
+  | 'PAYOUT_CLEARING';
+
+export type LedgerEntryDirection = 'DEBIT' | 'CREDIT';
+
+export interface LedgerEntryDto {
+  id: string;
+  transactionId: string;
+  transactionType?: LedgerTransactionType;
+  accountType: LedgerAccountType;
+  instructorId?: string | null;
+  walletId?: string | null;
+  direction: LedgerEntryDirection;
+  amountCents: number;
+  currency: Currency;
+  balanceAfterCents?: number | null;
+  description: string;
+  createdAt: string;
+}
+
+export interface LedgerTransactionDto {
+  id: string;
+  transactionNumber: string;
+  transactionType: LedgerTransactionType;
+  idempotencyKey: string;
+  currency: Currency;
+  totalAmountCents: number;
+  referenceType: string;
+  referenceId: string;
+  description: string;
+  postedAt: string;
+  createdAt: string;
+  entries?: LedgerEntryDto[];
+}
+
+export interface InstructorWalletDto {
+  id: string;
+  instructorId: string;
+  balanceCents: number;
+  pendingBalanceCents: number;
+  payoutHoldCents: number;
+  lifetimeEarningsCents: number;
+  currency: Currency;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InstructorEarningsSummaryDto {
+  wallet: InstructorWalletDto;
+  recentTransactions: LedgerEntryDto[];
+  pendingPayoutsCount: number;
+  settledPayoutsTotalCents: number;
+}
+
+export type PayoutMethod = 'BKASH' | 'NAGAD' | 'BANK_TRANSFER';
+export type PayoutStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SETTLED' | 'FAILED';
+
+export const requestPayoutSchema = z
+  .object({
+    amountCents: z
+      .number()
+      .int('Amount must be an integer minor unit (poisha)')
+      .positive('Payout amount must be greater than zero')
+      .min(5000, 'Minimum payout amount is 50.00 BDT (5000 poisha)'),
+    payoutMethod: z.enum(['BKASH', 'NAGAD', 'BANK_TRANSFER']),
+    accountDetails: z
+      .string()
+      .min(5, 'Account details must be at least 5 characters')
+      .max(500, 'Account details cannot exceed 500 characters')
+      .trim(),
+    idempotencyKey: z.string().max(120).optional(),
+  })
+  .strict();
+export type RequestPayoutDto = z.infer<typeof requestPayoutSchema>;
+
+export const approvePayoutSchema = z
+  .object({
+    adminNotes: z.string().max(1000).optional(),
+  })
+  .strict();
+export type ApprovePayoutDto = z.infer<typeof approvePayoutSchema>;
+
+export const rejectPayoutSchema = z
+  .object({
+    rejectionReason: z
+      .string()
+      .min(5, 'Rejection reason must be at least 5 characters')
+      .max(1000, 'Rejection reason cannot exceed 1000 characters')
+      .trim(),
+    adminNotes: z.string().max(1000).optional(),
+  })
+  .strict();
+export type RejectPayoutDto = z.infer<typeof rejectPayoutSchema>;
+
+export const settlePayoutSchema = z
+  .object({
+    settlementReference: z
+      .string()
+      .min(3, 'Settlement reference must be at least 3 characters')
+      .max(100, 'Settlement reference cannot exceed 100 characters')
+      .trim(),
+    adminNotes: z.string().max(1000).optional(),
+  })
+  .strict();
+export type SettlePayoutDto = z.infer<typeof settlePayoutSchema>;
+
+export interface PayoutRequestDto {
+  id: string;
+  requestNumber: string;
+  instructorId: string;
+  instructorName?: string | null;
+  instructorEmail?: string | null;
+  walletId: string;
+  amountCents: number;
+  currency: Currency;
+  payoutMethod: PayoutMethod;
+  accountDetails: string;
+  status: PayoutStatus;
+  requestedAt: string;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  adminNotes?: string | null;
+  rejectionReason?: string | null;
+  disbursedAt?: string | null;
+  settlementReference?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const payoutListQuerySchema = z
+  .object({
+    status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'SETTLED', 'FAILED']).optional(),
+    instructorId: z.string().uuid().optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+  })
+  .strict();
+export type PayoutListQuery = z.infer<typeof payoutListQuerySchema>;
+
+export interface PaginatedPayoutsDto {
+  data: PayoutRequestDto[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+

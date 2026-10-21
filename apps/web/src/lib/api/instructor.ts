@@ -16,7 +16,22 @@ import type {
   VideoRetentionCurveDto,
   VideoRetentionIntervalDto,
   QueryRetentionAnalyticsDto,
+  InstructorWalletDto,
+  InstructorEarningsSummaryDto,
+  PayoutRequestDto,
+  RequestPayoutDto,
+  PaginatedPayoutsDto,
+  LedgerEntryDto,
 } from '@techsprout/contracts';
+
+export type {
+  InstructorWalletDto,
+  InstructorEarningsSummaryDto,
+  PayoutRequestDto,
+  RequestPayoutDto,
+  PaginatedPayoutsDto,
+  LedgerEntryDto,
+};
 
 export type {
   InstructorAnalyticsOverviewDto,
@@ -292,6 +307,33 @@ export async function fetchCourseRetentionAnalytics(
   );
   return response.data.data;
 }
+
+export async function fetchInstructorEarnings(): Promise<InstructorEarningsSummaryDto> {
+  const response = await axiosInstance.get('/api/v1/instructor/earnings');
+  return response.data.data;
+}
+
+export async function fetchInstructorPayouts(params?: {
+  page?: number;
+  limit?: number;
+}): Promise<PaginatedPayoutsDto> {
+  const response = await axiosInstance.get('/api/v1/instructor/payouts', { params });
+  return response.data.data;
+}
+
+export async function submitPayoutRequest(payload: RequestPayoutDto): Promise<PayoutRequestDto> {
+  const response = await axiosInstance.post('/api/v1/instructor/payouts/request', payload);
+  return response.data.data;
+}
+
+export async function fetchInstructorLedger(params?: {
+  page?: number;
+  limit?: number;
+}): Promise<{ entries: LedgerEntryDto[]; total: number }> {
+  const response = await axiosInstance.get('/api/v1/instructor/ledger', { params });
+  return response.data.data;
+}
+
 
 
 

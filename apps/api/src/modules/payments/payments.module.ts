@@ -5,10 +5,11 @@ import { SSLCommerzClient, SSLCOMMERZ_CLIENT } from './sslcommerz.client';
 import { DatabaseModule } from '../../database/database.module';
 import { AuditModule } from '../audit/audit.module';
 import { OrdersModule } from '../orders/orders.module';
+import { MonetizationModule } from '../monetization/monetization.module';
 import { env } from '../../config/env.config';
 
 @Module({
-  imports: [DatabaseModule, AuditModule, forwardRef(() => OrdersModule)],
+  imports: [DatabaseModule, AuditModule, forwardRef(() => OrdersModule), forwardRef(() => MonetizationModule)],
   controllers: [PaymentsController],
   providers: [
     PaymentsService,
