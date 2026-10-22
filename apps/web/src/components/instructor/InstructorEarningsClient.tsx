@@ -25,8 +25,9 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
-function formatBdtCents(cents: number): string {
-  const bdt = (cents / 100).toLocaleString('en-US', {
+export function formatBdtCents(cents?: number | null): string {
+  const safeCents = typeof cents === 'number' && Number.isFinite(cents) ? cents : 0;
+  const bdt = (safeCents / 100).toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -142,7 +143,7 @@ export function InstructorEarningsClient() {
       `"${e.accountType}"`,
       `"${e.direction}"`,
       `"${(e.amountCents / 100).toFixed(2)}"`,
-      `"${e.description.replace(/"/g, '""')}"`,
+      `"${(e.description || '').replace(/"/g, '""')}"`,
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
@@ -305,6 +306,12 @@ export function InstructorEarningsClient() {
                     badge = (
                       <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800'>
                         Rejected
+                      </span>
+                    );
+                  } else if (p.status === 'FAILED') {
+                    badge = (
+                      <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800'>
+                        Failed
                       </span>
                     );
                   }
