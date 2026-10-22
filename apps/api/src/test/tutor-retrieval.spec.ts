@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TutorRetrievalService } from '../modules/learning/tutor-retrieval.service';
+import { TutorEmbeddingService } from '../modules/learning/tutor-embedding.service';
 import { createTestDatabase } from './test-helper';
 import { courses, modules, lessons, enrollments, users, categories } from '../database/schema';
 import * as crypto from 'crypto';
 
 describe('Phase 7.2: AI Tutoring & Contextual Retrieval Engine (WP-P7-04)', () => {
   let db: any;
+  let embeddingService: TutorEmbeddingService;
   let service: TutorRetrievalService;
 
   let instructorId: string;
@@ -25,7 +27,8 @@ describe('Phase 7.2: AI Tutoring & Contextual Retrieval Engine (WP-P7-04)', () =
   beforeEach(async () => {
     const testDb = await createTestDatabase();
     db = testDb.db;
-    service = new TutorRetrievalService(db);
+    embeddingService = new TutorEmbeddingService();
+    service = new TutorRetrievalService(db, undefined, embeddingService);
 
     instructorId = crypto.randomUUID();
     studentId = crypto.randomUUID();
@@ -367,6 +370,79 @@ describe('Phase 7.2: AI Tutoring & Contextual Retrieval Engine (WP-P7-04)', () =
       const lessonIds = result.citations.map((c) => c.lessonId);
       const uniqueLessonIds = new Set(lessonIds);
       expect(uniqueLessonIds.size).toBe(lessonIds.length);
+    });
+  });
+
+  describe('9. WP-P7-09: Semantic Hybrid Retrieval & Reciprocal Rank Fusion (RRF)', () => {
+    it('9.1 should execute Reciprocal Rank Fusion (RRF) when hybrid vector search is enabled', async () => {
+      const result = await service.retrieveContext(
+        courseAId,
+        'Docker multi-stage builds and Alpine container optimization',
+        5,
+        { id: studentId, role: 'student' },
+        { enableHybridVector: true, fusionStrategy: 'RRF', rrfK: 60 }
+      );
+
+      expect(result.isGrounded).toBe(true);
+      expect(result.citations.length).toBeGreaterThanOrEqual(1);
+      expect(result.citations[0].lessonId).toBe(lessonA1Id);
+      // RRF scores are non-zero reciprocal rank sums
+      expect(result.citations[0].relevanceScore).toBeGreaterThan(0);
+    });
+
+    it('9.2 should execute Linear hybrid blending when fusionStrategy is LINEAR', async () => {
+      const result = await service.retrieveContext(
+        courseAId,
+        'Docker multi-stage builds and Alpine container optimization',
+        5,
+        { id: studentId, role: 'student' },
+        { enableHybridVector: true, fusionStrategy: 'LINEAR', linearAlpha: 0.7 }
+      );
+
+      expect(result.isGrounded).toBe(true);
+      expect(result.citations.length).toBeGreaterThanOrEqual(1);
+      expect(result.citations[0].lessonId).toBe(lessonA1Id);
+    });
+
+    it('9.3 should accelerate repeated queries via in-memory query embedding cache', async () => {
+      embeddingService.clearCache();
+      expect(embeddingService.getCacheStats().hits).toBe(0);
+
+      // Query 1: Cold cache
+      await service.retrieveContext(
+        courseAId,
+        'Automated CI/CD Pipelines with GitHub Actions',
+        3,
+        { id: studentId, role: 'student' },
+        { enableHybridVector: true }
+      );
+      expect(embeddingService.getCacheStats().misses).toBe(1);
+      expect(embeddingService.getCacheStats().hits).toBe(0);
+
+      // Query 2: Warm cache
+      await service.retrieveContext(
+        courseAId,
+        'Automated CI/CD Pipelines with GitHub Actions',
+        3,
+        { id: studentId, role: 'student' },
+        { enableHybridVector: true }
+      );
+      expect(embeddingService.getCacheStats().hits).toBe(1);
+    });
+
+    it('9.4 should safely gate vector search under mock provider by default', async () => {
+      // By default without options, vector search is gated under mock provider
+      const result = await service.retrieveContext(
+        courseAId,
+        'Stateless authentication and session cookies',
+        5,
+        { id: studentId, role: 'student' }
+      );
+
+      expect(result.isGrounded).toBe(true);
+      expect(result.citations[0].lessonId).toBe(lessonA2Id);
+      // Normalized lexical score is preserved without mock hash noise
+      expect(result.citations[0].relevanceScore).toBeGreaterThanOrEqual(0.70);
     });
   });
 });

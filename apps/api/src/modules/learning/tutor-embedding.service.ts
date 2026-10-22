@@ -10,30 +10,71 @@ export class TutorEmbeddingService {
   private readonly provider = env.TUTOR_EMBEDDING_PROVIDER || 'mock';
   private readonly apiKey = env.TUTOR_LLM_API_KEY;
 
+  private readonly embeddingCache = new Map<string, { vector: number[]; timestamp: number }>();
+  private readonly maxCacheEntries = 500;
+  private readonly cacheTtlMs = 3600 * 1000; // 1 hour TTL
+  private cacheHits = 0;
+  private cacheMisses = 0;
+
   /**
    * Generates a 768-dimensional normalized embedding vector.
    * Uses deterministic projection in 'mock' mode for reproducible CI and offline testing.
+   * Employs an in-memory LRU/TTL cache for warm query acceleration.
    */
   public async generateEmbedding(text: string): Promise<number[]> {
     if (!text || text.trim().length === 0) {
       return new Array(EMBEDDING_DIMENSION).fill(0);
     }
 
+    const cacheKey = text.trim().toLowerCase();
+    const cached = this.embeddingCache.get(cacheKey);
+    const now = Date.now();
+    if (cached && now - cached.timestamp < this.cacheTtlMs) {
+      this.cacheHits++;
+      return cached.vector;
+    }
+    this.cacheMisses++;
+
+    let vector: number[];
     if (this.provider === 'mock' || !this.apiKey) {
-      return this.generateMockEmbedding(text);
-    }
-
-    try {
-      if (this.provider === 'gemini') {
-        return await this.generateGeminiEmbedding(text);
-      } else if (this.provider === 'openai') {
-        return await this.generateOpenAiEmbedding(text);
+      vector = this.generateMockEmbedding(text);
+    } else {
+      try {
+        if (this.provider === 'gemini') {
+          vector = await this.generateGeminiEmbedding(text);
+        } else if (this.provider === 'openai') {
+          vector = await this.generateOpenAiEmbedding(text);
+        } else {
+          vector = this.generateMockEmbedding(text);
+        }
+      } catch (err: any) {
+        this.logger.warn(`External embedding provider error (${err.message}); falling back to deterministic mock.`);
+        vector = this.generateMockEmbedding(text);
       }
-    } catch (err: any) {
-      this.logger.warn(`External embedding provider error (${err.message}); falling back to deterministic mock.`);
     }
 
-    return this.generateMockEmbedding(text);
+    // Cache the resulting normalized vector
+    if (this.embeddingCache.size >= this.maxCacheEntries) {
+      const oldestKey = this.embeddingCache.keys().next().value;
+      if (oldestKey) this.embeddingCache.delete(oldestKey);
+    }
+    this.embeddingCache.set(cacheKey, { vector, timestamp: now });
+
+    return vector;
+  }
+
+  public getCacheStats(): { hits: number; misses: number; size: number } {
+    return {
+      hits: this.cacheHits,
+      misses: this.cacheMisses,
+      size: this.embeddingCache.size,
+    };
+  }
+
+  public clearCache(): void {
+    this.embeddingCache.clear();
+    this.cacheHits = 0;
+    this.cacheMisses = 0;
   }
 
   /**

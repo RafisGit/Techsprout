@@ -1,0 +1,20 @@
+-- PROTOTYPE MIGRATION ONLY: DISABLED IN DEPLOYED APPLICATION (ADR-P7-001 / WP-P7-09)
+-- DO NOT RUN IN STAGING OR PRODUCTION WITHOUT EXPLICIT RENDER TIER UPGRADE AUTHORIZATION
+--
+-- This migration specifies the pgvector extension, embedding vector column,
+-- and HNSW index for lesson context chunks when 768-dimensional embeddings are activated.
+--
+-- Minimum Runtime Requirement: PostgreSQL with >= 1 GB RAM (e.g. Render Starter Plus $19/mo).
+-- Hard blocker: Render Free PostgreSQL (256 MB RAM) baseline consumes 193 MB (75.4%),
+-- leaving only 24.6% headroom (< 30% required). HNSW index builds on 256 MB risk SIGKILL OOM.
+
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Add 768-dimensional normalized embedding column to lessons
+ALTER TABLE lessons ADD COLUMN IF NOT EXISTS embedding vector(768);
+
+-- Create HNSW index for cosine distance similarity search
+CREATE INDEX IF NOT EXISTS lessons_embedding_hnsw_idx 
+ON lessons 
+USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);

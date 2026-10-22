@@ -18,6 +18,13 @@ interface ScoredChunk {
   score: number;
 }
 
+export interface RetrievalOptions {
+  enableHybridVector?: boolean;
+  fusionStrategy?: 'RRF' | 'LINEAR';
+  rrfK?: number;
+  linearAlpha?: number;
+}
+
 // ============================================================================
 // STOP WORDS & TECHNICAL VOCABULARY SYNONYMS
 // ============================================================================
@@ -274,12 +281,14 @@ export class TutorRetrievalService {
    * Grounded course context retrieval:
    * Retrieves relevant lesson citations strictly scoped to courseId with Okapi BM25 scoring,
    * field weighting, technical synonym expansion, and typo-tolerant trigram matching.
+   * Supports Reciprocal Rank Fusion (RRF) and Linear hybrid blending when vector search is active.
    */
   public async retrieveContext(
     courseId: string,
     question: string,
     maxCitations: number = 5,
-    user?: UserContext
+    user?: UserContext,
+    options?: RetrievalOptions
   ): Promise<TutorRetrievalResultDto> {
     if (user) {
       await this.verifyAccess(courseId, user);
@@ -431,7 +440,7 @@ export class TutorRetrievalService {
     const exactPhraseBoost = 2.0;
     const queryLower = question.toLowerCase().trim();
 
-    const scoredChunks: ScoredChunk[] = chunkTokensList
+    const rawScoredDocs = chunkTokensList
       .map((doc) => {
         let rawBm25 = 0;
 
@@ -469,30 +478,87 @@ export class TutorRetrievalService {
         // Monotonic normalization: maps [0, inf) to [0, 1) preserving exact rank ordering
         const normalizedLexical = rawBm25 > 0 ? Math.min(1.0, rawBm25 / (rawBm25 + 2.5)) : 0;
 
-        let finalScore = normalizedLexical;
-        const indexedChunk = doc.chunk as IndexedChunkDto;
-        if (
-          queryEmbedding &&
-          indexedChunk.embedding &&
-          indexedChunk.embedding.length > 0 &&
-          this.embeddingService
-        ) {
-          const semanticScore = this.embeddingService.cosineSimilarity(
-            queryEmbedding,
-            indexedChunk.embedding
-          );
-          // Hybrid blending: 0.6 lexical BM25 + 0.4 vector semantic
-          finalScore = 0.6 * normalizedLexical + 0.4 * semanticScore;
-        }
+        return {
+          chunk: doc.chunk,
+          rawBm25,
+          normalizedLexical,
+        };
+      });
 
-        return { chunk: doc.chunk, score: finalScore };
-      })
-      .filter((item) => item.score > 0)
-      .sort((a, b) => b.score - a.score);
+    // 7. Check if Hybrid Vector Search should be activated
+    const isGated = this.embeddingService ? this.embeddingService.isVectorSearchGated() : true;
+    const forceHybrid = options?.enableHybridVector ?? false;
+    const isHybridActive = (!isGated || forceHybrid) && queryEmbedding !== null && this.embeddingService !== undefined;
+    const fusionStrategy = options?.fusionStrategy || 'RRF';
+    const rrfK = options?.rrfK || 60;
+    const linearAlpha = options?.linearAlpha ?? 0.6;
 
-    // 7. Grounding threshold: if top score < 0.20 or 0 matching chunks, reject as ungrounded
+    let scoredChunks: ScoredChunk[] = [];
+
+    if (!isHybridActive) {
+      // Production Baseline: Pure Field-Weighted Okapi BM25 (Vector Search Gated)
+      scoredChunks = chunkTokensList
+        .map((_, idx) => {
+          const item = rawScoredDocs[idx];
+          return { chunk: item.chunk, score: item.normalizedLexical };
+        })
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score);
+    } else if (fusionStrategy === 'RRF') {
+      // Documented Hybrid Strategy: Reciprocal Rank Fusion (RRF, k=60 default)
+      const lexicalRanked = [...rawScoredDocs]
+        .filter((item) => item.rawBm25 > 0)
+        .sort((a, b) => b.rawBm25 - a.rawBm25);
+
+      const vectorRanked = rawScoredDocs
+        .map((item) => {
+          const indexedChunk = item.chunk as IndexedChunkDto;
+          const semanticScore =
+            indexedChunk.embedding && indexedChunk.embedding.length > 0 && queryEmbedding
+              ? this.embeddingService!.cosineSimilarity(queryEmbedding, indexedChunk.embedding)
+              : 0;
+          return { chunk: item.chunk, semanticScore };
+        })
+        .filter((item) => item.semanticScore > 0)
+        .sort((a, b) => b.semanticScore - a.semanticScore);
+
+      const rrfMap = new Map<string, { chunk: ContextChunkDto; score: number }>();
+
+      for (let rank = 0; rank < lexicalRanked.length; rank++) {
+        const item = lexicalRanked[rank];
+        const entry = rrfMap.get(item.chunk.id) || { chunk: item.chunk, score: 0 };
+        entry.score += 1.0 / (rrfK + rank + 1);
+        rrfMap.set(item.chunk.id, entry);
+      }
+
+      for (let rank = 0; rank < vectorRanked.length; rank++) {
+        const item = vectorRanked[rank];
+        const entry = rrfMap.get(item.chunk.id) || { chunk: item.chunk, score: 0 };
+        entry.score += 1.0 / (rrfK + rank + 1);
+        rrfMap.set(item.chunk.id, entry);
+      }
+
+      scoredChunks = Array.from(rrfMap.values()).sort((a, b) => b.score - a.score);
+    } else {
+      // Linear convex combination
+      scoredChunks = rawScoredDocs
+        .map((item) => {
+          const indexedChunk = item.chunk as IndexedChunkDto;
+          const semanticScore =
+            indexedChunk.embedding && indexedChunk.embedding.length > 0 && queryEmbedding
+              ? this.embeddingService!.cosineSimilarity(queryEmbedding, indexedChunk.embedding)
+              : 0;
+          const score = linearAlpha * item.normalizedLexical + (1 - linearAlpha) * semanticScore;
+          return { chunk: item.chunk, score };
+        })
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score);
+    }
+
+    // 8. Grounding threshold: if top score < threshold or 0 matching chunks, reject as ungrounded
     const topScore = scoredChunks.length > 0 ? scoredChunks[0].score : 0;
-    const isGrounded = topScore >= 0.20;
+    const groundingThreshold = isHybridActive && fusionStrategy === 'RRF' ? 0.005 : 0.20;
+    const isGrounded = topScore >= groundingThreshold;
 
     if (!isGrounded) {
       return {
