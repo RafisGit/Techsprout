@@ -140,15 +140,13 @@ def run_model_benchmark(model_name, display_name):
     print(f"  Cold Query Latency: {cold_ms:.2f} ms")
     print(f"  Warm Query Latency: mean = {mean_q_lat:.2f} ms, p50 = {p50_q_lat:.2f} ms, p95 = {p95_q_lat:.2f} ms")
 
-    # 3. Vector Similarity Retrieval
+    # 3. Vector Similarity Retrieval & Latency
     # chunk_embeddings are normalized to unit L2 norm, so cosine similarity is dot product
-    # Shape: (32, 100)
-    all_sims = np.dot(query_embeddings, chunk_embeddings.T)
-
-    # For each query, get ranked list of lesson IDs
     vector_rankings = []
+    vector_ranking_latencies = []
     for q_idx in range(len(queries)):
-        sims = all_sims[q_idx]
+        t0_v = time.perf_counter()
+        sims = np.dot(chunk_embeddings, query_embeddings[q_idx])
         # Map chunks to lessons with deduplication
         scored = []
         seen = set()
@@ -157,7 +155,14 @@ def run_model_benchmark(model_name, display_name):
             if lid not in seen:
                 seen.add(lid)
                 scored.append((lid, float(sims[c_idx])))
+        v_lat = (time.perf_counter() - t0_v) * 1000
+        vector_ranking_latencies.append(v_lat)
         vector_rankings.append(scored)
+
+    sorted_v_lat = sorted(vector_ranking_latencies)
+    p50_v_lat = sorted_v_lat[int(len(sorted_v_lat) * 0.5)]
+    p95_v_lat = sorted_v_lat[int(len(sorted_v_lat) * 0.95)]
+    mean_v_lat = sum(sorted_v_lat) / len(sorted_v_lat)
 
     # 4. Extract Authoritative BM25 rankings
     bm25_rankings = []
@@ -239,9 +244,11 @@ def run_model_benchmark(model_name, display_name):
             best_rrf_tune_score = t_res["tune_recall"]
             best_rrf_k = k_val
 
-    # Freeze optimal RRF k
+    # Freeze optimal RRF k & measure RRF fusion latency
     fused_rrf_rankings = []
+    rrf_latencies = []
     for q_idx in range(len(queries)):
+        t0_rrf = time.perf_counter()
         b_list = [x[0] for x in bm25_rankings[q_idx]]
         v_list = [x[0] for x in vector_rankings[q_idx]]
         rrf_map = {}
@@ -250,8 +257,15 @@ def run_model_benchmark(model_name, display_name):
         for rank, lid in enumerate(v_list):
             rrf_map[lid] = rrf_map.get(lid, 0.0) + 1.0 / (best_rrf_k + rank + 1)
         scored = sorted(rrf_map.items(), key=lambda x: x[1], reverse=True)
+        rrf_lat = (time.perf_counter() - t0_rrf) * 1000
+        rrf_latencies.append(rrf_lat)
         fused_rrf_rankings.append(scored)
     res_rrf = eval_suite(fused_rrf_rankings, f"3. BM25 + Vector RRF (k={best_rrf_k})")
+
+    sorted_rrf_lat = sorted(rrf_latencies)
+    p50_rrf_lat = sorted_rrf_lat[int(len(sorted_rrf_lat) * 0.5)]
+    p95_rrf_lat = sorted_rrf_lat[int(len(sorted_rrf_lat) * 0.95)]
+    mean_rrf_lat = sum(sorted_rrf_lat) / len(sorted_rrf_lat)
 
     # Config 4: Linear Fusion Tuning & Freezing
     best_linear_alpha = 0.7
@@ -281,9 +295,11 @@ def run_model_benchmark(model_name, display_name):
             best_linear_tune_score = t_res["tune_recall"]
             best_linear_alpha = alpha
 
-    # Freeze optimal Linear alpha
+    # Freeze optimal Linear alpha & measure Linear fusion latency
     fused_linear_rankings = []
+    linear_latencies = []
     for q_idx in range(len(queries)):
+        t0_lin = time.perf_counter()
         b_dict = {x[0]: x[1] for x in bm25_rankings[q_idx]}
         v_dict = {x[0]: x[1] for x in vector_rankings[q_idx]}
         all_lids = set(b_dict.keys()) | set(v_dict.keys())
@@ -295,8 +311,15 @@ def run_model_benchmark(model_name, display_name):
             combo = best_linear_alpha * norm_bm + (1.0 - best_linear_alpha) * vec_s
             fused.append((lid, combo))
         fused.sort(key=lambda x: x[1], reverse=True)
+        lin_lat = (time.perf_counter() - t0_lin) * 1000
+        linear_latencies.append(lin_lat)
         fused_linear_rankings.append(fused)
     res_linear = eval_suite(fused_linear_rankings, f"4. BM25 + Vector Linear (alpha={best_linear_alpha})")
+
+    sorted_lin_lat = sorted(linear_latencies)
+    p50_lin_lat = sorted_lin_lat[int(len(sorted_lin_lat) * 0.5)]
+    p95_lin_lat = sorted_lin_lat[int(len(sorted_lin_lat) * 0.95)]
+    mean_lin_lat = sum(sorted_lin_lat) / len(sorted_lin_lat)
 
     # PRINT SUMMARY TABLE
     print(f"\n--- RESULTS SUMMARY: {display_name} ---")
@@ -310,6 +333,13 @@ def run_model_benchmark(model_name, display_name):
     print_row("2. Dense Vector Only", res_vec)
     print_row(f"3. Hybrid RRF (k={best_rrf_k} frozen)", res_rrf)
     print_row(f"4. Hybrid Linear (alpha={best_linear_alpha} frozen)", res_linear)
+
+    print("\n--- LATENCY BREAKDOWN (LOCAL MACHINE) ---")
+    print(f"  Query Embedding Latency:       p50 = {p50_q_lat:.2f} ms, p95 = {p95_q_lat:.2f} ms, cold = {cold_ms:.2f} ms")
+    print(f"  Vector Similarity & Ranking:   p50 = {p50_v_lat:.3f} ms, p95 = {p95_v_lat:.3f} ms, mean = {mean_v_lat:.3f} ms")
+    print(f"  RRF Rank Fusion:               p50 = {p50_rrf_lat:.3f} ms, p95 = {p95_rrf_lat:.3f} ms, mean = {mean_rrf_lat:.3f} ms")
+    print(f"  Linear Convex Blending:        p50 = {p50_lin_lat:.3f} ms, p95 = {p95_lin_lat:.3f} ms, mean = {mean_lin_lat:.3f} ms")
+    print(f"  Combined Local RRF Pipeline:   p50 = {p50_q_lat + p50_v_lat + p50_rrf_lat:.2f} ms (+ BM25 retrieval)")
 
     print("\nRRF Parameter Sweep on Tuning Set:")
     for k_val, r in rrf_tuning_results.items():
@@ -334,6 +364,12 @@ def run_model_benchmark(model_name, display_name):
         "cold_q_ms": cold_ms,
         "p50_q_ms": p50_q_lat,
         "p95_q_ms": p95_q_lat,
+        "p50_v_lat_ms": p50_v_lat,
+        "p95_v_lat_ms": p95_v_lat,
+        "p50_rrf_lat_ms": p50_rrf_lat,
+        "p95_rrf_lat_ms": p95_rrf_lat,
+        "p50_lin_lat_ms": p50_lin_lat,
+        "p95_lin_lat_ms": p95_lin_lat,
         "bm25": res_bm25,
         "vector_only": res_vec,
         "rrf": res_rrf,
