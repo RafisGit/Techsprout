@@ -14,8 +14,18 @@ import { TutorIndexingService } from './tutor-indexing.service';
 import { TutorEmbeddingService } from './tutor-embedding.service';
 
 interface ScoredChunk {
-  chunk: ContextChunkDto;
+  chunk: ContextChunkDto & { position?: number | null };
   score: number;
+}
+
+export interface RetrievalOptions {
+  enableCurriculumAwareness?: boolean;
+  candidatePoolSize?: number;
+  anchorThreshold?: number;
+  sameModuleBonus?: number;
+  prereqBonus?: number;
+  nextBonus?: number;
+  maxBonusCap?: number;
 }
 
 // ============================================================================
@@ -172,9 +182,10 @@ export class TutorRetrievalService {
       content?: string | null;
       moduleId?: string | null;
       moduleTitle?: string | null;
+      position?: number | null;
     }
-  ): ContextChunkDto[] {
-    const chunks: ContextChunkDto[] = [];
+  ): (ContextChunkDto & { position?: number | null })[] {
+    const chunks: (ContextChunkDto & { position?: number | null })[] = [];
     const fullText = [lesson.description, lesson.content].filter(Boolean).join('\n\n');
 
     if (!fullText.trim()) {
@@ -188,6 +199,7 @@ export class TutorRetrievalService {
         lessonTitle: lesson.title,
         content: `Lesson: ${lesson.title}. Module: ${lesson.moduleTitle || 'General'}.`,
         tokens: this.tokenize(`${lesson.title} ${lesson.moduleTitle || ''}`),
+        position: lesson.position,
       });
       return chunks;
     }
@@ -210,6 +222,7 @@ export class TutorRetrievalService {
           tokens: this.tokenize(
             `${lesson.title} ${lesson.moduleTitle || ''} ${currentChunkText}`
           ),
+          position: lesson.position,
         });
         currentChunkText = `Lesson: ${lesson.title}\n${p}`;
       } else {
@@ -229,6 +242,7 @@ export class TutorRetrievalService {
         tokens: this.tokenize(
           `${lesson.title} ${lesson.moduleTitle || ''} ${currentChunkText}`
         ),
+        position: lesson.position,
       });
     }
 
@@ -279,7 +293,8 @@ export class TutorRetrievalService {
     courseId: string,
     question: string,
     maxCitations: number = 5,
-    user?: UserContext
+    user?: UserContext,
+    options?: RetrievalOptions
   ): Promise<TutorRetrievalResultDto> {
     if (user) {
       await this.verifyAccess(courseId, user);
@@ -309,6 +324,7 @@ export class TutorRetrievalService {
           content: lessons.content,
           moduleId: lessons.moduleId,
           moduleTitle: modules.title,
+          position: lessons.position,
         })
         .from(lessons)
         .innerJoin(modules, eq(lessons.moduleId, modules.id))
@@ -505,11 +521,68 @@ export class TutorRetrievalService {
       };
     }
 
-    // 8. Extract top citations (deduplicated by lessonId when possible)
+    // 8. Candidate-level curriculum-aware reranking (WP-P7-11 bounded experiment)
+    let candidatePool = scoredChunks;
+
+    if (options?.enableCurriculumAwareness) {
+      const poolSize = options.candidatePoolSize ?? 10;
+      const anchorThreshold = options.anchorThreshold ?? 0.40;
+      const sameModuleBonus = options.sameModuleBonus ?? 0.0;
+      const prereqBonus = options.prereqBonus ?? 0.03;
+      const nextBonus = options.nextBonus ?? 0.0;
+      const maxBonusCap = options.maxBonusCap ?? 0.05;
+
+      // Extract unique candidates up to poolSize
+      const pool: ScoredChunk[] = [];
+      const seenLessonsInPool = new Set<string>();
+      for (const item of scoredChunks) {
+        if (!seenLessonsInPool.has(item.chunk.lessonId)) {
+          seenLessonsInPool.add(item.chunk.lessonId);
+          pool.push(item);
+          if (pool.length >= poolSize) break;
+        }
+      }
+
+      // Identify anchors
+      const anchors = pool.filter((c) => c.score >= anchorThreshold);
+
+      // Apply bounded curriculum reranking
+      const rerankedPool = pool.map((item) => {
+        let bonus = 0;
+        const itemPos = item.chunk.position;
+        const itemModule = item.chunk.moduleTitle || item.chunk.moduleId;
+
+        for (const anchor of anchors) {
+          if (anchor.chunk.lessonId === item.chunk.lessonId) continue;
+          const anchorPos = anchor.chunk.position;
+          const anchorModule = anchor.chunk.moduleTitle || anchor.chunk.moduleId;
+
+          if (itemModule && anchorModule && itemModule === anchorModule) {
+            bonus += sameModuleBonus;
+            if (typeof itemPos === 'number' && typeof anchorPos === 'number') {
+              const dist = itemPos - anchorPos;
+              if (dist === -1) bonus += prereqBonus;
+              else if (dist === 1) bonus += nextBonus;
+            }
+          }
+        }
+
+        const effectiveBonus = Math.min(maxBonusCap, bonus);
+        return {
+          chunk: item.chunk,
+          score: item.score + effectiveBonus,
+        };
+      });
+
+      rerankedPool.sort((a, b) => b.score - a.score);
+      candidatePool = rerankedPool;
+    }
+
+    // 9. Extract top citations (deduplicated by lessonId when possible)
     const selectedLessons = new Set<string>();
     const citations: TutorCitationDto[] = [];
 
-    for (const item of scoredChunks) {
+    for (const item of candidatePool) {
       if (citations.length >= maxCitations) break;
       if (!selectedLessons.has(item.chunk.lessonId) || citations.length < 2) {
         selectedLessons.add(item.chunk.lessonId);
