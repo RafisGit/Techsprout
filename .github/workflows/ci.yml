@@ -72,7 +72,7 @@ jobs:
 
       - name: Typecheck Workspace Packages
         run: |
-          pnpm --filter @techsprout/contracts typecheck
+          pnpm --filter @techsprout/contracts build
           pnpm --filter @techsprout/api typecheck
 
       - name: Validate OpenAPI Contract
