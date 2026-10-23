@@ -694,3 +694,17 @@ export async function createTestDatabase() {
 
   return { db, pool };
 }
+
+/**
+ * Type-safe helper to extract cookie strings from response headers.
+ */
+export function extractCookies(headers: Record<string, unknown>): string[] {
+  const val = headers['set-cookie'];
+  if (Array.isArray(val)) {
+    return val.filter((c): c is string => typeof c === 'string');
+  }
+  if (typeof val === 'string') {
+    return [val];
+  }
+  return [];
+}

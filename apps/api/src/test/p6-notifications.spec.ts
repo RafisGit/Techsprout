@@ -282,6 +282,7 @@ describe('P6.1 — Pillar A: Decoupled Event & Notification Engine Test Suite', 
           payableCents: 500000,
           currency: 'BDT',
         },
+        version: 1,
       };
 
       const result = await notificationsService.processNotificationEvent(orderPlacedEvent);
@@ -322,6 +323,7 @@ describe('P6.1 — Pillar A: Decoupled Event & Notification Engine Test Suite', 
           orderNumber: 'ord_test_1001',
           payableCents: 500000,
         },
+        version: 1,
       };
 
       const secondResult = await notificationsService.processNotificationEvent(duplicateEvent);
@@ -357,6 +359,7 @@ describe('P6.1 — Pillar A: Decoupled Event & Notification Engine Test Suite', 
           currency: 'BDT',
           transactionId: 'TXN_TEST_2001',
         },
+        version: 1,
       };
 
       const result = await notificationsService.processNotificationEvent(orderPaidEvent);
@@ -386,6 +389,7 @@ describe('P6.1 — Pillar A: Decoupled Event & Notification Engine Test Suite', 
           courseTitle: 'Full-Stack Distributed Engineering',
           studentName: 'Student User',
         },
+        version: 1,
       };
 
       const result = await notificationsService.processNotificationEvent(certEvent);
@@ -421,6 +425,7 @@ describe('P6.1 — Pillar A: Decoupled Event & Notification Engine Test Suite', 
           orderNumber: 'ord_suppressed',
           amountCents: 200000,
         },
+        version: 1,
       };
 
       const result = await notificationsService.processNotificationEvent(suppressedEvent);
@@ -447,6 +452,7 @@ describe('P6.1 — Pillar A: Decoupled Event & Notification Engine Test Suite', 
           orderNumber: 'ord_5001',
           amountCents: 150000,
         },
+        version: 1,
       };
 
       const queueResult = await notificationQueueService.enqueueNotificationJob(event);
