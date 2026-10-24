@@ -5,7 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import { AppModule } from '../app.module';
 import { DatabaseService, DRIZZLE_DB } from '../database/drizzle.provider';
-import { createTestDatabase } from './test-helper';
+import { createTestDatabase, extractCookies } from './test-helper';
 import { CryptoUtil } from '../common/auth/crypto.util';
 import * as schema from '../database/schema';
 import { eq, and } from 'drizzle-orm';
@@ -186,7 +186,16 @@ describe('P6.3 — WP-03: Server-Side Learner Roster Search & Query Optimization
 
     // 8. Create a diverse cohort of 25 enrolled students for Course 1
     // Specific students with known names, emails, statuses, and progress:
-    const cohortDefinitions = [
+    interface CohortStudentDef {
+      name: string;
+      username: string;
+      email: string;
+      status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+      completedLessons: number;
+      daysAgo: number;
+      accessedDaysAgo: number | null;
+    }
+    const cohortDefinitions: CohortStudentDef[] = [
       {
         name: 'Alice Walker',
         username: 'alice_walker',
@@ -337,25 +346,25 @@ describe('P6.3 — WP-03: Server-Side Learner Roster Search & Query Optimization
       email: 'admin@techsprout.edu',
       password: 'AdminPassword123!',
     });
-    adminCookies = adminRes.headers['set-cookie'] || [];
+    adminCookies = extractCookies(adminRes.headers);
 
     const inst1Res = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
       email: 'instructor@techsprout.edu',
       password: 'InstructorPassword123!',
     });
-    instructor1Cookies = inst1Res.headers['set-cookie'] || [];
+    instructor1Cookies = extractCookies(inst1Res.headers);
 
     const inst2Res = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
       email: 'turing@techsprout.edu',
       password: 'Instructor2Password123!',
     });
-    instructor2Cookies = inst2Res.headers['set-cookie'] || [];
+    instructor2Cookies = extractCookies(inst2Res.headers);
 
     const studentRes = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
       email: 'student@techsprout.edu',
       password: 'StudentPassword123!',
     });
-    studentCookies = studentRes.headers['set-cookie'] || [];
+    studentCookies = extractCookies(studentRes.headers);
   });
 
   afterAll(async () => {

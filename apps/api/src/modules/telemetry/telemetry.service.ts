@@ -55,6 +55,27 @@ export class TelemetryService {
     return this.isPruningActive;
   }
 
+  /**
+   * Compares two metadata objects for semantic equality regardless of key insertion order.
+   * Required because PostgreSQL jsonb normalizes and does not preserve object key ordering.
+   */
+  private areMetadataEqual(
+    a: Record<string, unknown> | null | undefined,
+    b: Record<string, unknown> | null | undefined
+  ): boolean {
+    if (!a && !b) return true;
+    if (!a || !b) return false;
+    const aKeys = Object.keys(a).sort();
+    const bKeys = Object.keys(b).sort();
+    if (aKeys.length !== bKeys.length) return false;
+    for (let i = 0; i < aKeys.length; i++) {
+      const key = aKeys[i];
+      if (key !== bKeys[i]) return false;
+      if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) return false;
+    }
+    return true;
+  }
+
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     @Inject(TelemetryPrivacyService) private readonly privacyService: TelemetryPrivacyService
@@ -353,7 +374,7 @@ export class TelemetryService {
           (existing.lessonId || null) === (event.lessonId || null) &&
           existing.eventType === event.eventType &&
           new Date(existing.occurredAt).getTime() === eventTime &&
-          JSON.stringify(existing.metadata || null) === JSON.stringify(event.metadata || null);
+          this.areMetadataEqual(existing.metadata as Record<string, unknown> | null, event.metadata || null);
 
         if (isSamePayload) {
           // Exact duplicate: idempotent ignore (AC-P7-01-SEC-01)
@@ -379,7 +400,7 @@ export class TelemetryService {
           (alreadyInBatch.lessonId || null) === (event.lessonId || null) &&
           alreadyInBatch.eventType === event.eventType &&
           new Date(alreadyInBatch.occurredAt).getTime() === eventTime &&
-          JSON.stringify(alreadyInBatch.metadata || null) === JSON.stringify(event.metadata || null);
+          this.areMetadataEqual(alreadyInBatch.metadata, event.metadata || null);
 
         if (isSamePayload) {
           deduplicatedCount++;
