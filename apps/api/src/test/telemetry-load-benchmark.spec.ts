@@ -3,6 +3,7 @@ import request from 'supertest';
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
+import { monitorEventLoopDelay } from 'perf_hooks';
 import { AppModule } from '../app.module';
 import { DatabaseService, DRIZZLE_DB } from '../database/drizzle.provider';
 import { createTestDatabase } from './test-helper';
@@ -37,9 +38,17 @@ interface BenchmarkMetrics {
   p95Ms: number;
   p99Ms: number;
   maxMs: number;
+  eventLoopDelayMeanMs?: number;
+  eventLoopDelayMaxMs?: number;
+  eventLoopDelayP95Ms?: number;
 }
 
-function computeMetrics(latencies: number[], totalEvents: number, wallClockMs: number): BenchmarkMetrics {
+function computeMetrics(
+  latencies: number[],
+  totalEvents: number,
+  wallClockMs: number,
+  eldMetrics?: { meanMs: number; maxMs: number; p95Ms: number }
+): BenchmarkMetrics {
   const sorted = [...latencies].sort((a, b) => a - b);
   const n = sorted.length;
   const sum = sorted.reduce((acc, val) => acc + val, 0);
@@ -62,6 +71,9 @@ function computeMetrics(latencies: number[], totalEvents: number, wallClockMs: n
     p95Ms: Number(getPercentile(95).toFixed(2)),
     p99Ms: Number(getPercentile(99).toFixed(2)),
     maxMs: Number(sorted[n - 1].toFixed(2)),
+    eventLoopDelayMeanMs: eldMetrics ? Number(eldMetrics.meanMs.toFixed(2)) : undefined,
+    eventLoopDelayMaxMs: eldMetrics ? Number(eldMetrics.maxMs.toFixed(2)) : undefined,
+    eventLoopDelayP95Ms: eldMetrics ? Number(eldMetrics.p95Ms.toFixed(2)) : undefined,
   };
 }
 
@@ -248,6 +260,33 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
         });
       studentCookies.push(loginRes.headers['set-cookie'] as unknown as string[]);
     }
+
+    // Pre-warm route handlers, Zod schema bytecode, and Drizzle query builder templates
+    const warmupBatch = [
+      {
+        eventId: crypto.randomUUID(),
+        courseId: testCourse.id,
+        moduleId: testModule.id,
+        lessonId: videoLesson.id,
+        eventType: 'VIDEO_STARTED',
+        metadata: { watchPositionSeconds: 0, totalDurationSeconds: 1800, playbackRate: 1.0 },
+        occurredAt: new Date().toISOString(),
+      },
+    ];
+    await request(app.getHttpServer())
+      .post('/api/v1/learning/events')
+      .set('Cookie', studentCookies[0])
+      .send({ events: warmupBatch });
+
+    await request(app.getHttpServer())
+      .post('/api/v1/learning/events/beacon')
+      .set('Cookie', studentCookies[0])
+      .set('Content-Type', 'text/plain;charset=UTF-8')
+      .send(JSON.stringify({ events: warmupBatch }));
+
+    // Clean up warmup rows and reset rate limits so benchmark starts clean
+    await testDb.delete(learningEvents);
+    telemetryService.resetRateLimits();
   }, 45000);
 
   afterAll(async () => {
@@ -395,6 +434,9 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
       expect(initialRows).toHaveLength(0);
 
       // Concurrent Execution across 50 students with realistic concurrency pool (10 concurrent streams)
+      const eld = monitorEventLoopDelay({ resolution: 10 });
+      eld.enable();
+
       const startWallClock = performance.now();
       const responses = await runWithConcurrencyLimit(
         studentBatches,
@@ -415,6 +457,7 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
       );
       const endWallClock = performance.now();
       const wallClockMs = endWallClock - startWallClock;
+      eld.disable();
 
       // 1. Verify 100% success rate
       for (const r of responses) {
@@ -425,7 +468,11 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
 
       // 2. Compute performance metrics
       const latencies = responses.map((r) => r.latencyMs);
-      const metrics = computeMetrics(latencies, 500, wallClockMs);
+      const metrics = computeMetrics(latencies, 500, wallClockMs, {
+        meanMs: eld.mean / 1e6,
+        maxMs: eld.max / 1e6,
+        p95Ms: eld.percentile(95) / 1e6,
+      });
 
       // Log verified benchmark scorecard to test output
       console.log('=== P7.1 TELEMETRY INGESTION LOAD BENCHMARK SCORECARD (CONCURRENT POOL = 10) ===');
@@ -441,6 +488,10 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
       console.log(`Latency p95:             ${metrics.p95Ms} ms`);
       console.log(`Latency p99:             ${metrics.p99Ms} ms`);
       console.log(`Latency Max:             ${metrics.maxMs} ms`);
+      if (metrics.eventLoopDelayP95Ms !== undefined) {
+        console.log(`Event Loop Delay (p95):  ${metrics.eventLoopDelayP95Ms} ms`);
+        console.log(`Event Loop Delay (Max):  ${metrics.eventLoopDelayMaxMs} ms`);
+      }
       console.log('================================================================================');
 
       // 3. Assert Acceptance Criteria: Latency p95 must remain < 250ms under sustained concurrent load
@@ -503,6 +554,9 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
         ],
       }));
 
+      const eld = monitorEventLoopDelay({ resolution: 10 });
+      eld.enable();
+
       const startWallClock = performance.now();
       const responses = await Promise.all(
         beaconBatches.map(async (batch, idx) => {
@@ -520,6 +574,7 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
         })
       );
       const wallClockMs = performance.now() - startWallClock;
+      eld.disable();
 
       for (const r of responses) {
         expect(r.status).toBe(200);
@@ -528,7 +583,12 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
       const metrics = computeMetrics(
         responses.map((r) => r.latencyMs),
         beaconStudentsCount,
-        wallClockMs
+        wallClockMs,
+        {
+          meanMs: eld.mean / 1e6,
+          maxMs: eld.max / 1e6,
+          p95Ms: eld.percentile(95) / 1e6,
+        }
       );
 
       console.log('=== P7.1 CONCURRENT EXIT BEACON BENCHMARK SCORECARD ===');
@@ -537,6 +597,10 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
       console.log(`Latency p50:             ${metrics.p50Ms} ms`);
       console.log(`Latency p95:             ${metrics.p95Ms} ms`);
       console.log(`Latency Max:             ${metrics.maxMs} ms`);
+      if (metrics.eventLoopDelayP95Ms !== undefined) {
+        console.log(`Event Loop Delay (p95):  ${metrics.eventLoopDelayP95Ms} ms`);
+        console.log(`Event Loop Delay (Max):  ${metrics.eventLoopDelayMaxMs} ms`);
+      }
       console.log('=======================================================');
 
       if (isStrictBenchmark) {
