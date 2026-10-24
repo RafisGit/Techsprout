@@ -201,5 +201,6 @@ jobs:
           CLOUDINARY_API_KEY: test-key
           CLOUDINARY_API_SECRET: test-secret
           TELEMETRY_BENCHMARK_STRICT: 'true'
+          TELEMETRY_BENCHMARK_USE_POSTGRES: 'true'
         run: |
           pnpm --filter @techsprout/api test:benchmark

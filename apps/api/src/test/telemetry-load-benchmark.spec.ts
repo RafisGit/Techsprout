@@ -6,7 +6,7 @@ import cookieParser from 'cookie-parser';
 import { monitorEventLoopDelay } from 'perf_hooks';
 import { AppModule } from '../app.module';
 import { DatabaseService, DRIZZLE_DB } from '../database/drizzle.provider';
-import { createTestDatabase } from './test-helper';
+import { createTestDatabase, setupTestCloudinaryConfig } from './test-helper';
 import { CryptoUtil } from '../common/auth/crypto.util';
 import * as schema from '../database/schema';
 import { learningEvents } from '../database/schema/telemetry';
@@ -14,6 +14,8 @@ import { eq, sql } from 'drizzle-orm';
 import { TelemetryService } from '../modules/telemetry/telemetry.service';
 import { TelemetryPrivacyService } from '../modules/telemetry/telemetry-privacy.service';
 import * as crypto from 'crypto';
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
 
 /**
  * In dedicated benchmark execution (isolated runner), strictly enforce the p95 latency acceptance gate (< 250ms).
@@ -100,6 +102,7 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
   let app: INestApplication;
   let testDb: any;
   let testPool: any;
+  let isRealDb = false;
   let telemetryService: TelemetryService;
   let privacyService: TelemetryPrivacyService;
 
@@ -112,16 +115,76 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
   let videoLesson: any;
 
   beforeAll(async () => {
-    const mem = await createTestDatabase();
-    testDb = mem.db;
-    testPool = mem.pool;
+    setupTestCloudinaryConfig();
+
+    const usePostgres =
+      process.env.TELEMETRY_BENCHMARK_USE_POSTGRES === 'true' &&
+      !!process.env.DATABASE_URL;
+
+    if (usePostgres) {
+      testPool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+      });
+      testDb = drizzle(testPool, { schema });
+      isRealDb = true;
+
+      // Clean up any existing benchmark fixtures to ensure idempotency
+      await testDb.delete(schema.learningEvents);
+      await testDb
+        .delete(schema.enrollments)
+        .where(
+          sql`${schema.enrollments.studentId} IN (SELECT id FROM ${schema.users} WHERE username LIKE 'synth_student_%')`
+        );
+      await testDb
+        .delete(schema.lessons)
+        .where(eq(schema.lessons.title, 'Load Test Video Lecture (30m)'));
+      await testDb
+        .delete(schema.modules)
+        .where(eq(schema.modules.title, 'High-Throughput Telemetry Module'));
+      await testDb
+        .delete(schema.courses)
+        .where(eq(schema.courses.slug, 'concurrent-video-scrubbing-benchmark'));
+      await testDb
+        .delete(schema.categories)
+        .where(eq(schema.categories.slug, 'load-benchmark-category'));
+      await testDb
+        .delete(schema.userRoles)
+        .where(
+          sql`${schema.userRoles.userId} IN (SELECT id FROM ${schema.users} WHERE username LIKE 'synth_student_%' OR username = 'bench_instructor')`
+        );
+      await testDb
+        .delete(schema.sessions)
+        .where(
+          sql`${schema.sessions.userId} IN (SELECT id FROM ${schema.users} WHERE username LIKE 'synth_student_%' OR username = 'bench_instructor')`
+        );
+      await testDb
+        .delete(schema.users)
+        .where(
+          sql`${schema.users.username} LIKE 'synth_student_%' OR ${schema.users.username} = 'bench_instructor'`
+        );
+    } else {
+      const mem = await createTestDatabase();
+      testDb = mem.db;
+      testPool = mem.pool;
+      isRealDb = false;
+    }
 
     // Seed Instructor
-    const [instructorRole] = await testDb
+    let [instructorRole] = await testDb
       .select()
       .from(schema.roles)
       .where(eq(schema.roles.name, 'instructor'))
       .limit(1);
+
+    if (!instructorRole) {
+      [instructorRole] = await testDb
+        .insert(schema.roles)
+        .values({
+          name: 'instructor',
+          description: 'Course instructor with curriculum authoring privileges',
+        })
+        .returning();
+    }
 
     const instPasswordHash = await CryptoUtil.hashPassword('InstructorPass123!');
     const [instructorUser] = await testDb
@@ -189,11 +252,21 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
     videoLesson = les;
 
     // Seed 50 Concurrent Students & Active Enrollments
-    const [studentRole] = await testDb
+    let [studentRole] = await testDb
       .select()
       .from(schema.roles)
       .where(eq(schema.roles.name, 'student'))
       .limit(1);
+
+    if (!studentRole) {
+      [studentRole] = await testDb
+        .insert(schema.roles)
+        .values({
+          name: 'student',
+          description: 'Enrolled student with standard course access',
+        })
+        .returning();
+    }
 
     const studentPasswordHash = await CryptoUtil.hashPassword('BenchStudentPass123!');
 
@@ -290,8 +363,50 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
   }, 45000);
 
   afterAll(async () => {
+    if (isRealDb && testDb) {
+      try {
+        await testDb.delete(schema.learningEvents);
+        await testDb
+          .delete(schema.enrollments)
+          .where(
+            sql`${schema.enrollments.studentId} IN (SELECT id FROM ${schema.users} WHERE username LIKE 'synth_student_%')`
+          );
+        await testDb
+          .delete(schema.lessons)
+          .where(eq(schema.lessons.title, 'Load Test Video Lecture (30m)'));
+        await testDb
+          .delete(schema.modules)
+          .where(eq(schema.modules.title, 'High-Throughput Telemetry Module'));
+        await testDb
+          .delete(schema.courses)
+          .where(eq(schema.courses.slug, 'concurrent-video-scrubbing-benchmark'));
+        await testDb
+          .delete(schema.categories)
+          .where(eq(schema.categories.slug, 'load-benchmark-category'));
+        await testDb
+          .delete(schema.userRoles)
+          .where(
+            sql`${schema.userRoles.userId} IN (SELECT id FROM ${schema.users} WHERE username LIKE 'synth_student_%' OR username = 'bench_instructor')`
+          );
+        await testDb
+          .delete(schema.sessions)
+          .where(
+            sql`${schema.sessions.userId} IN (SELECT id FROM ${schema.users} WHERE username LIKE 'synth_student_%' OR username = 'bench_instructor')`
+          );
+        await testDb
+          .delete(schema.users)
+          .where(
+            sql`${schema.users.username} LIKE 'synth_student_%' OR ${schema.users.username} = 'bench_instructor'`
+          );
+      } catch {
+        // Ignore teardown cleanup errors
+      }
+    }
     if (app) {
       await app.close();
+    }
+    if (isRealDb && testPool) {
+      await testPool.end();
     }
   });
 
@@ -476,6 +591,7 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
 
       // Log verified benchmark scorecard to test output
       console.log('=== P7.1 TELEMETRY INGESTION LOAD BENCHMARK SCORECARD (CONCURRENT POOL = 10) ===');
+      console.log(`Database Adapter:        ${isRealDb ? 'PostgreSQL 16 (Provisioned Service)' : 'pg-mem (In-Memory Fallback)'}`);
       console.log(`Concurrent Students:     ${CONCURRENT_STUDENTS}`);
       console.log(`Total Requests:          ${metrics.totalRequests}`);
       console.log(`Total Ingested Events:   ${metrics.totalEvents}`);
@@ -592,6 +708,7 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
       );
 
       console.log('=== P7.1 CONCURRENT EXIT BEACON BENCHMARK SCORECARD ===');
+      console.log(`Database Adapter:        ${isRealDb ? 'PostgreSQL 16 (Provisioned Service)' : 'pg-mem (In-Memory Fallback)'}`);
       console.log(`Concurrent Exit Beacons: ${beaconStudentsCount}`);
       console.log(`Throughput (Req/sec):    ${metrics.throughputReqPerSec} req/s`);
       console.log(`Latency p50:             ${metrics.p50Ms} ms`);
