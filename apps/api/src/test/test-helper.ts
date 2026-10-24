@@ -4,8 +4,36 @@ import * as schema from '../database/schema';
 import { CryptoUtil } from '../common/auth/crypto.util';
 import { SEED_ROLES, SEED_USERS } from '../database/seed/fixtures';
 import * as crypto from 'crypto';
+import { env } from '../config/env.config';
+
+/**
+ * Configure test-safe dummy credentials for Cloudinary during unit and integration tests.
+ * Never supplies real credentials or connects to Cloudinary production endpoints.
+ */
+export function setupTestCloudinaryConfig(overrides?: {
+  cloudName?: string;
+  apiKey?: string;
+  apiSecret?: string;
+}) {
+  env.CLOUDINARY_CLOUD_NAME = overrides?.cloudName ?? process.env.CLOUDINARY_CLOUD_NAME ?? 'test-cloud';
+  env.CLOUDINARY_API_KEY = overrides?.apiKey ?? process.env.CLOUDINARY_API_KEY ?? 'test-key';
+  env.CLOUDINARY_API_SECRET = overrides?.apiSecret ?? process.env.CLOUDINARY_API_SECRET ?? 'test-secret';
+}
+
+/**
+ * Temporarily clears Cloudinary configuration in memory for testing unconfigured error paths.
+ */
+export function clearTestCloudinaryConfig() {
+  env.CLOUDINARY_CLOUD_NAME = undefined;
+  env.CLOUDINARY_API_KEY = undefined;
+  env.CLOUDINARY_API_SECRET = undefined;
+}
 
 export async function createTestDatabase() {
+  if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET) {
+    setupTestCloudinaryConfig();
+  }
+
   const memDb = newDb({ autoCreateForeignKeyIndices: true });
 
   // Register gen_random_uuid function for UUID generation

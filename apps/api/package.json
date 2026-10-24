@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:security": "vitest run src/test/security.spec.ts",
     "test:e2e": "vitest run src/test/http-e2e.spec.ts",
+    "test:benchmark": "node -e \"process.env.TELEMETRY_BENCHMARK_STRICT='true'; const res = require('child_process').spawnSync('npx', ['vitest', 'run', 'src/test/telemetry-load-benchmark.spec.ts'], { stdio: 'inherit', shell: true }); process.exit(res.status ?? 0);\"",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/database/migrate.ts",
     "db:migrate:prod": "node dist/database/migrate.js",

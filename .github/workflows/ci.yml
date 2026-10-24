@@ -91,8 +91,23 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/techsprout_test
           REDIS_URL: redis://localhost:6379
           AUTH_SECRET: ci_secret_key_minimum_32_characters_for_tests
+          CLOUDINARY_CLOUD_NAME: test-cloud
+          CLOUDINARY_API_KEY: test-key
+          CLOUDINARY_API_SECRET: test-secret
         run: |
           pnpm --filter @techsprout/api test
+
+      - name: Run Dedicated Telemetry Load Benchmark Performance Gate
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/techsprout_test
+          REDIS_URL: redis://localhost:6379
+          AUTH_SECRET: ci_secret_key_minimum_32_characters_for_tests
+          CLOUDINARY_CLOUD_NAME: test-cloud
+          CLOUDINARY_API_KEY: test-key
+          CLOUDINARY_API_SECRET: test-secret
+          TELEMETRY_BENCHMARK_STRICT: 'true'
+        run: |
+          pnpm --filter @techsprout/api test:benchmark
 
       - name: Monorepo Production Build
         run: |
