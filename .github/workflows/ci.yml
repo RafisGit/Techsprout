@@ -97,6 +97,101 @@ jobs:
         run: |
           pnpm --filter @techsprout/api test
 
+      - name: Monorepo Production Build
+        run: |
+          pnpm build
+
+  benchmark:
+    name: Telemetry Load Benchmark Performance Gate
+    needs: validate
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: techsprout_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js v20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install Monorepo Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Contracts
+        run: pnpm --filter @techsprout/contracts build
+
+      - name: Record Runner Diagnostics & System Specifications
+        shell: bash
+        run: |
+          echo "=========================================================================="
+          echo "=== RUNNER HARDWARE & SYSTEM DIAGNOSTICS ==="
+          echo "=========================================================================="
+          echo "--- Operating System / Distribution ---"
+          cat /etc/os-release
+          echo "--- Kernel Version ---"
+          uname -a
+          echo "--- Available CPU Cores & Architecture ---"
+          echo "Logical CPUs (nproc): $(nproc)"
+          lscpu 2>/dev/null || true
+          echo "--- System Memory & Swap Allocation ---"
+          free -h
+          echo "--- Node.js & Package Manager Versions ---"
+          node -v
+          pnpm -v
+          echo "=========================================================================="
+
+      - name: Run Database Migrations
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/techsprout_test
+        run: |
+          pnpm --filter @techsprout/api db:migrate
+          pnpm --filter @techsprout/api db:seed
+
       - name: Run Dedicated Telemetry Load Benchmark Performance Gate
         env:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/techsprout_test
@@ -108,7 +203,3 @@ jobs:
           TELEMETRY_BENCHMARK_STRICT: 'true'
         run: |
           pnpm --filter @techsprout/api test:benchmark
-
-      - name: Monorepo Production Build
-        run: |
-          pnpm build
