@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import request from 'supertest';
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -10,8 +10,13 @@ import { DatabaseService, DRIZZLE_DB } from '../database/drizzle.provider';
 import {
   createTestDatabase,
   setupTestCloudinaryConfig,
+  assertSafeDatabaseUrl,
   assertSafeTestDatabase,
   cleanupBenchmarkFixtures,
+  isSafeTestDatabaseName,
+  normalizeTestHost,
+  ALLOWED_TEST_HOSTS,
+  ALLOWED_TEST_DB_NAMES,
 } from './test-helper';
 import { CryptoUtil } from '../common/auth/crypto.util';
 import * as schema from '../database/schema';
@@ -19,7 +24,7 @@ import { learningEvents } from '../database/schema/telemetry';
 import { TelemetryService, areJsonValuesEqual } from '../modules/telemetry/telemetry.service';
 import { telemetryMetadataSchema, telemetryEventSchema } from '../modules/telemetry/dto/telemetry.dto';
 
-describe('P8.0.11: JSONB Equality, Idempotency & Benchmark Database Safety', () => {
+describe('P8.0.11 / P8.0.12: JSONB Equality, Idempotency & Strict Benchmark Database Safety', () => {
   // =========================================================================
   // 1. METADATA CONTRACT VALIDATION (SCALAR RESTRICTION ENFORCEMENT)
   // =========================================================================
@@ -335,6 +340,9 @@ describe('P8.0.11: JSONB Equality, Idempotency & Benchmark Database Safety', () 
       if (app) {
         await app.close();
       }
+      if (testPool) {
+        await testPool.end();
+      }
     });
 
     it('3.1 should idempotently accept duplicate submission with reordered metadata keys', async () => {
@@ -512,58 +520,104 @@ describe('P8.0.11: JSONB Equality, Idempotency & Benchmark Database Safety', () 
   });
 
   // =========================================================================
-  // 4. BENCHMARK DATABASE SAFETY GUARD (assertSafeTestDatabase)
+  // 4. BENCHMARK DATABASE SAFETY GUARD & STRICT ALLOWLIST ENFORCEMENT (P8.0.12)
   // =========================================================================
-  describe('4. Benchmark Database Safety Guard & Allowlist Enforcement', () => {
-    it('4.1 should reject remote or production database hosts', () => {
+  describe('4. Strict Benchmark Database Safety Guard & Allowlist Hardening', () => {
+    it('4.1 should strictly reject generic postgres and test database names', () => {
+      // postgres must be rejected in URL and in server identity
       expect(() => {
-        assertSafeTestDatabase('postgresql://user:pass@production-db.render.com:5432/techsprout_test');
+        assertSafeDatabaseUrl('postgresql://postgres:postgrespassword@localhost:5432/postgres');
+      }).toThrow(/does not match test naming allowlist/);
+
+      expect(() => {
+        assertSafeTestDatabase(
+          'postgresql://postgres:postgrespassword@localhost:5432/postgres',
+          'postgres'
+        );
+      }).toThrow(/does not match test naming allowlist/);
+
+      // generic 'test' must be rejected in URL and in server identity
+      expect(() => {
+        assertSafeDatabaseUrl('postgresql://postgres:postgrespassword@localhost:5432/test');
+      }).toThrow(/does not match test naming allowlist/);
+
+      expect(() => {
+        assertSafeTestDatabase(
+          'postgresql://postgres:postgrespassword@localhost:5432/test',
+          'test'
+        );
+      }).toThrow(/does not match test naming allowlist/);
+    });
+
+    it('4.2 should strictly reject 0.0.0.0, remote hosts, and staging/production databases', () => {
+      // 0.0.0.0 must be rejected
+      expect(() => {
+        assertSafeDatabaseUrl('postgresql://user:pass@0.0.0.0:5432/techsprout_test');
+      }).toThrow(/Host '0.0.0.0' is not a permitted local test host/);
+
+      // Remote cloud hosts must be rejected
+      expect(() => {
+        assertSafeDatabaseUrl('postgresql://user:pass@production-db.render.com:5432/techsprout_test');
       }).toThrow(/permitted local test host/);
 
       expect(() => {
-        assertSafeTestDatabase('postgresql://user:pass@db.aws.neon.tech:5432/techsprout_test');
+        assertSafeDatabaseUrl('postgresql://user:pass@db.aws.neon.tech:5432/techsprout_test');
       }).toThrow(/permitted local test host/);
-    });
 
-    it('4.2 should reject production or non-test database names even on localhost', () => {
       expect(() => {
-        assertSafeTestDatabase('postgresql://postgres:pass@localhost:5432/techsprout');
+        assertSafeDatabaseUrl('postgresql://user:pass@192.168.1.100:5432/techsprout_test');
+      }).toThrow(/permitted local test host/);
+
+      // Production & staging names must be rejected even on localhost
+      expect(() => {
+        assertSafeDatabaseUrl('postgresql://postgres:pass@localhost:5432/techsprout');
       }).toThrow(/does not match test naming allowlist/);
 
       expect(() => {
-        assertSafeTestDatabase('postgresql://postgres:pass@127.0.0.1:5432/prod_db');
+        assertSafeDatabaseUrl('postgresql://postgres:pass@127.0.0.1:5432/techsprout_prod');
       }).toThrow(/does not match test naming allowlist/);
 
       expect(() => {
-        assertSafeTestDatabase('postgresql://postgres:pass@localhost:5432/techsprout_staging');
+        assertSafeDatabaseUrl('postgresql://postgres:pass@localhost:5432/techsprout_staging');
+      }).toThrow(/does not match test naming allowlist/);
+
+      expect(() => {
+        assertSafeDatabaseUrl('postgresql://postgres:pass@localhost:5432/staging');
+      }).toThrow(/does not match test naming allowlist/);
+
+      expect(() => {
+        assertSafeDatabaseUrl('postgresql://postgres:pass@localhost:5432/production');
       }).toThrow(/does not match test naming allowlist/);
     });
 
-    it('4.3 should reject if server-verified current_database() does not match test allowlist', () => {
+    it('4.3 should correctly handle IPv6 loopback URL syntax (accepted and rejected forms)', () => {
+      // Valid RFC bracketed IPv6 loopback forms:
       expect(() => {
-        assertSafeTestDatabase('postgresql://postgres:pass@localhost:5432/techsprout_test', 'techsprout');
-      }).toThrow(/Verified server current_database.*does not match test allowlist/);
-
-      expect(() => {
-        assertSafeTestDatabase('postgresql://postgres:pass@localhost:5432/techsprout_test', 'production_master');
-      }).toThrow(/Verified server current_database.*does not match test allowlist/);
-    });
-
-    it('4.4 should reject missing, null, or malformed database URLs', () => {
-      expect(() => {
-        assertSafeTestDatabase('');
-      }).toThrow(/missing or empty/);
-
-      expect(() => {
-        assertSafeTestDatabase('not-a-valid-url');
-      }).toThrow(/Invalid DATABASE_URL/);
-    });
-
-    it('4.5 should permit valid local test and benchmark database configurations', () => {
-      expect(() => {
-        assertSafeTestDatabase('postgresql://postgres:postgrespassword@localhost:5432/techsprout_test');
+        assertSafeTestDatabase(
+          'postgresql://postgres:postgrespassword@[::1]:5432/techsprout_test',
+          'techsprout_test'
+        );
       }).not.toThrow();
 
+      expect(() => {
+        assertSafeTestDatabase(
+          'postgresql://postgres:postgrespassword@[0:0:0:0:0:0:0:1]:5432/techsprout_benchmark',
+          'techsprout_benchmark'
+        );
+      }).not.toThrow();
+
+      // Unbracketed IPv6 URL syntax is invalid under standard URL specification
+      expect(() => {
+        assertSafeDatabaseUrl('postgresql://postgres:postgrespassword@::1:5432/techsprout_test');
+      }).toThrow(/Invalid DATABASE_URL/);
+
+      // Non-loopback IPv6 addresses must be rejected
+      expect(() => {
+        assertSafeDatabaseUrl('postgresql://postgres:pass@[2001:db8::1]:5432/techsprout_test');
+      }).toThrow(/permitted local test host/);
+    });
+
+    it('4.4 should accept dedicated CI test and benchmark databases', () => {
       expect(() => {
         assertSafeTestDatabase(
           'postgresql://postgres:postgrespassword@localhost:5432/techsprout_test',
@@ -572,12 +626,262 @@ describe('P8.0.11: JSONB Equality, Idempotency & Benchmark Database Safety', () 
       }).not.toThrow();
 
       expect(() => {
-        assertSafeTestDatabase('postgresql://postgres:postgrespassword@127.0.0.1:5432/techsprout_benchmark');
+        assertSafeTestDatabase(
+          'postgresql://postgres:postgrespassword@127.0.0.1:5432/techsprout_benchmark',
+          'techsprout_benchmark'
+        );
+      }).not.toThrow();
+
+      // Custom databases with _test or _benchmark suffix
+      expect(() => {
+        assertSafeTestDatabase(
+          'postgresql://postgres:postgrespassword@localhost:5432/telemetry_load_benchmark',
+          'telemetry_load_benchmark'
+        );
       }).not.toThrow();
 
       expect(() => {
-        assertSafeTestDatabase('postgresql://postgres:postgrespassword@localhost:5432/postgres');
+        assertSafeTestDatabase(
+          'postgresql://postgres:postgrespassword@localhost:5432/worker_integration_test',
+          'worker_integration_test'
+        );
       }).not.toThrow();
+    });
+
+    it('4.5 should reject when URL database name and server-reported database name differ', () => {
+      // URL says techsprout_test, server reports techsprout_benchmark
+      expect(() => {
+        assertSafeTestDatabase(
+          'postgresql://postgres:postgrespassword@localhost:5432/techsprout_test',
+          'techsprout_benchmark'
+        );
+      }).toThrow(/URL database name 'techsprout_test' does not match server-verified current_database\(\) 'techsprout_benchmark'/);
+
+      // URL says techsprout_test, server reports techsprout
+      expect(() => {
+        assertSafeTestDatabase(
+          'postgresql://postgres:postgrespassword@localhost:5432/techsprout_test',
+          'techsprout'
+        );
+      }).toThrow(/does not match test allowlist/);
+    });
+
+    it('4.6 should reject missing, null, empty, or whitespace-only connection identity before cleanup', () => {
+      // Missing currentDatabaseName argument
+      expect(() => {
+        assertSafeTestDatabase('postgresql://postgres:postgrespassword@localhost:5432/techsprout_test');
+      }).toThrow(/Server-verified database identity \(SELECT current_database\(\)\) is missing or empty/);
+
+      // Empty string
+      expect(() => {
+        assertSafeTestDatabase(
+          'postgresql://postgres:postgrespassword@localhost:5432/techsprout_test',
+          ''
+        );
+      }).toThrow(/Server-verified database identity.*is missing or empty/);
+
+      // Whitespace string
+      expect(() => {
+        assertSafeTestDatabase(
+          'postgresql://postgres:postgrespassword@localhost:5432/techsprout_test',
+          '   '
+        );
+      }).toThrow(/Server-verified database identity.*is missing or empty/);
+
+      // Undefined or null
+      expect(() => {
+        assertSafeTestDatabase(
+          'postgresql://postgres:postgrespassword@localhost:5432/techsprout_test',
+          undefined as any
+        );
+      }).toThrow(/Server-verified database identity.*is missing or empty/);
+    });
+
+    it('4.7 should prove that rejected configurations NEVER invoke destructive cleanup statements', async () => {
+      const mockDelete = vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([]),
+      });
+
+      // 1. Rejected target: production database name
+      const mockDbProd = {
+        delete: mockDelete,
+        execute: vi.fn().mockResolvedValue({ rows: [{ current_database: 'techsprout' }] }),
+      };
+
+      await expect(
+        cleanupBenchmarkFixtures(mockDbProd, {
+          databaseUrl: 'postgresql://localhost:5432/techsprout',
+          currentDatabaseName: 'techsprout',
+        })
+      ).rejects.toThrow(/does not match test/);
+      expect(mockDelete).not.toHaveBeenCalled();
+
+      // 2. Rejected target: generic postgres database
+      const mockDbPostgres = {
+        delete: mockDelete,
+        execute: vi.fn().mockResolvedValue({ rows: [{ current_database: 'postgres' }] }),
+      };
+
+      await expect(
+        cleanupBenchmarkFixtures(mockDbPostgres, {
+          databaseUrl: 'postgresql://localhost:5432/postgres',
+          currentDatabaseName: 'postgres',
+        })
+      ).rejects.toThrow(/does not match test/);
+      expect(mockDelete).not.toHaveBeenCalled();
+
+      // 3. Rejected target: 0.0.0.0 host
+      const mockDbZeroHost = {
+        delete: mockDelete,
+        execute: vi.fn().mockResolvedValue({ rows: [{ current_database: 'techsprout_test' }] }),
+      };
+
+      await expect(
+        cleanupBenchmarkFixtures(mockDbZeroHost, {
+          databaseUrl: 'postgresql://0.0.0.0:5432/techsprout_test',
+          currentDatabaseName: 'techsprout_test',
+        })
+      ).rejects.toThrow(/Host '0.0.0.0' is not a permitted local test host/);
+      expect(mockDelete).not.toHaveBeenCalled();
+
+      // 4. Rejected target: Mismatched URL vs server identity
+      const mockDbMismatch = {
+        delete: mockDelete,
+        execute: vi.fn().mockResolvedValue({ rows: [{ current_database: 'techsprout_benchmark' }] }),
+      };
+
+      await expect(
+        cleanupBenchmarkFixtures(mockDbMismatch, {
+          databaseUrl: 'postgresql://localhost:5432/techsprout_test',
+          currentDatabaseName: 'techsprout_benchmark',
+        })
+      ).rejects.toThrow(/does not match server-verified current_database/);
+      expect(mockDelete).not.toHaveBeenCalled();
+
+      // 5. Rejected target: Server identity query failure
+      const mockDbFailedExec = {
+        delete: mockDelete,
+        execute: vi.fn().mockRejectedValue(new Error('Connection terminated')),
+      };
+
+      await expect(
+        cleanupBenchmarkFixtures(mockDbFailedExec)
+      ).rejects.toThrow(/Failed to verify server current_database/);
+      expect(mockDelete).not.toHaveBeenCalled();
+    });
+
+    it('4.8 should confirm fixture cleanup leaves unrelated learning events and courses untouched', async () => {
+      // Set up in-memory database with test fixtures
+      const mem = await createTestDatabase();
+      const db = mem.db;
+
+      // 1. Create a non-benchmark course and non-benchmark learning event
+      const [category] = await db
+        .insert(schema.categories)
+        .values({
+          name: 'Unrelated Production Category',
+          slug: 'unrelated-prod-category',
+          isActive: true,
+        })
+        .returning();
+
+      const [instructor] = await db
+        .insert(schema.users)
+        .values({
+          name: 'Regular Instructor',
+          username: 'regular_instructor',
+          email: 'regular@techsprout.edu',
+          passwordHash: 'dummy-hash',
+          isVerified: true,
+        })
+        .returning();
+
+      const [nonBenchmarkCourse] = await db
+        .insert(schema.courses)
+        .values({
+          title: 'Unrelated Machine Learning Course',
+          slug: 'unrelated-ml-course',
+          status: 'PUBLISHED',
+          visibility: 'PUBLIC',
+          categoryId: category.id,
+          instructorId: instructor.id,
+          price: '0.00',
+        })
+        .returning();
+
+      const nonBenchmarkEventId = crypto.randomUUID();
+      await db.insert(schema.learningEvents).values({
+        id: nonBenchmarkEventId,
+        userId: '1111222233334444555566667777888899990000aaaabbbbccccddddeeeeffff',
+        courseId: nonBenchmarkCourse.id,
+        eventType: 'COURSE_OPENED',
+        metadata: { watchPositionSeconds: 0 },
+        occurredAt: new Date(),
+      });
+
+      // 2. Also create a benchmark event
+      const [benchCat] = await db
+        .insert(schema.categories)
+        .values({
+          name: 'Load Benchmark Category',
+          slug: 'load-benchmark-category',
+          isActive: true,
+        })
+        .returning();
+
+      const [benchCourse] = await db
+        .insert(schema.courses)
+        .values({
+          title: 'Concurrent Video Scrubbing Benchmark',
+          slug: 'concurrent-video-scrubbing-benchmark',
+          status: 'PUBLISHED',
+          visibility: 'PUBLIC',
+          categoryId: benchCat.id,
+          instructorId: instructor.id,
+          price: '0.00',
+        })
+        .returning();
+
+      const benchEventId = crypto.randomUUID();
+      await db.insert(schema.learningEvents).values({
+        id: benchEventId,
+        userId: '222233334444555566667777888899990000aaaabbbbccccddddeeeeffff1111',
+        courseId: benchCourse.id,
+        eventType: 'VIDEO_CHECKPOINT',
+        metadata: { watchPositionSeconds: 30 },
+        occurredAt: new Date(),
+      });
+
+      // 3. Execute cleanupBenchmarkFixtures
+      await cleanupBenchmarkFixtures(db, { databaseUrl: null, currentDatabaseName: 'techsprout_test' });
+
+      // 4. Verify benchmark records were removed
+      const [checkBenchEvent] = await db
+        .select()
+        .from(schema.learningEvents)
+        .where(eq(schema.learningEvents.id, benchEventId));
+      expect(checkBenchEvent).toBeUndefined();
+
+      const [checkBenchCourse] = await db
+        .select()
+        .from(schema.courses)
+        .where(eq(schema.courses.id, benchCourse.id));
+      expect(checkBenchCourse).toBeUndefined();
+
+      // 5. Verify non-benchmark records were preserved completely intact!
+      const [checkNonBenchEvent] = await db
+        .select()
+        .from(schema.learningEvents)
+        .where(eq(schema.learningEvents.id, nonBenchmarkEventId));
+      expect(checkNonBenchEvent).toBeDefined();
+
+      const [checkNonBenchCourse] = await db
+        .select()
+        .from(schema.courses)
+        .where(eq(schema.courses.id, nonBenchmarkCourse.id));
+      expect(checkNonBenchCourse).toBeDefined();
+
+      await mem.pool.end();
     });
   });
 });

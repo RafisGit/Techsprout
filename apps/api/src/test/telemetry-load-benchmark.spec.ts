@@ -9,6 +9,7 @@ import { DatabaseService, DRIZZLE_DB } from '../database/drizzle.provider';
 import {
   createTestDatabase,
   setupTestCloudinaryConfig,
+  assertSafeDatabaseUrl,
   assertSafeTestDatabase,
   cleanupBenchmarkFixtures,
   BENCHMARK_COURSE_SLUG,
@@ -129,7 +130,7 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
 
     if (usePostgres) {
       // 1. Preflight URL safety check: fail closed if non-local or non-test database URL
-      assertSafeTestDatabase(process.env.DATABASE_URL!);
+      assertSafeDatabaseUrl(process.env.DATABASE_URL!);
 
       testPool = new Pool({
         connectionString: process.env.DATABASE_URL,
@@ -144,7 +145,10 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
       isRealDb = true;
 
       // 3. Fixture-scoped cleanup: removes ONLY benchmark records (never broad table delete)
-      await cleanupBenchmarkFixtures(testDb);
+      await cleanupBenchmarkFixtures(testDb, {
+        databaseUrl: process.env.DATABASE_URL!,
+        currentDatabaseName: currentDb,
+      });
     } else {
       const mem = await createTestDatabase();
       testDb = mem.db;
@@ -152,7 +156,7 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
       isRealDb = false;
 
       // Ensure clean benchmark state in in-memory database as well
-      await cleanupBenchmarkFixtures(testDb);
+      await cleanupBenchmarkFixtures(testDb, { databaseUrl: null });
     }
 
     // Seed Instructor
@@ -344,8 +348,10 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
       .send(JSON.stringify({ events: warmupBatch }));
 
     // Clean up warmup rows and reset rate limits so benchmark starts clean
-    if (isRealDb && process.env.DATABASE_URL) {
-      assertSafeTestDatabase(process.env.DATABASE_URL);
+    if (isRealDb && process.env.DATABASE_URL && testPool) {
+      const identityRes = await testPool.query('SELECT current_database()');
+      const currentDb = identityRes.rows[0]?.current_database;
+      assertSafeTestDatabase(process.env.DATABASE_URL, currentDb);
     }
     await testDb.delete(schema.learningEvents).where(
       sql`${schema.learningEvents.courseId} IN (
@@ -357,11 +363,16 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
 
   afterAll(async () => {
     try {
-      if (isRealDb && testDb && process.env.DATABASE_URL) {
-        assertSafeTestDatabase(process.env.DATABASE_URL);
-        await cleanupBenchmarkFixtures(testDb);
+      if (isRealDb && testDb && process.env.DATABASE_URL && testPool) {
+        const identityRes = await testPool.query('SELECT current_database()');
+        const currentDb = identityRes.rows[0]?.current_database;
+        assertSafeTestDatabase(process.env.DATABASE_URL, currentDb);
+        await cleanupBenchmarkFixtures(testDb, {
+          databaseUrl: process.env.DATABASE_URL,
+          currentDatabaseName: currentDb,
+        });
       } else if (!isRealDb && testDb) {
-        await cleanupBenchmarkFixtures(testDb);
+        await cleanupBenchmarkFixtures(testDb, { databaseUrl: null });
       }
     } catch (err) {
       console.error('[Benchmark Teardown] Error during fixture cleanup:', err);
