@@ -11,6 +11,7 @@ import {
   setupTestCloudinaryConfig,
   assertSafeTestDatabase,
   cleanupBenchmarkFixtures,
+  BENCHMARK_COURSE_SLUG,
 } from './test-helper';
 import { CryptoUtil } from '../common/auth/crypto.util';
 import * as schema from '../database/schema';
@@ -343,55 +344,34 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
       .send(JSON.stringify({ events: warmupBatch }));
 
     // Clean up warmup rows and reset rate limits so benchmark starts clean
-    await testDb.delete(learningEvents);
+    if (isRealDb && process.env.DATABASE_URL) {
+      assertSafeTestDatabase(process.env.DATABASE_URL);
+    }
+    await testDb.delete(schema.learningEvents).where(
+      sql`${schema.learningEvents.courseId} IN (
+        SELECT id FROM ${schema.courses} WHERE slug = ${BENCHMARK_COURSE_SLUG}
+      )`
+    );
     telemetryService.resetRateLimits();
   }, 45000);
 
   afterAll(async () => {
-    if (isRealDb && testDb) {
-      try {
-        await testDb.delete(schema.learningEvents);
-        await testDb
-          .delete(schema.enrollments)
-          .where(
-            sql`${schema.enrollments.studentId} IN (SELECT id FROM ${schema.users} WHERE username LIKE 'synth_student_%')`
-          );
-        await testDb
-          .delete(schema.lessons)
-          .where(eq(schema.lessons.title, 'Load Test Video Lecture (30m)'));
-        await testDb
-          .delete(schema.modules)
-          .where(eq(schema.modules.title, 'High-Throughput Telemetry Module'));
-        await testDb
-          .delete(schema.courses)
-          .where(eq(schema.courses.slug, 'concurrent-video-scrubbing-benchmark'));
-        await testDb
-          .delete(schema.categories)
-          .where(eq(schema.categories.slug, 'load-benchmark-category'));
-        await testDb
-          .delete(schema.userRoles)
-          .where(
-            sql`${schema.userRoles.userId} IN (SELECT id FROM ${schema.users} WHERE username LIKE 'synth_student_%' OR username = 'bench_instructor')`
-          );
-        await testDb
-          .delete(schema.sessions)
-          .where(
-            sql`${schema.sessions.userId} IN (SELECT id FROM ${schema.users} WHERE username LIKE 'synth_student_%' OR username = 'bench_instructor')`
-          );
-        await testDb
-          .delete(schema.users)
-          .where(
-            sql`${schema.users.username} LIKE 'synth_student_%' OR ${schema.users.username} = 'bench_instructor'`
-          );
-      } catch {
-        // Ignore teardown cleanup errors
+    try {
+      if (isRealDb && testDb && process.env.DATABASE_URL) {
+        assertSafeTestDatabase(process.env.DATABASE_URL);
+        await cleanupBenchmarkFixtures(testDb);
+      } else if (!isRealDb && testDb) {
+        await cleanupBenchmarkFixtures(testDb);
       }
-    }
-    if (app) {
-      await app.close();
-    }
-    if (isRealDb && testPool) {
-      await testPool.end();
+    } catch (err) {
+      console.error('[Benchmark Teardown] Error during fixture cleanup:', err);
+    } finally {
+      if (app) {
+        await app.close();
+      }
+      if (testPool) {
+        await testPool.end();
+      }
     }
   });
 
@@ -831,24 +811,5 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
 
       expect(Number(countAfter[0].count)).toBe(Number(countBefore[0].count));
     });
-  });
-
-  afterAll(async () => {
-    try {
-      if (isRealDb && testDb && process.env.DATABASE_URL) {
-        // Safe teardown: verify identity and clean up benchmark fixtures
-        assertSafeTestDatabase(process.env.DATABASE_URL);
-        await cleanupBenchmarkFixtures(testDb);
-      }
-    } catch (err) {
-      console.error('[Benchmark Teardown] Error during fixture cleanup:', err);
-    } finally {
-      if (app) {
-        await app.close();
-      }
-      if (testPool) {
-        await testPool.end();
-      }
-    }
   });
 });
