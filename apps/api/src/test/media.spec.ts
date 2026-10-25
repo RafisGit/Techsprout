@@ -60,6 +60,9 @@ describe('Media & Cloudinary Service Test Suite', () => {
   });
 
   afterEach(() => {
+    env.CLOUDINARY_CLOUD_NAME = 'test-cloud';
+    env.CLOUDINARY_API_KEY = 'test-api-key';
+    env.CLOUDINARY_API_SECRET = 'test-api-secret-12345';
     vi.restoreAllMocks();
   });
 

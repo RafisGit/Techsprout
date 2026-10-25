@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createTestDatabase } from './test-helper';
+import {
+  createTestDatabase,
+  setupTestCloudinaryConfig,
+  clearTestCloudinaryConfig,
+} from './test-helper';
 import {
   categories,
   media,
@@ -100,6 +104,7 @@ describe('P2.1 — Catalog Database & Media Persistence Test Suite', () => {
   });
 
   afterEach(async () => {
+    setupTestCloudinaryConfig();
     if (pool) {
       await pool.end();
     }
@@ -588,6 +593,31 @@ describe('P2.1 — Catalog Database & Media Persistence Test Suite', () => {
 
       // Verify Cloudinary compensation was triggered
       expect(mockCloudinaryClient.uploader.destroy).toHaveBeenCalled();
+    });
+
+    it('CASE D: missing Cloudinary configuration throws CLOUDINARY_NOT_CONFIGURED and prevents database persistence', async () => {
+      clearTestCloudinaryConfig();
+
+      const initialCount = (await db.select().from(media)).length;
+      const mockFile = {
+        buffer: Buffer.from('fake image content'),
+        mimetype: 'image/jpeg',
+        originalname: 'unconfigured.jpg',
+      };
+
+      try {
+        await mediaService.uploadImage(mockFile);
+        expect.unreachable('Should have thrown ApiException');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(ApiException);
+        expect(err.getStatus()).toBe(HttpStatus.SERVICE_UNAVAILABLE);
+        expect(err.errorCode).toBe('CLOUDINARY_NOT_CONFIGURED');
+      }
+
+      const finalCount = (await db.select().from(media)).length;
+      expect(finalCount).toBe(initialCount);
+
+      setupTestCloudinaryConfig();
     });
 
     it('should delete from Cloudinary and remove PostgreSQL row on deleteImage', async () => {
