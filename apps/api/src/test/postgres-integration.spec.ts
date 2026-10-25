@@ -9,8 +9,11 @@ import { OtpService } from '../modules/otp/otp.service';
 import { UsersService } from '../modules/users/users.service';
 import { CryptoUtil } from '../common/auth/crypto.util';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { eq } from 'drizzle-orm';
 import { SEED_ROLES, SEED_USERS } from '../database/seed/fixtures';
+import { areJsonValuesEqual } from '../modules/telemetry/telemetry.service';
+import { cleanupBenchmarkFixtures } from './test-helper';
 
 describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
   const dbUrl =
@@ -246,5 +249,150 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
 
     // Replay attempt must fail
     await expect(otpService.verifyOtp(phone, code)).rejects.toThrow();
+  });
+
+  it('7. Real PostgreSQL: JSONB round-trip normalization preserves telemetry metadata semantic equality', async () => {
+    if (!isPostgresAvailable) {
+      expect(true).toBe(true);
+      return;
+    }
+
+    const [cat] = await db
+      .insert(schema.categories)
+      .values({
+        name: 'PG JSONB Cat',
+        slug: `pg-jsonb-cat-${Date.now()}`,
+        isActive: true,
+      })
+      .returning();
+
+    const [instructor] = await db.select().from(schema.users).limit(1);
+
+    const [testCourse] = await db
+      .insert(schema.courses)
+      .values({
+        title: 'PG JSONB Course',
+        slug: `pg-jsonb-course-${Date.now()}`,
+        status: 'PUBLISHED',
+        visibility: 'PUBLIC',
+        categoryId: cat.id,
+        instructorId: instructor.id,
+        price: '0.00',
+      })
+      .returning();
+
+    const eventId = crypto.randomUUID();
+    const originalMetadata = {
+      watchPositionSeconds: 120,
+      totalDurationSeconds: 1800,
+      playbackRate: 1.5,
+      passed: true,
+      checkpointIndex: 2,
+    };
+
+    // Insert into real PostgreSQL learning_events table
+    await db.insert(schema.learningEvents).values({
+      id: eventId,
+      userId: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+      courseId: testCourse.id,
+      eventType: 'VIDEO_CHECKPOINT',
+      metadata: originalMetadata,
+      occurredAt: new Date(),
+    });
+
+    // Query back from PostgreSQL - JSONB storage normalizes internal key ordering
+    const [fetched] = await db
+      .select()
+      .from(schema.learningEvents)
+      .where(eq(schema.learningEvents.id, eventId));
+
+    expect(fetched).toBeDefined();
+
+    // Reordered metadata keys
+    const reorderedMetadata = {
+      passed: true,
+      checkpointIndex: 2,
+      playbackRate: 1.5,
+      totalDurationSeconds: 1800,
+      watchPositionSeconds: 120,
+    };
+
+    expect(areJsonValuesEqual(fetched.metadata, originalMetadata)).toBe(true);
+    expect(areJsonValuesEqual(fetched.metadata, reorderedMetadata)).toBe(true);
+
+    // Altered payload must not match
+    const alteredMetadata = {
+      ...reorderedMetadata,
+      watchPositionSeconds: 180,
+    };
+    expect(areJsonValuesEqual(fetched.metadata, alteredMetadata)).toBe(false);
+
+    // Clean up
+    await db.delete(schema.learningEvents).where(eq(schema.learningEvents.id, eventId));
+    await db.delete(schema.courses).where(eq(schema.courses.id, testCourse.id));
+    await db.delete(schema.categories).where(eq(schema.categories.id, cat.id));
+  });
+
+  it('8. Real PostgreSQL: Fixture-scoped cleanup removes only benchmark entities, preserving non-benchmark records', async () => {
+    if (!isPostgresAvailable) {
+      expect(true).toBe(true);
+      return;
+    }
+
+    // 1. Create a non-benchmark course and non-benchmark learning event
+    const [cat] = await db
+      .insert(schema.categories)
+      .values({
+        name: 'Preserved Test Category',
+        slug: `preserved-cat-${Date.now()}`,
+        isActive: true,
+      })
+      .returning();
+
+    const [instructor] = await db.select().from(schema.users).limit(1);
+
+    const [preservedCourse] = await db
+      .insert(schema.courses)
+      .values({
+        title: 'Preserved Production Course',
+        slug: `preserved-course-${Date.now()}`,
+        status: 'PUBLISHED',
+        visibility: 'PUBLIC',
+        categoryId: cat.id,
+        instructorId: instructor.id,
+        price: '0.00',
+      })
+      .returning();
+
+    const preservedEventId = crypto.randomUUID();
+    await db.insert(schema.learningEvents).values({
+      id: preservedEventId,
+      userId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      courseId: preservedCourse.id,
+      eventType: 'COURSE_OPENED',
+      metadata: { watchPositionSeconds: 0 },
+      occurredAt: new Date(),
+    });
+
+    // 2. Run cleanupBenchmarkFixtures on the database
+    await cleanupBenchmarkFixtures(db, { databaseUrl: dbUrl });
+
+    // 3. Verify that the non-benchmark course and non-benchmark learning event were preserved intact!
+    const [checkEvent] = await db
+      .select()
+      .from(schema.learningEvents)
+      .where(eq(schema.learningEvents.id, preservedEventId));
+    expect(checkEvent).toBeDefined();
+
+    const [checkCourse] = await db
+      .select()
+      .from(schema.courses)
+      .where(eq(schema.courses.id, preservedCourse.id));
+    expect(checkCourse).toBeDefined();
+
+    // Clean up our non-benchmark test rows
+    await db.delete(schema.learningEvents).where(eq(schema.learningEvents.id, preservedEventId));
+    await db.delete(schema.courses).where(eq(schema.courses.id, preservedCourse.id));
+    await db.delete(schema.categories).where(eq(schema.categories.id, cat.id));
   });
 });

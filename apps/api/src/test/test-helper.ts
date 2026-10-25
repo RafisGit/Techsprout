@@ -1,11 +1,61 @@
 import { newDb } from 'pg-mem';
 import { drizzle } from 'drizzle-orm/node-postgres';
+import { eq, sql } from 'drizzle-orm';
 import * as schema from '../database/schema';
 import { CryptoUtil } from '../common/auth/crypto.util';
 import { SEED_ROLES, SEED_USERS } from '../database/seed/fixtures';
 import * as crypto from 'crypto';
+import { env } from '../config/env.config';
+
+/**
+ * Configure test-safe dummy credentials for Cloudinary during unit and integration tests.
+ * Never supplies real credentials or connects to Cloudinary production endpoints.
+ */
+export function setupTestCloudinaryConfig(overrides?: {
+  cloudName?: string;
+  apiKey?: string;
+  apiSecret?: string;
+}) {
+  env.CLOUDINARY_CLOUD_NAME = overrides?.cloudName ?? process.env.CLOUDINARY_CLOUD_NAME ?? 'test-cloud';
+  env.CLOUDINARY_API_KEY = overrides?.apiKey ?? process.env.CLOUDINARY_API_KEY ?? 'test-key';
+  env.CLOUDINARY_API_SECRET = overrides?.apiSecret ?? process.env.CLOUDINARY_API_SECRET ?? 'test-secret';
+}
+
+/**
+ * Temporarily clears Cloudinary configuration in memory for testing unconfigured error paths.
+ */
+export function clearTestCloudinaryConfig() {
+  env.CLOUDINARY_CLOUD_NAME = undefined;
+  env.CLOUDINARY_API_KEY = undefined;
+  env.CLOUDINARY_API_SECRET = undefined;
+}
+
+/**
+ * Unique symbol marking explicitly identified in-memory test database adapters.
+ */
+export const IN_MEMORY_TEST_ADAPTER = Symbol.for('techsprout.in_memory_test_adapter');
+
+/**
+ * Validates whether a database connection instance represents an explicitly supported in-memory adapter.
+ */
+export function isInMemoryDatabase(db: any): boolean {
+  if (!db) return false;
+  if (db[IN_MEMORY_TEST_ADAPTER] === true) return true;
+  if (db.session?.client && (db.session.client as any)[IN_MEMORY_TEST_ADAPTER] === true) return true;
+  if (db._?.session?.client && (db._.session.client as any)[IN_MEMORY_TEST_ADAPTER] === true) return true;
+
+  const client = db.session?.client || db._?.session?.client || db.client;
+  if (client && typeof client.adaptQuery === 'function' && typeof client.adaptResults === 'function') {
+    return true;
+  }
+  return false;
+}
 
 export async function createTestDatabase() {
+  if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET) {
+    setupTestCloudinaryConfig();
+  }
+
   const memDb = newDb({ autoCreateForeignKeyIndices: true });
 
   // Register gen_random_uuid function for UUID generation
@@ -32,8 +82,16 @@ export async function createTestDatabase() {
     implementation: (val: string) => (typeof val === 'string' ? val.length : 0),
   });
 
+  // Register current_database function for server identity verification in pg-mem
+  memDb.public.registerFunction({
+    name: 'current_database',
+    returns: (memDb.public as any).getType('text'),
+    implementation: () => 'techsprout_test',
+  });
+
   const { Pool } = memDb.adapters.createPg();
   const pool = new Pool();
+  (pool as any)[IN_MEMORY_TEST_ADAPTER] = true;
 
   // Adapt queries for Drizzle ORM compatibility with pg-mem
   const wrapQuery = (origQuery: any) => {
@@ -85,11 +143,13 @@ export async function createTestDatabase() {
   const originalConnect = pool.connect.bind(pool);
   pool.connect = async function (...args: any[]) {
     const client = await originalConnect(...args);
+    (client as any)[IN_MEMORY_TEST_ADAPTER] = true;
     client.query = wrapQuery(client.query.bind(client));
     return client;
   };
 
   const db = drizzle(pool, { schema });
+  (db as any)[IN_MEMORY_TEST_ADAPTER] = true;
 
   // Create schema tables in test DB
   await pool.query(`
@@ -694,3 +754,281 @@ export async function createTestDatabase() {
 
   return { db, pool };
 }
+
+/**
+ * Type-safe helper to extract cookie strings from response headers.
+ */
+export function extractCookies(headers: Record<string, unknown>): string[] {
+  const val = headers['set-cookie'];
+  if (Array.isArray(val)) {
+    return val.filter((c): c is string => typeof c === 'string');
+  }
+  if (typeof val === 'string') {
+    return [val];
+  }
+  return [];
+}
+
+export const ALLOWED_TEST_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+export const ALLOWED_TEST_DB_NAMES = new Set(['techsprout_test', 'techsprout_benchmark']);
+
+export const EXPLICIT_DISALLOWED_DB_NAMES = new Set([
+  'postgres',
+  'test',
+  'techsprout',
+  'techsprout_prod',
+  'techsprout_production',
+  'techsprout_staging',
+  'production',
+  'staging',
+  'prod',
+]);
+
+/**
+ * Normalizes hostname from a URL.
+ * Strips IPv6 enclosing brackets (e.g. '[::1]' -> '::1') and trims/lowercases.
+ */
+export function normalizeTestHost(hostname: string): string {
+  let host = hostname.toLowerCase().trim();
+  if (host.startsWith('[') && host.endsWith(']')) {
+    host = host.slice(1, -1);
+  }
+  return host;
+}
+
+/**
+ * Evaluates whether a database name qualifies under the strict test allowlist.
+ * Generic names ('postgres', 'test') and production/staging indicators are strictly rejected.
+ */
+export function isSafeTestDatabaseName(dbName: string): boolean {
+  if (!dbName || typeof dbName !== 'string') {
+    return false;
+  }
+  const normalized = dbName.toLowerCase().trim();
+  if (normalized === '' || EXPLICIT_DISALLOWED_DB_NAMES.has(normalized)) {
+    return false;
+  }
+  // Reject any database name with staging or prod in it
+  if (normalized.includes('staging') || normalized.includes('prod')) {
+    return false;
+  }
+  if (ALLOWED_TEST_DB_NAMES.has(normalized)) {
+    return true;
+  }
+  // Allow custom names ending with _test or _benchmark (must have meaningful prefix, not just '_test' or '_benchmark')
+  if (normalized.endsWith('_test') && normalized.length > 5 && normalized !== '_test') {
+    return true;
+  }
+  if (normalized.endsWith('_benchmark') && normalized.length > 10 && normalized !== '_benchmark') {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Preflight check for a database URL. Validates URL syntax, host, and database name.
+ * Returns the extracted database name from the URL.
+ */
+export function assertSafeDatabaseUrl(databaseUrl: string): string {
+  if (!databaseUrl || typeof databaseUrl !== 'string') {
+    throw new Error('[Database Safety Guard] DATABASE_URL is missing or empty. Refusing cleanup.');
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(databaseUrl);
+  } catch (err) {
+    throw new Error(`[Database Safety Guard] Invalid DATABASE_URL format: ${(err as Error).message}`);
+  }
+
+  // 1. Host check: must be strictly permitted loopback host (localhost, 127.0.0.1, ::1)
+  const normalizedHost = normalizeTestHost(parsed.hostname);
+  if (!ALLOWED_TEST_HOSTS.has(normalizedHost)) {
+    throw new Error(
+      `[Database Safety Guard] Destructive cleanup rejected: Host '${parsed.hostname}' is not a permitted local test host (${Array.from(ALLOWED_TEST_HOSTS).join(', ')}). Refusing execution.`
+    );
+  }
+
+  // 2. URL database name check
+  const dbNameFromUrl = parsed.pathname.replace(/^\//, '').toLowerCase().trim();
+  if (!isSafeTestDatabaseName(dbNameFromUrl)) {
+    throw new Error(
+      `[Database Safety Guard] Destructive cleanup rejected: Database '${dbNameFromUrl}' in DATABASE_URL does not match test naming allowlist (must be in [${Array.from(ALLOWED_TEST_DB_NAMES).join(', ')}] or end with _test / _benchmark, and cannot be generic 'postgres' or 'test'). Refusing execution.`
+    );
+  }
+
+  return dbNameFromUrl;
+}
+
+/**
+ * Fail-closed safety guard for test database cleanup operations.
+ * Ensures destructive queries can NEVER execute against production, staging, or unverified databases.
+ * Requires BOTH a valid local test URL AND server-verified current_database() matching the URL.
+ * Throws immediately if hostname, URL database name, or server database identity is not in the explicit allowlist,
+ * or if the URL database name does not match the server-verified database identity.
+ */
+export function assertSafeTestDatabase(databaseUrl: string, currentDatabaseName?: string): void {
+  // 1. Preflight URL checks
+  const dbNameFromUrl = assertSafeDatabaseUrl(databaseUrl);
+
+  // 2. Server-verified database identity check (MUST be provided and verified)
+  if (!currentDatabaseName || typeof currentDatabaseName !== 'string' || currentDatabaseName.trim() === '') {
+    throw new Error(
+      '[Database Safety Guard] Destructive cleanup rejected: Server-verified database identity (SELECT current_database()) is missing or empty. A URL check alone is insufficient proof of test database safety.'
+    );
+  }
+
+  const verifiedDbName = currentDatabaseName.toLowerCase().trim();
+  if (!isSafeTestDatabaseName(verifiedDbName)) {
+    throw new Error(
+      `[Database Safety Guard] Destructive cleanup rejected: Verified server current_database() '${verifiedDbName}' does not match test allowlist. Refusing execution.`
+    );
+  }
+
+  // 3. Match check: URL database name MUST match server-verified current_database()
+  if (dbNameFromUrl !== verifiedDbName) {
+    throw new Error(
+      `[Database Safety Guard] Destructive cleanup rejected: URL database name '${dbNameFromUrl}' does not match server-verified current_database() '${verifiedDbName}'. Refusing execution.`
+    );
+  }
+}
+
+export const BENCHMARK_COURSE_SLUG = 'concurrent-video-scrubbing-benchmark';
+export const BENCHMARK_CATEGORY_SLUG = 'load-benchmark-category';
+export const BENCHMARK_MODULE_TITLE = 'High-Throughput Telemetry Module';
+export const BENCHMARK_LESSON_TITLE = 'Load Test Video Lecture (30m)';
+export const BENCHMARK_USER_PREFIX = 'synth_student_%';
+export const BENCHMARK_INSTRUCTOR_USERNAME = 'bench_instructor';
+
+/**
+ * Fixture-scoped cleanup: removes ONLY records created by the telemetry load benchmark.
+ * Never performs broad, unbounded deletes on learning_events or any other table.
+ * Actively validates live server identity and database URL before executing any destructive query.
+ */
+export async function cleanupBenchmarkFixtures(
+  db: any,
+  options?: { databaseUrl?: string | null; currentDatabaseName?: string }
+): Promise<void> {
+  // 1. Mandatory live server identity verification through the connected db
+  // A caller-supplied currentDatabaseName is NEVER accepted as proof of identity.
+  let liveDbName: string;
+  try {
+    const res = await db.execute(sql.raw('SELECT current_database()'));
+    liveDbName = res?.rows?.[0]?.current_database || res?.[0]?.current_database;
+  } catch (err) {
+    throw new Error(
+      `[Database Safety Guard] Destructive cleanup rejected: Failed to verify live server current_database(): ${(err as Error).message}`
+    );
+  }
+
+  if (!liveDbName || typeof liveDbName !== 'string' || liveDbName.trim() === '') {
+    throw new Error(
+      '[Database Safety Guard] Destructive cleanup rejected: Server-verified database identity (SELECT current_database()) is missing or empty. Live identity verification is required before cleanup.'
+    );
+  }
+
+  liveDbName = liveDbName.toLowerCase().trim();
+
+  if (!isSafeTestDatabaseName(liveDbName)) {
+    throw new Error(
+      `[Database Safety Guard] Destructive cleanup rejected: Connected database identity '${liveDbName}' does not match test allowlist.`
+    );
+  }
+
+  // 2. Caller-supplied identity check: if supplied, MUST match live identity
+  // Prevents caller from supplying a forged currentDatabaseName.
+  if (options?.currentDatabaseName !== undefined) {
+    const callerSupplied = String(options.currentDatabaseName).toLowerCase().trim();
+    if (callerSupplied !== liveDbName) {
+      throw new Error(
+        `[Database Safety Guard] Destructive cleanup rejected: Caller-supplied database identity '${callerSupplied}' does not match live server current_database() '${liveDbName}'. Caller-supplied identity cannot bypass live verification.`
+      );
+    }
+  }
+
+  // 3. Adapter check & URL verification
+  // Restrict any URL-free exception to an explicitly identified in-memory adapter.
+  // Supplying databaseUrl: null or omitting a URL for a real PostgreSQL adapter cannot authorize cleanup.
+  const isMem = isInMemoryDatabase(db);
+
+  if (isMem) {
+    // Explicitly identified in-memory test adapter: does NOT read developer's process.env.DATABASE_URL
+    if (options?.databaseUrl) {
+      assertSafeTestDatabase(options.databaseUrl, liveDbName);
+    }
+  } else {
+    // Real PostgreSQL adapter: a verified databaseUrl is MANDATORY!
+    if (options?.databaseUrl === null) {
+      throw new Error(
+        '[Database Safety Guard] Destructive cleanup rejected: Supplying databaseUrl: null for a PostgreSQL adapter cannot authorize cleanup. Nullable URLs are restricted to explicitly identified in-memory adapters.'
+      );
+    }
+
+    const dbUrl = options?.databaseUrl || process.env.DATABASE_URL;
+    if (!dbUrl) {
+      throw new Error(
+        '[Database Safety Guard] Destructive cleanup rejected: PostgreSQL cleanup requires a verified databaseUrl. Missing databaseUrl cannot authorize cleanup.'
+      );
+    }
+
+    assertSafeTestDatabase(dbUrl, liveDbName);
+  }
+
+  // 2. Delete learning_events specifically scoped to the benchmark course
+  await db.delete(schema.learningEvents).where(
+    sql`${schema.learningEvents.courseId} IN (
+      SELECT id FROM ${schema.courses} WHERE slug = ${BENCHMARK_COURSE_SLUG}
+    )`
+  );
+
+  // 3. Delete enrollments scoped to benchmark students
+  await db.delete(schema.enrollments).where(
+    sql`${schema.enrollments.studentId} IN (
+      SELECT id FROM ${schema.users} WHERE username LIKE ${BENCHMARK_USER_PREFIX}
+    )`
+  );
+
+  // 4. Delete lessons scoped to benchmark lesson title or module
+  await db.delete(schema.lessons).where(
+    sql`${schema.lessons.title} = ${BENCHMARK_LESSON_TITLE} OR ${schema.lessons.moduleId} IN (
+      SELECT id FROM ${schema.modules} WHERE title = ${BENCHMARK_MODULE_TITLE}
+    )`
+  );
+
+  // 5. Delete modules scoped to benchmark module title or course
+  await db.delete(schema.modules).where(
+    sql`${schema.modules.title} = ${BENCHMARK_MODULE_TITLE} OR ${schema.modules.courseId} IN (
+      SELECT id FROM ${schema.courses} WHERE slug = ${BENCHMARK_COURSE_SLUG}
+    )`
+  );
+
+  // 6. Delete courses scoped to benchmark course slug
+  await db.delete(schema.courses).where(
+    eq(schema.courses.slug, BENCHMARK_COURSE_SLUG)
+  );
+
+  // 7. Delete categories scoped to benchmark category slug
+  await db.delete(schema.categories).where(
+    eq(schema.categories.slug, BENCHMARK_CATEGORY_SLUG)
+  );
+
+  // 8. Delete userRoles for benchmark users
+  await db.delete(schema.userRoles).where(
+    sql`${schema.userRoles.userId} IN (
+      SELECT id FROM ${schema.users} WHERE username LIKE ${BENCHMARK_USER_PREFIX} OR username = ${BENCHMARK_INSTRUCTOR_USERNAME}
+    )`
+  );
+
+  // 9. Delete sessions for benchmark users
+  await db.delete(schema.sessions).where(
+    sql`${schema.sessions.userId} IN (
+      SELECT id FROM ${schema.users} WHERE username LIKE ${BENCHMARK_USER_PREFIX} OR username = ${BENCHMARK_INSTRUCTOR_USERNAME}
+    )`
+  );
+
+  // 10. Delete users for benchmark users
+  await db.delete(schema.users).where(
+    sql`${schema.users.username} LIKE ${BENCHMARK_USER_PREFIX} OR ${schema.users.username} = ${BENCHMARK_INSTRUCTOR_USERNAME}`
+  );
+}
+

@@ -3,7 +3,7 @@ import request from 'supertest';
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '../app.module';
-import { createTestDatabase } from './test-helper';
+import { createTestDatabase, extractCookies } from './test-helper';
 import { DatabaseService, DRIZZLE_DB } from '../database/drizzle.provider';
 import { CryptoUtil } from '../common/auth/crypto.util';
 import * as schema from '../database/schema';
@@ -171,27 +171,27 @@ describe('P6.3 — WP-06: Security Hardening & Release Gate Test Suite', () => {
     const loginAdmin = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .send({ email: 'admin@techsprout.edu', password: 'AdminPassword123!' });
-    adminCookies = loginAdmin.headers['set-cookie'] || [];
+    adminCookies = extractCookies(loginAdmin.headers);
 
     const loginInst1 = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .send({ email: 'instructor@techsprout.edu', password: 'InstructorPassword123!' });
-    instructor1Cookies = loginInst1.headers['set-cookie'] || [];
+    instructor1Cookies = extractCookies(loginInst1.headers);
 
     const loginInst2 = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .send({ email: 'instructor2_wp06@techsprout.edu', password: 'Instructor2Password123!' });
-    instructor2Cookies = loginInst2.headers['set-cookie'] || [];
+    instructor2Cookies = extractCookies(loginInst2.headers);
 
     const loginStd1 = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .send({ email: 'student@techsprout.edu', password: 'StudentPassword123!' });
-    student1Cookies = loginStd1.headers['set-cookie'] || [];
+    student1Cookies = extractCookies(loginStd1.headers);
 
     const loginStd2 = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .send({ email: 'student2_wp06@techsprout.edu', password: 'Student2Password123!' });
-    student2Cookies = loginStd2.headers['set-cookie'] || [];
+    student2Cookies = extractCookies(loginStd2.headers);
   });
 
   afterAll(async () => {

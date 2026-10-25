@@ -334,7 +334,6 @@ describe('P5.5.6 — Downloadable PDF Invoices Test Suite', () => {
   // Helper to extract text from PDF buffer
   async function extractPdfText(buf: Buffer): Promise<string> {
     const parser = new PDFParse(new Uint8Array(buf));
-    await parser.load();
     const result = await parser.getText();
     return result.text;
   }
