@@ -29,6 +29,83 @@ export interface PruneResult {
   reason?: string;
 }
 
+/**
+ * Recursively compares two JSON-compatible values for deep semantic equality.
+ * - Object key ordering is ignored (canonical key order).
+ * - Array ordering is strictly preserved.
+ * - Primitive type differences are preserved (e.g. 1 !== '1', 0 !== false).
+ * - Distinctions between null, undefined, and missing keys are preserved.
+ */
+export function areJsonValuesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true;
+  }
+
+  // If either is null or undefined (they aren't equal since a === b was false)
+  if (a === null || b === null || a === undefined || b === undefined) {
+    return false;
+  }
+
+  // Type mismatch (e.g. number vs string, boolean vs number, object vs string)
+  if (typeof a !== typeof b) {
+    return false;
+  }
+
+  // Array comparison: order is significant!
+  const aIsArr = Array.isArray(a);
+  const bIsArr = Array.isArray(b);
+  if (aIsArr || bIsArr) {
+    if (!aIsArr || !bIsArr) {
+      return false;
+    }
+    const aArr = a as unknown[];
+    const bArr = b as unknown[];
+    if (aArr.length !== bArr.length) {
+      return false;
+    }
+    for (let i = 0; i < aArr.length; i++) {
+      if (!areJsonValuesEqual(aArr[i], bArr[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // Object comparison (non-null, non-array object)
+  if (typeof a === 'object') {
+    const aObj = a as Record<string, unknown>;
+    const bObj = b as Record<string, unknown>;
+
+    const aKeys = Object.keys(aObj).sort();
+    const bKeys = Object.keys(bObj).sort();
+
+    if (aKeys.length !== bKeys.length) {
+      return false;
+    }
+
+    for (let i = 0; i < aKeys.length; i++) {
+      const key = aKeys[i];
+      if (key !== bKeys[i]) {
+        return false;
+      }
+      if (!Object.prototype.hasOwnProperty.call(bObj, key)) {
+        return false;
+      }
+      if (!areJsonValuesEqual(aObj[key], bObj[key])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // NaN edge case for numbers
+  if (typeof a === 'number' && typeof b === 'number') {
+    return Number.isNaN(a) && Number.isNaN(b);
+  }
+
+  return false;
+}
+
 @Injectable()
 export class TelemetryService {
   private readonly logger = new Logger(TelemetryService.name);
@@ -56,24 +133,17 @@ export class TelemetryService {
   }
 
   /**
-   * Compares two metadata objects for semantic equality regardless of key insertion order.
+   * Compares two metadata objects for deep semantic equality regardless of key insertion order.
    * Required because PostgreSQL jsonb normalizes and does not preserve object key ordering.
+   * Distinguishes missing keys from null, respects type differences, and preserves array order.
    */
-  private areMetadataEqual(
+  public areMetadataEqual(
     a: Record<string, unknown> | null | undefined,
     b: Record<string, unknown> | null | undefined
   ): boolean {
     if (!a && !b) return true;
     if (!a || !b) return false;
-    const aKeys = Object.keys(a).sort();
-    const bKeys = Object.keys(b).sort();
-    if (aKeys.length !== bKeys.length) return false;
-    for (let i = 0; i < aKeys.length; i++) {
-      const key = aKeys[i];
-      if (key !== bKeys[i]) return false;
-      if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) return false;
-    }
-    return true;
+    return areJsonValuesEqual(a, b);
   }
 
   constructor(

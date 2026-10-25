@@ -6,7 +6,12 @@ import cookieParser from 'cookie-parser';
 import { monitorEventLoopDelay } from 'perf_hooks';
 import { AppModule } from '../app.module';
 import { DatabaseService, DRIZZLE_DB } from '../database/drizzle.provider';
-import { createTestDatabase, setupTestCloudinaryConfig } from './test-helper';
+import {
+  createTestDatabase,
+  setupTestCloudinaryConfig,
+  assertSafeTestDatabase,
+  cleanupBenchmarkFixtures,
+} from './test-helper';
 import { CryptoUtil } from '../common/auth/crypto.util';
 import * as schema from '../database/schema';
 import { learningEvents } from '../database/schema/telemetry';
@@ -122,51 +127,31 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
       !!process.env.DATABASE_URL;
 
     if (usePostgres) {
+      // 1. Preflight URL safety check: fail closed if non-local or non-test database URL
+      assertSafeTestDatabase(process.env.DATABASE_URL!);
+
       testPool = new Pool({
         connectionString: process.env.DATABASE_URL,
       });
+
+      // 2. Server-side identity check: verify current_database() from live PostgreSQL connection
+      const identityRes = await testPool.query('SELECT current_database(), current_user');
+      const currentDb = identityRes.rows[0]?.current_database;
+      assertSafeTestDatabase(process.env.DATABASE_URL!, currentDb);
+
       testDb = drizzle(testPool, { schema });
       isRealDb = true;
 
-      // Clean up any existing benchmark fixtures to ensure idempotency
-      await testDb.delete(schema.learningEvents);
-      await testDb
-        .delete(schema.enrollments)
-        .where(
-          sql`${schema.enrollments.studentId} IN (SELECT id FROM ${schema.users} WHERE username LIKE 'synth_student_%')`
-        );
-      await testDb
-        .delete(schema.lessons)
-        .where(eq(schema.lessons.title, 'Load Test Video Lecture (30m)'));
-      await testDb
-        .delete(schema.modules)
-        .where(eq(schema.modules.title, 'High-Throughput Telemetry Module'));
-      await testDb
-        .delete(schema.courses)
-        .where(eq(schema.courses.slug, 'concurrent-video-scrubbing-benchmark'));
-      await testDb
-        .delete(schema.categories)
-        .where(eq(schema.categories.slug, 'load-benchmark-category'));
-      await testDb
-        .delete(schema.userRoles)
-        .where(
-          sql`${schema.userRoles.userId} IN (SELECT id FROM ${schema.users} WHERE username LIKE 'synth_student_%' OR username = 'bench_instructor')`
-        );
-      await testDb
-        .delete(schema.sessions)
-        .where(
-          sql`${schema.sessions.userId} IN (SELECT id FROM ${schema.users} WHERE username LIKE 'synth_student_%' OR username = 'bench_instructor')`
-        );
-      await testDb
-        .delete(schema.users)
-        .where(
-          sql`${schema.users.username} LIKE 'synth_student_%' OR ${schema.users.username} = 'bench_instructor'`
-        );
+      // 3. Fixture-scoped cleanup: removes ONLY benchmark records (never broad table delete)
+      await cleanupBenchmarkFixtures(testDb);
     } else {
       const mem = await createTestDatabase();
       testDb = mem.db;
       testPool = mem.pool;
       isRealDb = false;
+
+      // Ensure clean benchmark state in in-memory database as well
+      await cleanupBenchmarkFixtures(testDb);
     }
 
     // Seed Instructor
@@ -846,5 +831,24 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
 
       expect(Number(countAfter[0].count)).toBe(Number(countBefore[0].count));
     });
+  });
+
+  afterAll(async () => {
+    try {
+      if (isRealDb && testDb && process.env.DATABASE_URL) {
+        // Safe teardown: verify identity and clean up benchmark fixtures
+        assertSafeTestDatabase(process.env.DATABASE_URL);
+        await cleanupBenchmarkFixtures(testDb);
+      }
+    } catch (err) {
+      console.error('[Benchmark Teardown] Error during fixture cleanup:', err);
+    } finally {
+      if (app) {
+        await app.close();
+      }
+      if (testPool) {
+        await testPool.end();
+      }
+    }
   });
 });

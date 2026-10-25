@@ -1,5 +1,6 @@
 import { newDb } from 'pg-mem';
 import { drizzle } from 'drizzle-orm/node-postgres';
+import { eq, sql } from 'drizzle-orm';
 import * as schema from '../database/schema';
 import { CryptoUtil } from '../common/auth/crypto.util';
 import { SEED_ROLES, SEED_USERS } from '../database/seed/fixtures';
@@ -736,3 +737,131 @@ export function extractCookies(headers: Record<string, unknown>): string[] {
   }
   return [];
 }
+
+export const ALLOWED_TEST_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
+export const ALLOWED_TEST_DB_NAMES = new Set(['techsprout_test', 'techsprout_benchmark', 'postgres', 'test']);
+
+/**
+ * Fail-closed safety guard for test database cleanup operations.
+ * Ensures destructive queries can NEVER execute against production or staging databases.
+ * Throws immediately if hostname or database identity is not in the explicit test allowlist.
+ */
+export function assertSafeTestDatabase(databaseUrl: string, currentDatabaseName?: string): void {
+  if (!databaseUrl || typeof databaseUrl !== 'string') {
+    throw new Error('[Database Safety Guard] DATABASE_URL is missing or empty. Refusing cleanup.');
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(databaseUrl);
+  } catch (err) {
+    throw new Error(`[Database Safety Guard] Invalid DATABASE_URL format: ${(err as Error).message}`);
+  }
+
+  // 1. Host check: must be strictly local test runner
+  const hostname = parsed.hostname.toLowerCase();
+  if (!ALLOWED_TEST_HOSTS.has(hostname)) {
+    throw new Error(
+      `[Database Safety Guard] Destructive cleanup rejected: Host '${hostname}' is not a permitted local test host (${Array.from(ALLOWED_TEST_HOSTS).join(', ')}). Refusing execution.`
+    );
+  }
+
+  // 2. URL database name check
+  const dbNameFromUrl = parsed.pathname.replace(/^\//, '').toLowerCase();
+  const isAllowedUrlDb =
+    ALLOWED_TEST_DB_NAMES.has(dbNameFromUrl) ||
+    dbNameFromUrl.endsWith('_test') ||
+    dbNameFromUrl.endsWith('_benchmark');
+
+  if (!isAllowedUrlDb) {
+    throw new Error(
+      `[Database Safety Guard] Destructive cleanup rejected: Database '${dbNameFromUrl}' in DATABASE_URL does not match test naming allowlist (must be in [${Array.from(ALLOWED_TEST_DB_NAMES).join(', ')}] or end with _test / _benchmark). Refusing execution.`
+    );
+  }
+
+  // 3. Server-verified database identity check (from SELECT current_database())
+  if (currentDatabaseName) {
+    const verifiedDbName = currentDatabaseName.toLowerCase().trim();
+    const isAllowedCurrentDb =
+      ALLOWED_TEST_DB_NAMES.has(verifiedDbName) ||
+      verifiedDbName.endsWith('_test') ||
+      verifiedDbName.endsWith('_benchmark');
+
+    if (!isAllowedCurrentDb) {
+      throw new Error(
+        `[Database Safety Guard] Destructive cleanup rejected: Verified server current_database() '${verifiedDbName}' does not match test allowlist. Refusing execution.`
+      );
+    }
+  }
+}
+
+export const BENCHMARK_COURSE_SLUG = 'concurrent-video-scrubbing-benchmark';
+export const BENCHMARK_CATEGORY_SLUG = 'load-benchmark-category';
+export const BENCHMARK_MODULE_TITLE = 'High-Throughput Telemetry Module';
+export const BENCHMARK_LESSON_TITLE = 'Load Test Video Lecture (30m)';
+export const BENCHMARK_USER_PREFIX = 'synth_student_%';
+export const BENCHMARK_INSTRUCTOR_USERNAME = 'bench_instructor';
+
+/**
+ * Fixture-scoped cleanup: removes ONLY records created by the telemetry load benchmark.
+ * Never performs broad, unbounded deletes on learning_events or any other table.
+ */
+export async function cleanupBenchmarkFixtures(db: any): Promise<void> {
+  // 1. Delete learning_events specifically scoped to the benchmark course
+  await db.delete(schema.learningEvents).where(
+    sql`${schema.learningEvents.courseId} IN (
+      SELECT id FROM ${schema.courses} WHERE slug = ${BENCHMARK_COURSE_SLUG}
+    )`
+  );
+
+  // 2. Delete enrollments scoped to benchmark students
+  await db.delete(schema.enrollments).where(
+    sql`${schema.enrollments.studentId} IN (
+      SELECT id FROM ${schema.users} WHERE username LIKE ${BENCHMARK_USER_PREFIX}
+    )`
+  );
+
+  // 3. Delete lessons scoped to benchmark lesson title or module
+  await db.delete(schema.lessons).where(
+    sql`${schema.lessons.title} = ${BENCHMARK_LESSON_TITLE} OR ${schema.lessons.moduleId} IN (
+      SELECT id FROM ${schema.modules} WHERE title = ${BENCHMARK_MODULE_TITLE}
+    )`
+  );
+
+  // 4. Delete modules scoped to benchmark module title or course
+  await db.delete(schema.modules).where(
+    sql`${schema.modules.title} = ${BENCHMARK_MODULE_TITLE} OR ${schema.modules.courseId} IN (
+      SELECT id FROM ${schema.courses} WHERE slug = ${BENCHMARK_COURSE_SLUG}
+    )`
+  );
+
+  // 5. Delete courses scoped to benchmark course slug
+  await db.delete(schema.courses).where(
+    eq(schema.courses.slug, BENCHMARK_COURSE_SLUG)
+  );
+
+  // 6. Delete categories scoped to benchmark category slug
+  await db.delete(schema.categories).where(
+    eq(schema.categories.slug, BENCHMARK_CATEGORY_SLUG)
+  );
+
+  // 7. Delete userRoles for benchmark users
+  await db.delete(schema.userRoles).where(
+    sql`${schema.userRoles.userId} IN (
+      SELECT id FROM ${schema.users} WHERE username LIKE ${BENCHMARK_USER_PREFIX} OR username = ${BENCHMARK_INSTRUCTOR_USERNAME}
+    )`
+  );
+
+  // 8. Delete sessions for benchmark users
+  await db.delete(schema.sessions).where(
+    sql`${schema.sessions.userId} IN (
+      SELECT id FROM ${schema.users} WHERE username LIKE ${BENCHMARK_USER_PREFIX} OR username = ${BENCHMARK_INSTRUCTOR_USERNAME}
+    )`
+  );
+
+  // 9. Delete users for benchmark users
+  await db.delete(schema.users).where(
+    sql`${schema.users.username} LIKE ${BENCHMARK_USER_PREFIX} OR ${schema.users.username} = ${BENCHMARK_INSTRUCTOR_USERNAME}`
+  );
+}
+
