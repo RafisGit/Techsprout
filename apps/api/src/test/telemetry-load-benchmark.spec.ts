@@ -147,7 +147,6 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
       // 3. Fixture-scoped cleanup: removes ONLY benchmark records (never broad table delete)
       await cleanupBenchmarkFixtures(testDb, {
         databaseUrl: process.env.DATABASE_URL!,
-        currentDatabaseName: currentDb,
       });
     } else {
       const mem = await createTestDatabase();
@@ -156,7 +155,7 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
       isRealDb = false;
 
       // Ensure clean benchmark state in in-memory database as well
-      await cleanupBenchmarkFixtures(testDb, { databaseUrl: null });
+      await cleanupBenchmarkFixtures(testDb);
     }
 
     // Seed Instructor
@@ -369,10 +368,9 @@ describe('P7.1 / WP-P7-06: Telemetry Ingestion Load Benchmark & Security Gate', 
         assertSafeTestDatabase(process.env.DATABASE_URL, currentDb);
         await cleanupBenchmarkFixtures(testDb, {
           databaseUrl: process.env.DATABASE_URL,
-          currentDatabaseName: currentDb,
         });
       } else if (!isRealDb && testDb) {
-        await cleanupBenchmarkFixtures(testDb, { databaseUrl: null });
+        await cleanupBenchmarkFixtures(testDb);
       }
     } catch (err) {
       console.error('[Benchmark Teardown] Error during fixture cleanup:', err);

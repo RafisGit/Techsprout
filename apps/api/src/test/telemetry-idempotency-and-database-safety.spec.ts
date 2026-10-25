@@ -766,7 +766,61 @@ describe('P8.0.11 / P8.0.12: JSONB Equality, Idempotency & Strict Benchmark Data
 
       await expect(
         cleanupBenchmarkFixtures(mockDbFailedExec)
-      ).rejects.toThrow(/Failed to verify server current_database/);
+      ).rejects.toThrow(/Failed to verify live server current_database/);
+      expect(mockDelete).not.toHaveBeenCalled();
+
+      // 6. Rejected target: Forged caller-supplied currentDatabaseName targeting production
+      const mockDbForged = {
+        delete: mockDelete,
+        execute: vi.fn().mockResolvedValue({ rows: [{ current_database: 'techsprout' }] }),
+      };
+
+      await expect(
+        cleanupBenchmarkFixtures(mockDbForged, {
+          databaseUrl: 'postgresql://localhost:5432/techsprout_test',
+          currentDatabaseName: 'techsprout_test',
+        })
+      ).rejects.toThrow(/Connected database identity 'techsprout' does not match test allowlist/);
+      expect(mockDelete).not.toHaveBeenCalled();
+
+      // 7. Rejected target: Forged caller-supplied currentDatabaseName mismatching live server identity
+      const mockDbForgedMismatch = {
+        delete: mockDelete,
+        execute: vi.fn().mockResolvedValue({ rows: [{ current_database: 'techsprout_benchmark' }] }),
+      };
+
+      await expect(
+        cleanupBenchmarkFixtures(mockDbForgedMismatch, {
+          databaseUrl: 'postgresql://localhost:5432/techsprout_test',
+          currentDatabaseName: 'techsprout_test',
+        })
+      ).rejects.toThrow(/Caller-supplied database identity 'techsprout_test' does not match live server current_database\(\) 'techsprout_benchmark'/);
+      expect(mockDelete).not.toHaveBeenCalled();
+
+      // 8. Rejected target: Supplying databaseUrl: null for a real PostgreSQL adapter
+      const mockRealPostgresDb = {
+        delete: mockDelete,
+        execute: vi.fn().mockResolvedValue({ rows: [{ current_database: 'techsprout_test' }] }),
+      };
+
+      await expect(
+        cleanupBenchmarkFixtures(mockRealPostgresDb, {
+          databaseUrl: null,
+        })
+      ).rejects.toThrow(/Supplying databaseUrl: null for a PostgreSQL adapter cannot authorize cleanup/);
+      expect(mockDelete).not.toHaveBeenCalled();
+
+      // 9. Rejected target: Missing server-reported identity (empty string)
+      const mockDbEmptyIdentity = {
+        delete: mockDelete,
+        execute: vi.fn().mockResolvedValue({ rows: [{ current_database: '' }] }),
+      };
+
+      await expect(
+        cleanupBenchmarkFixtures(mockDbEmptyIdentity, {
+          databaseUrl: 'postgresql://localhost:5432/techsprout_test',
+        })
+      ).rejects.toThrow(/Server-verified database identity \(SELECT current_database\(\)\) is missing or empty/);
       expect(mockDelete).not.toHaveBeenCalled();
     });
 
@@ -852,8 +906,8 @@ describe('P8.0.11 / P8.0.12: JSONB Equality, Idempotency & Strict Benchmark Data
         occurredAt: new Date(),
       });
 
-      // 3. Execute cleanupBenchmarkFixtures
-      await cleanupBenchmarkFixtures(db, { databaseUrl: null, currentDatabaseName: 'techsprout_test' });
+      // 3. Execute cleanupBenchmarkFixtures without options (in-memory adapter self-verifies)
+      await cleanupBenchmarkFixtures(db);
 
       // 4. Verify benchmark records were removed
       const [checkBenchEvent] = await db
@@ -882,6 +936,21 @@ describe('P8.0.11 / P8.0.12: JSONB Equality, Idempotency & Strict Benchmark Data
       expect(checkNonBenchCourse).toBeDefined();
 
       await mem.pool.end();
+    });
+
+    it('4.9 should confirm in-memory test adapter functions without reading developer DATABASE_URL', async () => {
+      const originalEnvUrl = process.env.DATABASE_URL;
+      try {
+        // Set an unsafe developer URL in process.env
+        process.env.DATABASE_URL = 'postgresql://postgres:postgrespassword@localhost:5432/techsprout_production';
+
+        const mem = await createTestDatabase();
+        // cleanupBenchmarkFixtures should succeed on in-memory db without throwing allowlist error for techsprout_production
+        await expect(cleanupBenchmarkFixtures(mem.db)).resolves.not.toThrow();
+        await mem.pool.end();
+      } finally {
+        process.env.DATABASE_URL = originalEnvUrl;
+      }
     });
   });
 });

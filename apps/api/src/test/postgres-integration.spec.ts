@@ -375,7 +375,7 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
     });
 
     // 2. Run cleanupBenchmarkFixtures on the database
-    await cleanupBenchmarkFixtures(db);
+    await cleanupBenchmarkFixtures(db, { databaseUrl: dbUrl });
 
     // 3. Verify that the non-benchmark course and non-benchmark learning event were preserved intact!
     const [checkEvent] = await db

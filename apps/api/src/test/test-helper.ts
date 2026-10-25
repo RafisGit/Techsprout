@@ -30,6 +30,27 @@ export function clearTestCloudinaryConfig() {
   env.CLOUDINARY_API_SECRET = undefined;
 }
 
+/**
+ * Unique symbol marking explicitly identified in-memory test database adapters.
+ */
+export const IN_MEMORY_TEST_ADAPTER = Symbol.for('techsprout.in_memory_test_adapter');
+
+/**
+ * Validates whether a database connection instance represents an explicitly supported in-memory adapter.
+ */
+export function isInMemoryDatabase(db: any): boolean {
+  if (!db) return false;
+  if (db[IN_MEMORY_TEST_ADAPTER] === true) return true;
+  if (db.session?.client && (db.session.client as any)[IN_MEMORY_TEST_ADAPTER] === true) return true;
+  if (db._?.session?.client && (db._.session.client as any)[IN_MEMORY_TEST_ADAPTER] === true) return true;
+
+  const client = db.session?.client || db._?.session?.client || db.client;
+  if (client && typeof client.adaptQuery === 'function' && typeof client.adaptResults === 'function') {
+    return true;
+  }
+  return false;
+}
+
 export async function createTestDatabase() {
   if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET) {
     setupTestCloudinaryConfig();
@@ -70,6 +91,7 @@ export async function createTestDatabase() {
 
   const { Pool } = memDb.adapters.createPg();
   const pool = new Pool();
+  (pool as any)[IN_MEMORY_TEST_ADAPTER] = true;
 
   // Adapt queries for Drizzle ORM compatibility with pg-mem
   const wrapQuery = (origQuery: any) => {
@@ -121,11 +143,13 @@ export async function createTestDatabase() {
   const originalConnect = pool.connect.bind(pool);
   pool.connect = async function (...args: any[]) {
     const client = await originalConnect(...args);
+    (client as any)[IN_MEMORY_TEST_ADAPTER] = true;
     client.query = wrapQuery(client.query.bind(client));
     return client;
   };
 
   const db = drizzle(pool, { schema });
+  (db as any)[IN_MEMORY_TEST_ADAPTER] = true;
 
   // Create schema tables in test DB
   await pool.query(`
@@ -879,35 +903,75 @@ export const BENCHMARK_INSTRUCTOR_USERNAME = 'bench_instructor';
 /**
  * Fixture-scoped cleanup: removes ONLY records created by the telemetry load benchmark.
  * Never performs broad, unbounded deletes on learning_events or any other table.
- * Actively validates server identity before executing any destructive query.
+ * Actively validates live server identity and database URL before executing any destructive query.
  */
 export async function cleanupBenchmarkFixtures(
   db: any,
   options?: { databaseUrl?: string | null; currentDatabaseName?: string }
 ): Promise<void> {
-  // 1. Resolve and verify database identity before any destructive query
-  let serverDbName = options?.currentDatabaseName;
-  if (!serverDbName) {
-    try {
-      const res = await db.execute(sql.raw('SELECT current_database()'));
-      serverDbName = res?.rows?.[0]?.current_database || res?.[0]?.current_database;
-    } catch (err) {
+  // 1. Mandatory live server identity verification through the connected db
+  // A caller-supplied currentDatabaseName is NEVER accepted as proof of identity.
+  let liveDbName: string;
+  try {
+    const res = await db.execute(sql.raw('SELECT current_database()'));
+    liveDbName = res?.rows?.[0]?.current_database || res?.[0]?.current_database;
+  } catch (err) {
+    throw new Error(
+      `[Database Safety Guard] Destructive cleanup rejected: Failed to verify live server current_database(): ${(err as Error).message}`
+    );
+  }
+
+  if (!liveDbName || typeof liveDbName !== 'string' || liveDbName.trim() === '') {
+    throw new Error(
+      '[Database Safety Guard] Destructive cleanup rejected: Server-verified database identity (SELECT current_database()) is missing or empty. Live identity verification is required before cleanup.'
+    );
+  }
+
+  liveDbName = liveDbName.toLowerCase().trim();
+
+  if (!isSafeTestDatabaseName(liveDbName)) {
+    throw new Error(
+      `[Database Safety Guard] Destructive cleanup rejected: Connected database identity '${liveDbName}' does not match test allowlist.`
+    );
+  }
+
+  // 2. Caller-supplied identity check: if supplied, MUST match live identity
+  // Prevents caller from supplying a forged currentDatabaseName.
+  if (options?.currentDatabaseName !== undefined) {
+    const callerSupplied = String(options.currentDatabaseName).toLowerCase().trim();
+    if (callerSupplied !== liveDbName) {
       throw new Error(
-        `[Database Safety Guard] Destructive cleanup rejected: Failed to verify server current_database(): ${(err as Error).message}`
+        `[Database Safety Guard] Destructive cleanup rejected: Caller-supplied database identity '${callerSupplied}' does not match live server current_database() '${liveDbName}'. Caller-supplied identity cannot bypass live verification.`
       );
     }
   }
 
-  if (!serverDbName || typeof serverDbName !== 'string' || !isSafeTestDatabaseName(serverDbName)) {
-    throw new Error(
-      `[Database Safety Guard] Destructive cleanup rejected: Connected database identity '${serverDbName}' does not match test allowlist.`
-    );
-  }
+  // 3. Adapter check & URL verification
+  // Restrict any URL-free exception to an explicitly identified in-memory adapter.
+  // Supplying databaseUrl: null or omitting a URL for a real PostgreSQL adapter cannot authorize cleanup.
+  const isMem = isInMemoryDatabase(db);
 
-  // Determine URL to validate against
-  const dbUrl = options?.databaseUrl !== undefined ? options.databaseUrl : process.env.DATABASE_URL;
-  if (dbUrl) {
-    assertSafeTestDatabase(dbUrl, serverDbName);
+  if (isMem) {
+    // Explicitly identified in-memory test adapter: does NOT read developer's process.env.DATABASE_URL
+    if (options?.databaseUrl) {
+      assertSafeTestDatabase(options.databaseUrl, liveDbName);
+    }
+  } else {
+    // Real PostgreSQL adapter: a verified databaseUrl is MANDATORY!
+    if (options?.databaseUrl === null) {
+      throw new Error(
+        '[Database Safety Guard] Destructive cleanup rejected: Supplying databaseUrl: null for a PostgreSQL adapter cannot authorize cleanup. Nullable URLs are restricted to explicitly identified in-memory adapters.'
+      );
+    }
+
+    const dbUrl = options?.databaseUrl || process.env.DATABASE_URL;
+    if (!dbUrl) {
+      throw new Error(
+        '[Database Safety Guard] Destructive cleanup rejected: PostgreSQL cleanup requires a verified databaseUrl. Missing databaseUrl cannot authorize cleanup.'
+      );
+    }
+
+    assertSafeTestDatabase(dbUrl, liveDbName);
   }
 
   // 2. Delete learning_events specifically scoped to the benchmark course
