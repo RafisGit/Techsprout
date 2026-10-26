@@ -2378,3 +2378,171 @@ export interface TutorRetrievalResultDto {
 
 export type TutorRetrievalResponse = ApiSuccessResponse<TutorRetrievalResultDto>;
 
+// ============================================================================
+// PHASE 8.0 RECURRING SUBSCRIPTIONS & PLATFORM MEMBERSHIPS (WP-P8-01)
+// ============================================================================
+
+export const subscriptionBillingIntervalEnum = z.enum(['MONTHLY', 'ANNUAL']);
+export type SubscriptionBillingInterval = z.infer<typeof subscriptionBillingIntervalEnum>;
+
+export const subscriptionStatusEnum = z.enum([
+  'INCOMPLETE',
+  'ACTIVE',
+  'PAST_DUE',
+  'CANCELED',
+  'UNPAID',
+  'EXPIRED',
+]);
+export type SubscriptionStatus = z.infer<typeof subscriptionStatusEnum>;
+
+export const mandateStatusEnum = z.enum(['PENDING', 'ACTIVE', 'REVOKED', 'EXPIRED']);
+export type PaymentMandateStatus = z.infer<typeof mandateStatusEnum>;
+
+export const subscriptionInvoiceStatusEnum = z.enum(['PENDING', 'PAID', 'FAILED']);
+export type SubscriptionInvoiceStatus = z.infer<typeof subscriptionInvoiceStatusEnum>;
+
+export interface SubscriptionPlanDto {
+  id: string;
+  code: string;
+  title: string;
+  description?: string | null;
+  billingInterval: SubscriptionBillingInterval;
+  priceCents: number;
+  currency: string;
+  trialPeriodDays: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const createSubscriptionPlanSchema = z
+  .object({
+    code: z.string().min(2, 'Plan code must be at least 2 characters').max(50).trim(),
+    title: z.string().min(3, 'Plan title must be at least 3 characters').max(250).trim(),
+    description: z.string().max(2000).optional().nullable(),
+    billingInterval: subscriptionBillingIntervalEnum,
+    priceCents: moneyCentsSchema,
+    currency: z.literal('BDT').default('BDT'),
+    trialPeriodDays: z.number().int().min(0, 'Trial days cannot be negative').default(0),
+    isActive: z.boolean().default(true),
+  })
+  .strict();
+export type CreateSubscriptionPlanInput = z.input<typeof createSubscriptionPlanSchema>;
+export type CreateSubscriptionPlanDto = z.infer<typeof createSubscriptionPlanSchema>;
+
+export const updateSubscriptionPlanSchema = z
+  .object({
+    title: z.string().min(3).max(250).trim().optional(),
+    description: z.string().max(2000).optional().nullable(),
+    priceCents: moneyCentsSchema.optional(),
+    trialPeriodDays: z.number().int().min(0).optional(),
+    isActive: z.boolean().optional(),
+  })
+  .strict();
+export type UpdateSubscriptionPlanDto = z.infer<typeof updateSubscriptionPlanSchema>;
+
+/**
+ * Public-safe representation of a stored payment mandate.
+ * The provider token/ciphertext is intentionally never exposed through API DTOs.
+ */
+export interface PaymentMandateDto {
+  id: string;
+  studentId: string;
+  provider: string;
+  maskedCardNumber?: string | null;
+  cardBrand?: string | null;
+  cardExpiry?: string | null;
+  status: PaymentMandateStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const initiateMandateSchema = z
+  .object({
+    provider: z.string().min(2).max(50).default('SSLCOMMERZ'),
+    returnUrl: z.string().url().optional(),
+    cancelUrl: z.string().url().optional(),
+  })
+  .strict();
+export type InitiateMandateInput = z.input<typeof initiateMandateSchema>;
+export type InitiateMandateDto = z.infer<typeof initiateMandateSchema>;
+
+export const mandateCallbackSchema = z
+  .object({
+    mandateId: z.string().uuid(),
+    status: z.enum(['SUCCESS', 'FAILED', 'CANCELLED']),
+    token: z.string().optional(),
+    maskedCard: z.string().max(30).optional(),
+    cardBrand: z.string().max(50).optional(),
+    cardExpiry: z.string().max(10).optional(),
+    failureReason: z.string().max(500).optional(),
+  })
+  .passthrough();
+export type MandateCallbackInput = z.input<typeof mandateCallbackSchema>;
+export type MandateCallbackDto = z.infer<typeof mandateCallbackSchema>;
+
+export interface SubscriptionDto {
+  id: string;
+  subscriptionNumber: string;
+  studentId: string;
+  planId: string;
+  mandateId?: string | null;
+  status: SubscriptionStatus;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  cancelAtPeriodEnd: boolean;
+  canceledAt?: string | null;
+  dunningAttempts: number;
+  lastDunningAt?: string | null;
+  plan?: SubscriptionPlanDto | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SubscriptionInvoiceDto {
+  id: string;
+  invoiceNumber: string;
+  subscriptionId: string;
+  billingCycleStart: string;
+  billingCycleEnd: string;
+  amountCents: number;
+  currency: string;
+  status: SubscriptionInvoiceStatus;
+  paymentId?: string | null;
+  paidAt?: string | null;
+  createdAt: string;
+}
+
+export const subscriptionCheckoutSchema = z
+  .object({
+    planCode: z.string().min(2).max(50).trim(),
+    redirectSuccessUrl: z.string().url().optional(),
+    redirectFailUrl: z.string().url().optional(),
+    redirectCancelUrl: z.string().url().optional(),
+  })
+  .strict();
+export type SubscriptionCheckoutDto = z.infer<typeof subscriptionCheckoutSchema>;
+
+export const cancelSubscriptionSchema = z
+  .object({
+    reason: z.string().max(1000).optional().nullable(),
+    feedbackCategory: z
+      .enum(['TOO_EXPENSIVE', 'CONTENT_NOT_RELEVANT', 'SWITCHING_TIER', 'TECHNICAL_ISSUES', 'OTHER'])
+      .optional()
+      .nullable(),
+  })
+  .strict();
+export type CancelSubscriptionDto = z.infer<typeof cancelSubscriptionSchema>;
+
+export interface SubscriptionEntitlementResultDto {
+  hasAccess: boolean;
+  accessType: 'LIFETIME_PURCHASE' | 'SUBSCRIPTION_MEMBERSHIP' | 'NONE';
+  reason?: string;
+  subscription?: {
+    id: string;
+    status: SubscriptionStatus;
+    currentPeriodEnd: string;
+    cancelAtPeriodEnd: boolean;
+  } | null;
+}
+

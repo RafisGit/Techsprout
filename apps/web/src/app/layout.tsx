@@ -10,7 +10,6 @@ import QueryProvider from '@/lib/QueryProvider';
 const lexendDeca = Lexend_Deca({
   variable: '--font-lexend-deca',
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
   fallback: [
     'ui-sans-serif',
     'system-ui',
