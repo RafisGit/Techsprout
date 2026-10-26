@@ -410,9 +410,9 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
     const txNumber = `LTX-TEST-${Date.now()}`;
     const insertRes = await pool.query(`
       INSERT INTO ledger_transactions (id, transaction_number, transaction_type, idempotency_key, currency, total_amount_cents, reference_type, reference_id, description)
-      VALUES (gen_random_uuid(), $1, $2, 'BDT', 5000, 'TEST', 'test-1', 'Test ledger transaction')
+      VALUES (gen_random_uuid(), $1, $2, $3, 'BDT', 5000, 'TEST', 'test-1', 'Test ledger transaction')
       RETURNING id;
-    `, [txNumber, `idemp-${Date.now()}`]);
+    `, [txNumber, 'COURSE_PURCHASE', `idemp-${Date.now()}`]);
     const txId = insertRes.rows[0].id;
 
     // Direct UPDATE must fail due to prevent_ledger_mutation trigger
