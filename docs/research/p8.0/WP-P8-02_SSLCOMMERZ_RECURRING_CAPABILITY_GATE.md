@@ -63,6 +63,12 @@ The WP-P8-01 development branch now:
 
 Because migration `0012_subscription_foundation.sql` has not been applied to any environment, its new column definition can still be reviewed in development. If it is ever applied to an environment, subsequent changes must use a new reviewed migration rather than editing historical applied migration SQL.
 
+### Fail-closed execution gate added
+
+The feature branch now also contains `apps/api/src/modules/payments/recurring-capability-gate.ts` with an explicit two-part guard: the recurring feature must be enabled and the merchant-specific capability must be verified. Missing values fail closed. The accompanying unit tests cover missing configuration, disabled execution, unverified capability, and the positive case.
+
+This guard is not yet wired into any controller, worker, checkout path, or provider adapter. Its presence alone does not make the live system safe or imply that recurring charges are implemented. Future charge/renewal entry points must invoke the guard and also enforce mandate state, durable idempotency, authorization, and reconciled transaction state before any provider request.
+
 ## 5. Acceptance criteria for completing WP-P8-02
 
 - Written merchant-specific capability evidence is attached to DEC-P8-01, or the product explicitly adopts customer-initiated manual renewals/prepaid passes instead of auto-debit.
