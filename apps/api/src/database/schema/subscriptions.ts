@@ -75,7 +75,8 @@ export const paymentMandates = pgTable(
       .references(() => users.id, { onDelete: 'restrict' })
       .notNull(),
     provider: varchar('provider', { length: 50 }).default('SSLCOMMERZ').notNull(),
-    gatewayToken: varchar('gateway_token', { length: 255 }).notNull(),
+    // AES-256-GCM ciphertext only; never store or expose a raw provider token.
+    gatewayTokenCiphertext: varchar('gateway_token_ciphertext', { length: 512 }).notNull(),
     maskedCardNumber: varchar('masked_card_number', { length: 20 }),
     cardBrand: varchar('card_brand', { length: 50 }),
     cardExpiry: varchar('card_expiry', { length: 10 }),
