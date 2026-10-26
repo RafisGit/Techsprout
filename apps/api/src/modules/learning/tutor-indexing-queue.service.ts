@@ -125,9 +125,10 @@ export class TutorIndexingQueueService implements OnModuleInit, OnModuleDestroy 
 
     if (this.queue && this.isConnected && !this.isClosing) {
       try {
-        // Debounce burst updates with a 5-second deterministic jobId window
+        // Deduplicate equivalent triggers within a five-second window, without
+        // suppressing a distinct lifecycle event such as republishing after a purge.
         const windowKey = Math.floor(Date.now() / 5000);
-        const jobId = `index-course:${courseId}:${windowKey}`;
+        const jobId = `index-course:${courseId}:${trigger}:${windowKey}`;
         await this.queue.add('index-course', payload, { jobId });
         return;
       } catch (err: any) {
