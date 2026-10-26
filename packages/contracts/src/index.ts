@@ -2457,6 +2457,30 @@ export interface PaymentMandateDto {
   updatedAt: string;
 }
 
+export const initiateMandateSchema = z
+  .object({
+    provider: z.string().min(2).max(50).default('SSLCOMMERZ'),
+    returnUrl: z.string().url().optional(),
+    cancelUrl: z.string().url().optional(),
+  })
+  .strict();
+export type InitiateMandateInput = z.input<typeof initiateMandateSchema>;
+export type InitiateMandateDto = z.infer<typeof initiateMandateSchema>;
+
+export const mandateCallbackSchema = z
+  .object({
+    mandateId: z.string().uuid(),
+    status: z.enum(['SUCCESS', 'FAILED', 'CANCELLED']),
+    token: z.string().optional(),
+    maskedCard: z.string().max(30).optional(),
+    cardBrand: z.string().max(50).optional(),
+    cardExpiry: z.string().max(10).optional(),
+    failureReason: z.string().max(500).optional(),
+  })
+  .passthrough();
+export type MandateCallbackInput = z.input<typeof mandateCallbackSchema>;
+export type MandateCallbackDto = z.infer<typeof mandateCallbackSchema>;
+
 export interface SubscriptionDto {
   id: string;
   subscriptionNumber: string;

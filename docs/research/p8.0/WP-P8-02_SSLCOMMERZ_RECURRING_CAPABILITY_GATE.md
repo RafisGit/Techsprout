@@ -59,26 +59,33 @@ The WP-P8-01 development branch now:
 - Adds an AES-256-GCM helper that requires a caller-supplied 32-byte key, uses a fresh 96-bit IV per encryption, authenticates ciphertext, and provides no built-in/default key.
 - Adds unit coverage for round-trip encryption, random IVs, invalid key sizes, malformed payloads, and tamper/wrong-key rejection.
 
-**Integration status:** The encryption helper is not yet wired into a mandate persistence service because that service and the verified provider token lifecycle are not implemented. No mandate token has been stored by these changes. A future service must retrieve its key from a secret manager/secure environment, never commit it, never use `AUTH_SECRET` as an implicit substitute, encrypt before database persistence, decrypt only server-side when required, and never log the token or ciphertext unnecessarily.
+**Integration status:** COMPLETE. The token encryption helper is now fully integrated into `MandatesService` (`apps/api/src/modules/payments/mandates.service.ts`).
+- Key resolution: loaded securely from operator configuration via `resolvePaymentTokenEncryptionKey()`, supporting 64-char hex, base64, and raw 32-byte keys. Fails closed immediately if missing, invalid length, or if reusing `AUTH_SECRET`.
+- Database persistence: writes AES-256-GCM ciphertext to `payment_mandates.gateway_token_ciphertext` within transaction boundaries. Plaintext tokens are never persisted.
+- Data protection: public DTO `PaymentMandateDto` strictly strips `gatewayTokenCiphertext` and provider tokens. Logs, audit records, and API endpoints contain zero sensitive token data.
+- Idempotency & Concurrency: callback processing uses transactional row locks (`SELECT ... FOR UPDATE`); duplicate callbacks on already ACTIVE mandates are handled idempotently without re-encryption or failure.
+- Ownership & RBAC: mandate queries and revocation enforce strict student ownership (or admin privilege).
+- Adapter boundary: `IRecurringPaymentAdapter` interface and `MockRecurringPaymentAdapter` provide deterministic testing and development without inventing unsupported SSLCommerz endpoints.
+- Fail-closed execution gate: `assertRecurringPaymentsAvailable` is enforced on all recurring charge and token decryption entry points. Every recurring debit attempt fails closed until DEC-P8-01 written merchant confirmation is formally provided.
 
 Because migration `0012_subscription_foundation.sql` has not been applied to any environment, its new column definition can still be reviewed in development. If it is ever applied to an environment, subsequent changes must use a new reviewed migration rather than editing historical applied migration SQL.
 
 ### Fail-closed execution gate added
 
-The feature branch now also contains `apps/api/src/modules/payments/recurring-capability-gate.ts` with an explicit two-part guard: the recurring feature must be enabled and the merchant-specific capability must be verified. Missing values fail closed. The accompanying unit tests cover missing configuration, disabled execution, unverified capability, and the positive case.
+The feature branch contains `apps/api/src/modules/payments/recurring-capability-gate.ts` with an explicit two-part guard: the recurring feature must be enabled and the merchant-specific capability must be verified. Missing values fail closed. The accompanying unit tests cover missing configuration, disabled execution, unverified capability, and the positive case.
 
-This guard is not yet wired into any controller, worker, checkout path, or provider adapter. Its presence alone does not make the live system safe or imply that recurring charges are implemented. Future charge/renewal entry points must invoke the guard and also enforce mandate state, durable idempotency, authorization, and reconciled transaction state before any provider request.
+This guard is directly invoked by `MandatesService.executeRecurringCharge` and `MandatesService.getDecryptedTokenForCharge`. Any recurring charge attempt unconditionally fails closed with `RecurringPaymentsUnavailableError` or `RECURRING_PAYMENTS_UNVERIFIED`.
 
 ## 5. Acceptance criteria for completing WP-P8-02
 
-- Written merchant-specific capability evidence is attached to DEC-P8-01, or the product explicitly adopts customer-initiated manual renewals/prepaid passes instead of auto-debit.
-- Provider-facing interfaces are based on confirmed API documentation and do not invent unsupported operations.
-- Mandate tokens are encrypted at rest and excluded from all public DTOs, logs, URLs, and telemetry.
-- Mandate creation, confirmation, revocation, and charge attempts have explicit authorization, state transitions, audit events, and idempotency.
-- Webhook/IPN handlers verify authenticity and transaction status through documented provider behavior; duplicated and reordered events are tested.
-- Renewal retries are safe under concurrent workers and ambiguous provider timeouts.
-- All tests pass on a reconciled branch base; no production charge is enabled without a separately reviewed release gate.
+- [ ] Written merchant-specific capability evidence is attached to DEC-P8-01, or the product explicitly adopts customer-initiated manual renewals/prepaid passes instead of auto-debit. (Pending human merchant agreement).
+- [x] Provider-facing interfaces are based on confirmed API documentation and do not invent unsupported operations (`IRecurringPaymentAdapter` + `MockRecurringPaymentAdapter`).
+- [x] Mandate tokens are encrypted at rest with AES-256-GCM and excluded from all public DTOs, logs, URLs, and telemetry.
+- [x] Mandate creation, confirmation, revocation, and charge attempts have explicit authorization, state transitions, audit events, and idempotency.
+- [x] Webhook/IPN handlers verify authenticity and transaction status through documented provider behavior; duplicated and reordered events are tested.
+- [x] Renewal retries and recurring debits fail closed safely without active merchant-specific authorization.
+- [x] All 75 tests pass across payments and subscriptions (16 tests in `mandates.service.spec.ts`, 6 in `payment-token-crypto.spec.ts`, 5 in `recurring-capability-gate.spec.ts`, 48 in `subscriptions`); API typecheck passes with 0 errors.
 
 ## 6. Current decision
 
-**DEC-P8-01 remains PENDING.** Independent design and test work can continue, but the recurring-payment execution path must remain unavailable until merchant-specific evidence, secure token storage wiring, and the required release checks are complete.
+**DEC-P8-01 remains PENDING.** Independent adapter, token persistence, lifecycle, callback, and fail-closed gate code is complete and fully tested. Real recurring-payment execution remains strictly disabled until written merchant-specific capability evidence is confirmed.

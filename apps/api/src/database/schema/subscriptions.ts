@@ -171,3 +171,14 @@ export const subscriptionStatusHistory = pgTable(
     index('subscription_status_history_created_at_idx').on(table.createdAt),
   ]
 );
+
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+export type NewSubscriptionPlan = typeof subscriptionPlans.$inferInsert;
+export type PaymentMandate = typeof paymentMandates.$inferSelect;
+export type NewPaymentMandate = typeof paymentMandates.$inferInsert;
+export type Subscription = typeof subscriptions.$inferSelect;
+export type NewSubscription = typeof subscriptions.$inferInsert;
+export type SubscriptionInvoice = typeof subscriptionInvoices.$inferSelect;
+export type NewSubscriptionInvoice = typeof subscriptionInvoices.$inferInsert;
+export type SubscriptionStatusHistory = typeof subscriptionStatusHistory.$inferSelect;
+export type NewSubscriptionStatusHistory = typeof subscriptionStatusHistory.$inferInsert;
