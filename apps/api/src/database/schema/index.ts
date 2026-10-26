@@ -23,3 +23,4 @@ export * from './notifications';
 export * from './course-reviews';
 export * from './instructor-profiles';
 export * from './telemetry';
+export * from './subscriptions';
