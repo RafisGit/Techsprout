@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS "payment_mandates" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"student_id" uuid NOT NULL,
 	"provider" varchar(50) DEFAULT 'SSLCOMMERZ' NOT NULL,
-	"gateway_token" varchar(255) NOT NULL,
+	"gateway_token_ciphertext" varchar(512) NOT NULL,
 	"masked_card_number" varchar(20),
 	"card_brand" varchar(50),
 	"card_expiry" varchar(10),
