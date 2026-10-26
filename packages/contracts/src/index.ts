@@ -2441,11 +2441,14 @@ export const updateSubscriptionPlanSchema = z
   .strict();
 export type UpdateSubscriptionPlanDto = z.infer<typeof updateSubscriptionPlanSchema>;
 
+/**
+ * Public-safe representation of a stored payment mandate.
+ * The provider token/ciphertext is intentionally never exposed through API DTOs.
+ */
 export interface PaymentMandateDto {
   id: string;
   studentId: string;
   provider: string;
-  gatewayToken: string;
   maskedCardNumber?: string | null;
   cardBrand?: string | null;
   cardExpiry?: string | null;
