@@ -872,10 +872,10 @@ describe('Phase 7.3 / WP-P7-06: Instructor Monetization & Marketplace Ledger', (
 
       // Verify accounting integrity: sum of debits === sum of credits === 10,000 poisha
       expect(clawbackTx!.totalAmountCents).toBe(10000);
-      const totalDebits = clawbackTx!.entries
+      const totalDebits = clawbackTx!.entries!
         .filter((e) => e.direction === 'DEBIT')
         .reduce((sum, e) => sum + e.amountCents, 0);
-      const totalCredits = clawbackTx!.entries
+      const totalCredits = clawbackTx!.entries!
         .filter((e) => e.direction === 'CREDIT')
         .reduce((sum, e) => sum + e.amountCents, 0);
       expect(totalDebits).toBe(10000);
@@ -962,7 +962,7 @@ describe('Phase 7.3 / WP-P7-06: Instructor Monetization & Marketplace Ledger', (
       expect(walletBobAfter.balanceCents).toBe(0);
 
       // Verify debits: PLATFORM_REVENUE (10,000 = 3,000 fee + 7,000 absorption), Credit: PLATFORM_CASH (10,000)
-      const platformRevenueDebits = clawbackTx!.entries
+      const platformRevenueDebits = clawbackTx!.entries!
         .filter((e) => e.accountType === 'PLATFORM_REVENUE' && e.direction === 'DEBIT')
         .reduce((sum, e) => sum + e.amountCents, 0);
       expect(platformRevenueDebits).toBe(10000);

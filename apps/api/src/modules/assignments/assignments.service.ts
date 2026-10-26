@@ -22,6 +22,7 @@ import { validateAndSanitizeContent } from '../../common/utils/content-sanitizer
 import { AssignmentUploadService } from './assignment-upload.service';
 import type {
   CreateAssignmentDto,
+  CreateAssignmentInput,
   UpdateAssignmentDto,
   GradeSubmissionDto,
   AssignmentListQuery,
@@ -155,7 +156,7 @@ export class AssignmentsService {
   async createAssignment(
     courseId: string,
     userId: string,
-    dto: CreateAssignmentDto
+    dto: CreateAssignmentDto | CreateAssignmentInput
   ): Promise<AssignmentDto> {
     await this.verifyInstructorOrAdmin(courseId, userId);
 

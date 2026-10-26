@@ -2800,6 +2800,7 @@ export const createAssignmentSchema = z
   })
   .strict();
 export type CreateAssignmentDto = z.infer<typeof createAssignmentSchema>;
+export type CreateAssignmentInput = z.input<typeof createAssignmentSchema>;
 
 export const updateAssignmentSchema = z
   .object({
