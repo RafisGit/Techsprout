@@ -17,6 +17,8 @@ import {
   auditLogs,
 } from '../database/schema';
 import { RefundRequestsService } from '../modules/refunds/refund-requests.service';
+import { RefundsService } from '../modules/refunds/refunds.service';
+import { MockSSLCommerzClient } from '../modules/payments/sslcommerz.client';
 import { AdminRefundRequestsController } from '../modules/refunds/admin-refund-requests.controller';
 import { AuditService } from '../modules/audit/audit.service';
 import { ApiException } from '../common/errors/api-error';
@@ -30,6 +32,7 @@ describe('P5.5.4 — Admin Refund Review Queue Test Suite', () => {
   let db: any;
   let pool: any;
   let auditService: AuditService;
+  let refundsService: RefundsService;
   let service: RefundRequestsService;
   let adminController: AdminRefundRequestsController;
 
@@ -48,7 +51,9 @@ describe('P5.5.4 — Admin Refund Review Queue Test Suite', () => {
     db = mem.db;
     pool = mem.pool;
     auditService = new AuditService(db);
-    service = new RefundRequestsService(db, auditService);
+    const mockSslCommerz = new MockSSLCommerzClient();
+    refundsService = new RefundsService(db, mockSslCommerz, auditService);
+    service = new RefundRequestsService(db, auditService, refundsService);
     adminController = new AdminRefundRequestsController(service);
 
     // 1. Users

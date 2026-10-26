@@ -5,7 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import { AppModule } from '../app.module';
 import { DRIZZLE_DB } from '../database/drizzle.provider';
-import { createTestDatabase } from './test-helper';
+import { createTestDatabase, extractCookies } from './test-helper';
 import { CryptoUtil } from '../common/auth/crypto.util';
 import * as schema from '../database/schema';
 import { eq, desc, and } from 'drizzle-orm';
@@ -288,13 +288,13 @@ describe('P5.5.7 — Admin Financial CSV Export Test Suite', () => {
     const adminLoginRes = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .send({ email: 'finance-admin@techsprout.edu', password: 'Password123!' });
-    adminCookies = adminLoginRes.headers['set-cookie'] || [];
+    adminCookies = extractCookies(adminLoginRes.headers);
 
     // Authenticate Student Session
     const studentLoginRes = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .send({ email: 'student-buyer@techsprout.edu', password: 'Password123!' });
-    studentCookies = studentLoginRes.headers['set-cookie'] || [];
+    studentCookies = extractCookies(studentLoginRes.headers);
   });
 
   afterAll(async () => {

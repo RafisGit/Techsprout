@@ -14,6 +14,7 @@
     "test": "pnpm --recursive test",
     "test:api": "pnpm --filter @techsprout/api test",
     "test:security": "pnpm --filter @techsprout/api test:security",
+    "test:benchmark": "pnpm --filter @techsprout/api test:benchmark",
     "lint": "pnpm --recursive lint",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\"",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""

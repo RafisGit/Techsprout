@@ -5,7 +5,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import { AppModule } from '../app.module';
 import { DatabaseService, DRIZZLE_DB } from '../database/drizzle.provider';
-import { createTestDatabase } from './test-helper';
+import { createTestDatabase, extractCookies } from './test-helper';
 import { CryptoUtil } from '../common/auth/crypto.util';
 import * as schema from '../database/schema';
 import { eq, and } from 'drizzle-orm';
@@ -206,25 +206,25 @@ describe('P6.3 — WP-02: Backend Analytics Engine & Scoped APIs Test Suite', ()
       email: 'admin@techsprout.edu',
       password: 'AdminPassword123!',
     });
-    adminCookies = adminRes.headers['set-cookie'] || [];
+    adminCookies = extractCookies(adminRes.headers);
 
     const inst1Res = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
       email: 'instructor@techsprout.edu',
       password: 'InstructorPassword123!',
     });
-    instructor1Cookies = inst1Res.headers['set-cookie'] || [];
+    instructor1Cookies = extractCookies(inst1Res.headers);
 
     const inst2Res = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
       email: 'instructor2@techsprout.edu',
       password: 'Instructor2Password123!',
     });
-    instructor2Cookies = inst2Res.headers['set-cookie'] || [];
+    instructor2Cookies = extractCookies(inst2Res.headers);
 
     const studentRes = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
       email: 'student@techsprout.edu',
       password: 'StudentPassword123!',
     });
-    studentCookies = studentRes.headers['set-cookie'] || [];
+    studentCookies = extractCookies(studentRes.headers);
   });
 
   afterAll(async () => {

@@ -16,6 +16,8 @@ import {
   quizAttempts,
 } from '../database/schema';
 import { RefundRequestsService } from '../modules/refunds/refund-requests.service';
+import { RefundsService } from '../modules/refunds/refunds.service';
+import { MockSSLCommerzClient } from '../modules/payments/sslcommerz.client';
 import { RefundRequestsController } from '../modules/refunds/refund-requests.controller';
 import { OrdersController } from '../modules/orders/orders.controller';
 import { AuditService } from '../modules/audit/audit.service';
@@ -31,6 +33,7 @@ describe('P5.5.3 — Student Refund Request API & Workflow Test Suite', () => {
   let db: any;
   let pool: any;
   let auditService: AuditService;
+  let refundsService: RefundsService;
   let service: RefundRequestsService;
   let refundRequestsController: RefundRequestsController;
   let ordersController: OrdersController;
@@ -50,7 +53,9 @@ describe('P5.5.3 — Student Refund Request API & Workflow Test Suite', () => {
     db = mem.db;
     pool = mem.pool;
     auditService = new AuditService(db);
-    service = new RefundRequestsService(db, auditService);
+    const mockSslCommerz = new MockSSLCommerzClient();
+    refundsService = new RefundsService(db, mockSslCommerz, auditService);
+    service = new RefundRequestsService(db, auditService, refundsService);
     refundRequestsController = new RefundRequestsController(service);
 
     const mockOrdersService: any = {
@@ -284,10 +289,10 @@ describe('P5.5.3 — Student Refund Request API & Workflow Test Suite', () => {
         reasonDetail: 'Unable to commit to the study schedule',
       });
 
-      const student2List = await service.listStudentRefundRequests(student2Id, {});
+      const student2List = await service.listStudentRefundRequests(student2Id, { page: 1, limit: 10 });
       expect(student2List.items).toHaveLength(0);
 
-      const student1List = await service.listStudentRefundRequests(student1Id, {});
+      const student1List = await service.listStudentRefundRequests(student1Id, { page: 1, limit: 10 });
       expect(student1List.items).toHaveLength(1);
       expect(student1List.items[0].orderId).toBe(order1Id);
     });
