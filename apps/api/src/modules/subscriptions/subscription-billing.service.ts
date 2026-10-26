@@ -241,16 +241,14 @@ export class SubscriptionBillingService {
           };
         }
 
-        // 3. Handle cancel-at-period-end: transition to CANCELED when period ends
-        if (sub.cancelAtPeriodEnd && now >= sub.currentPeriodEnd) {
-          const fromStatus = sub.status;
-          if (fromStatus === 'ACTIVE' && canTransitionSubscriptionStatus(fromStatus, 'CANCELED')) {
-            const nextStatus = transitionSubscriptionStatus(fromStatus, 'CANCELED');
+        // 3. Handle already CANCELED subscription: transition to EXPIRED when period ends
+        if (sub.status === 'CANCELED' && now >= sub.currentPeriodEnd) {
+          if (canTransitionSubscriptionStatus('CANCELED', 'EXPIRED')) {
+            const nextStatus = transitionSubscriptionStatus('CANCELED', 'EXPIRED');
             await tx
               .update(subscriptions)
               .set({
                 status: nextStatus,
-                canceledAt: now,
                 updatedAt: now,
               })
               .where(eq(subscriptions.id, sub.id));
@@ -258,14 +256,14 @@ export class SubscriptionBillingService {
             await tx.insert(subscriptionStatusHistory).values({
               id: randomUUID(),
               subscriptionId: sub.id,
-              fromStatus,
+              fromStatus: 'CANCELED',
               toStatus: nextStatus,
-              reason: 'Subscription canceled at period end per customer request',
+              reason: 'Canceled subscription prepaid period has expired',
             });
 
             await this.auditService.record({
               actorId: sub.studentId,
-              action: 'SUBSCRIPTION_CANCELED_AT_PERIOD_END',
+              action: 'SUBSCRIPTION_EXPIRED',
               targetType: 'SUBSCRIPTION',
               targetId: sub.id,
             });
@@ -273,8 +271,54 @@ export class SubscriptionBillingService {
 
           return {
             subscriptionId,
+            status: 'EXPIRED',
+            reason: 'Prepaid period expired; subscription marked EXPIRED',
+          };
+        }
+
+        // 3b. Handle ACTIVE subscription with cancel-at-period-end: transition to CANCELED when period ends, or skip renewal if still within prepaid period
+        if (sub.cancelAtPeriodEnd) {
+          if (now >= sub.currentPeriodEnd) {
+            const fromStatus = sub.status;
+            if (fromStatus === 'ACTIVE' && canTransitionSubscriptionStatus(fromStatus, 'CANCELED')) {
+              const nextStatus = transitionSubscriptionStatus(fromStatus, 'CANCELED');
+              await tx
+                .update(subscriptions)
+                .set({
+                  status: nextStatus,
+                  canceledAt: now,
+                  updatedAt: now,
+                })
+                .where(eq(subscriptions.id, sub.id));
+
+              await tx.insert(subscriptionStatusHistory).values({
+                id: randomUUID(),
+                subscriptionId: sub.id,
+                fromStatus,
+                toStatus: nextStatus,
+                reason: 'Subscription canceled at period end per customer request',
+              });
+
+              await this.auditService.record({
+                actorId: sub.studentId,
+                action: 'SUBSCRIPTION_CANCELED_AT_PERIOD_END',
+                targetType: 'SUBSCRIPTION',
+                targetId: sub.id,
+              });
+            }
+
+            return {
+              subscriptionId,
+              status: 'CANCELED_AT_PERIOD_END',
+              reason: 'Prepaid period ended; subscription canceled without renewal',
+            };
+          }
+
+          // If still within prepaid period, do not generate invoices or charge renewals
+          return {
+            subscriptionId,
             status: 'CANCELED_AT_PERIOD_END',
-            reason: 'Prepaid period ended; subscription canceled without renewal',
+            reason: 'Subscription scheduled for cancellation at period end; skipping renewal charge',
           };
         }
 
@@ -654,6 +698,27 @@ export class SubscriptionBillingService {
               plan.billingInterval === 'ANNUAL'
                 ? addYears(cycleStart, 1)
                 : addMonths(cycleStart, 1);
+
+            // Update associated cycle invoice to PAID for financial consistency
+            const [cycleInvoice] = await tx
+              .select()
+              .from(subscriptionInvoices)
+              .where(
+                and(
+                  eq(subscriptionInvoices.subscriptionId, lockedSub.id),
+                  eq(subscriptionInvoices.billingCycleStart, cycleStart)
+                )
+              );
+
+            if (cycleInvoice) {
+              await tx
+                .update(subscriptionInvoices)
+                .set({
+                  status: 'PAID',
+                  paidAt: now,
+                })
+                .where(eq(subscriptionInvoices.id, cycleInvoice.id));
+            }
 
             await tx
               .update(subscriptions)

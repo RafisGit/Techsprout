@@ -103,10 +103,10 @@ export class SubscriptionBillingWorker implements OnModuleInit, OnModuleDestroy 
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
       retryStrategy: (times) => {
-        if (this.isClosing) {
+        if (this.isClosing || env.NODE_ENV === 'test' || times > 3) {
           return null;
         }
-        return Math.min(times * 250, 10000);
+        return Math.min(times * 150, 1500);
       },
       lazyConnect: true,
     });

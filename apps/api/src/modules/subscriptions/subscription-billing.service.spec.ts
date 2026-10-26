@@ -279,27 +279,58 @@ describe('SubscriptionBillingService', () => {
       expect(res.reason).toContain('not found');
     });
 
-    it('skips subscriptions in CANCELED, EXPIRED, or UNPAID status', async () => {
+    it('skips subscriptions in EXPIRED or UNPAID status', async () => {
       const plan = createMockPlan();
       plansStore.set(plan.id, plan);
 
-      const canceledSub = createMockSubscription({
+      const expiredSub = createMockSubscription({
         planId: plan.id,
-        status: 'CANCELED',
+        status: 'EXPIRED',
         currentPeriodStart: new Date('2026-09-01Z'),
         currentPeriodEnd: new Date('2026-10-01Z'),
         cancelAtPeriodEnd: false,
-        canceledAt: new Date('2026-09-15Z'),
       });
-      subscriptionsStore.set(canceledSub.id, canceledSub);
+      subscriptionsStore.set(expiredSub.id, expiredSub);
 
-      const res = await service.processSubscriptionRenewal(canceledSub.id, {
+      const res = await service.processSubscriptionRenewal(expiredSub.id, {
         idempotencyStore,
       });
 
       expect(res.status).toBe('SKIPPED_INELIGIBLE');
-      expect(res.reason).toContain('CANCELED');
+      expect(res.reason).toContain('EXPIRED');
       expect(mockAdapter.executeRecurringCharge).not.toHaveBeenCalled();
+    });
+
+    it('skips renewal when cancelAtPeriodEnd is true before period end without charging', async () => {
+      const plan = createMockPlan();
+      plansStore.set(plan.id, plan);
+
+      const subId = randomUUID();
+      const periodEnd = new Date('2026-10-30T00:00:00.000Z');
+      const sub = createMockSubscription({
+        id: subId,
+        planId: plan.id,
+        status: 'ACTIVE',
+        currentPeriodStart: new Date('2026-09-30T00:00:00.000Z'),
+        currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: true,
+      });
+      subscriptionsStore.set(sub.id, sub);
+
+      // Current time is before periodEnd (e.g. 24h advance window)
+      const now = new Date('2026-10-29T12:00:00.000Z');
+      const res = await service.processSubscriptionRenewal(subId, {
+        now,
+        idempotencyStore,
+      });
+
+      expect(res.status).toBe('CANCELED_AT_PERIOD_END');
+      expect(res.reason).toContain('skipping renewal charge');
+      expect(mockAdapter.executeRecurringCharge).not.toHaveBeenCalled();
+
+      // Subscription remains ACTIVE until prepaid period ends
+      const unchanged = subscriptionsStore.get(subId);
+      expect(unchanged?.status).toBe('ACTIVE');
     });
 
     it('handles cancelAtPeriodEnd by transitioning to CANCELED when period has elapsed without renewal', async () => {
@@ -336,6 +367,42 @@ describe('SubscriptionBillingService', () => {
         expect.objectContaining({
           action: 'SUBSCRIPTION_CANCELED_AT_PERIOD_END',
           targetId: sub.id,
+        })
+      );
+    });
+
+    it('transitions already CANCELED subscription to EXPIRED when prepaid period has elapsed', async () => {
+      const plan = createMockPlan();
+      plansStore.set(plan.id, plan);
+
+      const periodEnd = new Date('2026-10-20T00:00:00.000Z');
+      const canceledSub = createMockSubscription({
+        planId: plan.id,
+        status: 'CANCELED',
+        currentPeriodStart: new Date('2026-09-20T00:00:00.000Z'),
+        currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: true,
+        canceledAt: new Date('2026-09-25T00:00:00.000Z'),
+      });
+      subscriptionsStore.set(canceledSub.id, canceledSub);
+
+      const now = new Date('2026-10-26T00:00:00.000Z');
+      const res = await service.processSubscriptionRenewal(canceledSub.id, {
+        now,
+        idempotencyStore,
+      });
+
+      expect(res.status).toBe('EXPIRED');
+      expect(res.reason).toContain('Prepaid period expired');
+      expect(mockAdapter.executeRecurringCharge).not.toHaveBeenCalled();
+
+      const updated = subscriptionsStore.get(canceledSub.id);
+      expect(updated?.status).toBe('EXPIRED');
+
+      expect(mockAuditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'SUBSCRIPTION_EXPIRED',
+          targetId: canceledSub.id,
         })
       );
     });
@@ -607,6 +674,21 @@ describe('SubscriptionBillingService', () => {
       });
       subscriptionsStore.set(sub.id, sub);
 
+      const failedInvoiceId = randomUUID();
+      invoicesStore.set(failedInvoiceId, {
+        id: failedInvoiceId,
+        invoiceNumber: 'INV-FAILED-CYCLE',
+        subscriptionId: sub.id,
+        billingCycleStart: periodEnd,
+        billingCycleEnd: addMonths(periodEnd, 1),
+        amountCents: 4900,
+        currency: 'BDT',
+        status: 'FAILED',
+        paidAt: null,
+        paymentId: null,
+        createdAt: new Date(),
+      });
+
       const res = await service.processDunningRetries({
         now: new Date('2026-10-22T00:00:00.000Z'),
         gate: verifiedGate,
@@ -621,6 +703,10 @@ describe('SubscriptionBillingService', () => {
       expect(updated?.dunningAttempts).toBe(0);
       expect(updated?.currentPeriodStart).toEqual(periodEnd);
       expect(updated?.currentPeriodEnd).toEqual(addMonths(periodEnd, 1));
+
+      const updatedInvoice = invoicesStore.get(failedInvoiceId);
+      expect(updatedInvoice?.status).toBe('PAID');
+      expect(updatedInvoice?.paidAt).toBeDefined();
     });
   });
 });
