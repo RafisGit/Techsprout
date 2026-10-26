@@ -9,6 +9,10 @@ import {
   TelemetryPruningWorker,
   RetentionWorkerHealthDetails,
 } from '../../modules/telemetry/telemetry-pruning.worker';
+import {
+  SubscriptionBillingWorker,
+  BillingWorkerHealthDetails,
+} from '../../modules/subscriptions/subscription-billing.worker';
 
 @ApiTags('Health')
 @Controller('health')
@@ -20,7 +24,10 @@ export class HealthController {
     @Optional() @Inject(QueueService) private readonly queueService?: QueueService,
     @Optional()
     @Inject(TelemetryPruningWorker)
-    private readonly telemetryPruningWorker?: TelemetryPruningWorker
+    private readonly telemetryPruningWorker?: TelemetryPruningWorker,
+    @Optional()
+    @Inject(SubscriptionBillingWorker)
+    private readonly subscriptionBillingWorker?: SubscriptionBillingWorker
   ) {}
 
   @Public()
@@ -58,6 +65,18 @@ export class HealthController {
       }
     }
 
+    let billingWorkerStatus: 'ready' | 'degraded' | 'disabled' | 'unknown' = 'unknown';
+    let billingWorkerDetails: BillingWorkerHealthDetails | undefined;
+
+    if (this.subscriptionBillingWorker) {
+      try {
+        billingWorkerStatus = this.subscriptionBillingWorker.getStatus();
+        billingWorkerDetails = this.subscriptionBillingWorker.getHealthDetails();
+      } catch {
+        billingWorkerStatus = 'degraded';
+      }
+    }
+
     return {
       status: dbStatus === 'up' ? 'ok' : 'degraded',
       timestamp: new Date().toISOString(),
@@ -67,8 +86,10 @@ export class HealthController {
         database: dbStatus,
         redis: redisStatus,
         retentionWorker: retentionWorkerStatus,
+        billingWorker: billingWorkerStatus,
       },
       retentionWorker: retentionWorkerDetails,
+      billingWorker: billingWorkerDetails,
     };
   }
 
