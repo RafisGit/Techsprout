@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import request from 'supertest';
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -594,13 +594,20 @@ describe('WP-P7-06 Remainder: Sustained Load & Redis Resource Verification', () 
 
     it('3.2 purges course chunks on unpublish / archive and cleans cache', async () => {
       await queueService.enqueuePurgeCourse(testCourse.id, 'COURSE_UNPUBLISHED');
-      const chunksAfterPurge = await indexingService.getCourseChunks(testCourse.id);
-      expect(chunksAfterPurge).toHaveLength(0);
 
-      // Re-index for subsequent test cases
+      // BullMQ enqueueing is asynchronous; wait for the worker to purge the index
+      // before asserting. This avoids a race between queue.add() and worker execution.
+      await vi.waitFor(async () => {
+        const chunksAfterPurge = await indexingService.getCourseChunks(testCourse.id);
+        expect(chunksAfterPurge).toHaveLength(0);
+      }, { timeout: 10000, interval: 50 });
+
+      // Re-index for subsequent test cases and wait for asynchronous worker completion.
       await queueService.enqueueIndexCourse(testCourse.id, 'COURSE_PUBLISHED');
-      const reindexed = await indexingService.getCourseChunks(testCourse.id);
-      expect(reindexed.length).toBeGreaterThanOrEqual(2);
+      await vi.waitFor(async () => {
+        const reindexed = await indexingService.getCourseChunks(testCourse.id);
+        expect(reindexed.length).toBeGreaterThanOrEqual(2);
+      }, { timeout: 10000, interval: 50 });
     });
   });
 
