@@ -448,5 +448,4 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
       `, [`PR-TEST-${Date.now()}`, userId, walletId])
     ).rejects.toThrow();
   });
-  });
 });
