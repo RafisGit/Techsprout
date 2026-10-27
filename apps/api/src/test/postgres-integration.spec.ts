@@ -54,8 +54,11 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
       for (const role of SEED_ROLES) {
         await db.insert(schema.roles).values(role).onConflictDoNothing();
       }
-    } catch {
+    } catch (err: any) {
       isPostgresAvailable = false;
+      if (process.env.CI_DISPOSABLE_POSTGRES === 'true') {
+        throw new Error(`FAIL-CLOSED: Real PostgreSQL instance unreachable in CI (${err.message}).`);
+      }
       console.log(
         'Notice: Real PostgreSQL instance offline in local host environment. PostgreSQL integration tests run against active CI PostgreSQL container.'
       );
@@ -70,6 +73,9 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
 
   it('1. Real PostgreSQL: Migrations executed and tables exist in information_schema', async () => {
     if (!isPostgresAvailable) {
+      if (process.env.CI_DISPOSABLE_POSTGRES === 'true') {
+        throw new Error('FAIL-CLOSED: Postgres offline in CI');
+      }
       expect(true).toBe(true);
       return;
     }
@@ -81,7 +87,9 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
         'categories', 'media', 'courses', 'modules', 'lessons', 'enrollments', 'lesson_progress',
         'quizzes', 'quiz_questions', 'quiz_question_options', 'quiz_attempts', 'quiz_attempt_answers', 'certificates',
         'coupons', 'orders', 'order_items', 'payments', 'coupon_redemptions', 'invoices', 'refunds',
-        'refund_requests', 'instructor_wallets', 'ledger_transactions', 'ledger_entries', 'payout_requests'
+        'refund_requests', 'instructor_wallets', 'ledger_transactions', 'ledger_entries', 'payout_requests',
+        'discussions', 'discussion_replies', 'discussion_votes',
+        'assignments', 'assignment_submissions', 'assignment_grades'
       );
     `);
 
@@ -118,6 +126,12 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
     expect(tableNames).toContain('ledger_transactions');
     expect(tableNames).toContain('ledger_entries');
     expect(tableNames).toContain('payout_requests');
+    expect(tableNames).toContain('discussions');
+    expect(tableNames).toContain('discussion_replies');
+    expect(tableNames).toContain('discussion_votes');
+    expect(tableNames).toContain('assignments');
+    expect(tableNames).toContain('assignment_submissions');
+    expect(tableNames).toContain('assignment_grades');
   });
 
   it('2. Real PostgreSQL: Enforces unique database constraints on users', async () => {

@@ -17,6 +17,7 @@ function parseRenderManifest(filePath: string) {
     name: string;
     type: string;
     branch?: string;
+    autoDeploy?: string;
     startCommand?: string;
     buildCommand?: string;
     envVars: Record<string, string>;
@@ -72,6 +73,9 @@ function parseRenderManifest(filePath: string) {
         } else if (/^\s{4}branch:\s*(.+)$/.test(rawLine)) {
           const m = rawLine.match(/^\s{4}branch:\s*(.+)$/);
           currentService.branch = m![1].trim();
+        } else if (/^\s{4}autoDeploy:\s*(.+)$/.test(rawLine)) {
+          const m = rawLine.match(/^\s{4}autoDeploy:\s*(.+)$/);
+          currentService.autoDeploy = m![1].trim();
         } else if (/^\s{4}startCommand:\s*(.+)$/.test(rawLine)) {
           const m = rawLine.match(/^\s{4}startCommand:\s*(.+)$/);
           currentService.startCommand = m![1].trim();
@@ -197,6 +201,12 @@ describe('Production Blueprint & Startup Safety Remediation (WP-P7-17)', () => {
       expect(prodDb).toBeDefined();
       expect(prodDb?.databaseName).toBe('techsprout');
       expect(prodDb?.user).toBe('techsprout');
+    });
+
+    it('1.8 should explicitly configure autoDeploy: false to prevent unreviewed automatic deployments', () => {
+      const manifest = parseRenderManifest(prodManifestPath);
+      const apiService = manifest.services.find((s) => s.name === 'techsprout-api');
+      expect(apiService?.autoDeploy).toBe('false');
     });
   });
 
