@@ -144,8 +144,14 @@ describe('Real PostgreSQL 16 Migration Validation & DDL Gate (0000-0011)', () =>
     const expectedEntries = journal.entries;
 
     // Verify __drizzle_migrations table exists and has exact matching count
+    const migrationTableRes = await testPool!.query(`
+      SELECT table_schema, table_name
+      FROM information_schema.tables
+      WHERE table_name = '__drizzle_migrations';
+    `);
+    const schemaName = migrationTableRes.rows[0]?.table_schema || 'drizzle';
     const res = await testPool!.query(`
-      SELECT id, hash, created_at FROM __drizzle_migrations ORDER BY id ASC;
+      SELECT id, hash, created_at FROM "${schemaName}"."__drizzle_migrations" ORDER BY id ASC;
     `);
 
     expect(res.rows.length).toBe(expectedEntries.length);
@@ -156,7 +162,7 @@ describe('Real PostgreSQL 16 Migration Validation & DDL Gate (0000-0011)', () =>
     expect(expectedEntries[11].tag).toBe('0011_discussions_and_assignments');
   });
 
-  it('2. Schema Verification: All 34 required relational tables exist in information_schema', async () => {
+  it('2. Schema Verification: All 45 required relational tables exist in information_schema', async () => {
     if (!isPostgresAvailable) {
       if (isCiEnvironment) throw new Error('FAIL-CLOSED: Postgres offline in CI');
       return;
@@ -172,18 +178,22 @@ describe('Real PostgreSQL 16 Migration Validation & DDL Gate (0000-0011)', () =>
     const requiredTables = [
       // Core & Auth (0000)
       'users', 'sessions', 'roles', 'user_roles', 'otps', 'audit_logs', 'accounts',
-      // Catalog & Courses (0000-0003)
+      // Catalog & Courses (0001)
       'categories', 'media', 'courses', 'modules', 'lessons',
-      // Learning & Progress (0000-0003)
-      'enrollments', 'lesson_progress', 'quizzes', 'quiz_questions', 'quiz_question_options',
-      'quiz_attempts', 'quiz_attempt_answers', 'certificates',
-      // Orders, Payments & Refunds (0004-0005)
-      'coupons', 'orders', 'order_items', 'payments', 'coupon_redemptions', 'invoices',
-      'refunds', 'refund_requests',
+      // Learning & Progress (0002)
+      'enrollments', 'lesson_progress',
+      // Quizzes & Certificates (0003)
+      'quiz_question_options', 'quiz_questions', 'quizzes', 'quiz_attempt_answers', 'quiz_attempts', 'certificates',
+      // Orders, Payments & Invoices (0004)
+      'coupons', 'orders', 'order_items', 'payments', 'coupon_redemptions', 'invoices', 'refunds',
+      // Refund Requests Subsystem (0005)
+      'refund_requests',
+      // Notifications & Outbox Subsystem (0006)
+      'notifications', 'notification_preferences', 'notification_deliveries', 'outbox_events',
       // Instructor Platform Foundation (0007)
       'course_review_requests', 'instructor_profiles',
       // Telemetry Foundation (0009)
-      'learning_events', 'learning_daily_aggregates',
+      'learning_events',
       // Monetization Ledger (0010)
       'instructor_wallets', 'ledger_transactions', 'ledger_entries', 'payout_requests',
       // Discussions & Project Assignments (0011)
@@ -191,6 +201,7 @@ describe('Real PostgreSQL 16 Migration Validation & DDL Gate (0000-0011)', () =>
       'assignments', 'assignment_submissions', 'assignment_grades'
     ];
 
+    expect(requiredTables.length).toBe(45);
     for (const table of requiredTables) {
       expect(tableNames).toContain(table);
     }
@@ -203,7 +214,7 @@ describe('Real PostgreSQL 16 Migration Validation & DDL Gate (0000-0011)', () =>
     }
 
     const res = await testPool!.query(`
-      SELECT t.typname, array_agg(e.enumlabel ORDER BY e.enumsortorder) as labels
+      SELECT t.typname, array_agg(e.enumlabel::text ORDER BY e.enumsortorder) as labels
       FROM pg_type t
       JOIN pg_enum e ON t.oid = e.enumtypid
       GROUP BY t.typname;
@@ -211,7 +222,12 @@ describe('Real PostgreSQL 16 Migration Validation & DDL Gate (0000-0011)', () =>
 
     const enums: Record<string, string[]> = {};
     for (const row of res.rows) {
-      enums[row.typname] = row.labels;
+      const labels = Array.isArray(row.labels)
+        ? row.labels
+        : typeof row.labels === 'string'
+        ? row.labels.replace(/^\{|\}$/g, '').split(',')
+        : [];
+      enums[row.typname] = labels;
     }
 
     // 0010 ENUM types
