@@ -4,100 +4,140 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import * as schema from '../database/schema';
 
 /**
  * Validates that the target database URL points strictly to a local, disposable test instance.
  * Fails closed if the URL targets production, staging, or an external cloud database.
+ * Suppresses credentials and sensitive connection parameters from error messages.
  */
-function assertDisposableDatabaseSafety(dbUrl: string): void {
-  const parsed = new URL(dbUrl);
+function assertDisposableDatabaseSafety(dbUrl: string): { hostname: string; port: string; pathname: string } {
+  let parsed: URL;
+  try {
+    parsed = new URL(dbUrl);
+  } catch {
+    throw new Error('SAFETY VIOLATION: Invalid database URL format. Credentials and details suppressed.');
+  }
+
   const hostname = parsed.hostname.toLowerCase();
+  const port = parsed.port || '5432';
   const pathname = parsed.pathname.toLowerCase();
 
   const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === 'postgres';
-  const isTestDb = pathname.includes('test') || pathname.includes('disposable') || pathname.includes('temp');
 
-  const isProhibitedTarget =
+  const isProhibitedHost =
     hostname.includes('render.com') ||
     hostname.includes('aws') ||
+    hostname.includes('amazon') ||
     hostname.includes('supabase') ||
     hostname.includes('neon.tech') ||
     hostname.includes('railway') ||
+    hostname.includes('elephantsql') ||
+    hostname.includes('cockroachlabs') ||
+    hostname.includes('azure') ||
+    hostname.includes('google') ||
+    hostname.includes('cloud');
+
+  const isProhibitedName =
     pathname.includes('prod') ||
     pathname.includes('production') ||
     pathname.includes('staging') ||
     pathname.includes('live');
 
-  if (!isLocalHost || !isTestDb || isProhibitedTarget) {
+  if (!isLocalHost || isProhibitedHost || isProhibitedName) {
     throw new Error(
-      `SAFETY VIOLATION: Database target "${hostname}${pathname}" is NOT explicitly recognized as a disposable test database. Real PostgreSQL migration validation requires a local disposable database containing "test", "disposable", or "temp".`
+      `SAFETY VIOLATION: Database target host "${hostname}" and path "${pathname}" is NOT recognized as a local disposable test target. Real PostgreSQL migration validation only allows localhost/127.0.0.1/postgres and prohibits production or cloud environments.`
     );
   }
+
+  return { hostname, port, pathname };
 }
 
-describe('Real PostgreSQL 16 Migration Validation & DDL Gate (0000-0011)', () => {
+const isGitHubActions = process.env.GITHUB_ACTIONS === 'true';
+const isDisposableConfigured = process.env.CI_DISPOSABLE_POSTGRES === 'true';
+const shouldSkipSuite = !isDisposableConfigured && !isGitHubActions;
+
+if (shouldSkipSuite) {
+  console.info(
+    'SKIPPED: Real PostgreSQL migration validation skipped because CI_DISPOSABLE_POSTGRES is not "true". Set CI_DISPOSABLE_POSTGRES=true and ensure a local disposable PostgreSQL 16 instance is running to execute this gate.'
+  );
+}
+
+describe.skipIf(shouldSkipSuite)('Real PostgreSQL 16 Migration Validation & DDL Gate (0000-0011)', () => {
   const baseDbUrl =
     process.env.DATABASE_URL ||
     'postgresql://postgres:postgrespassword@localhost:5432/techsprout_test';
 
-  const dedicatedDbName = 'techsprout_migration_validation';
+  const testRunId = crypto.randomBytes(6).toString('hex');
+  const dedicatedDbName = `techsprout_mig_${testRunId}`;
   let dedicatedDbUrl: string;
 
   let basePool: Pool | null = null;
   let testPool: Pool | null = null;
   let testDb: any = null;
-  let isPostgresAvailable = false;
-
-  const isCiEnvironment =
-    process.env.CI === 'true' ||
-    process.env.CI_DISPOSABLE_POSTGRES === 'true' ||
-    process.env.GITHUB_ACTIONS === 'true';
+  let dbCreatedByThisRun = false;
 
   beforeAll(async () => {
-    // 1. Verify safety invariant on target database
+    // 1. In GitHub Actions, require explicit disposable flag
+    if (isGitHubActions && !isDisposableConfigured) {
+      throw new Error(
+        'FAIL-CLOSED GATE: GitHub Actions execution requires explicit CI_DISPOSABLE_POSTGRES="true" environment flag. Real PostgreSQL migration validation requires explicit disposable environment confirmation.'
+      );
+    }
+
+    // 2. Validate safety invariant on base target database
     assertDisposableDatabaseSafety(baseDbUrl);
 
-    // Build dedicated test database URL
+    // Build dedicated test database URL and validate its safety
     const urlObj = new URL(baseDbUrl);
     urlObj.pathname = `/${dedicatedDbName}`;
     dedicatedDbUrl = urlObj.toString();
+    assertDisposableDatabaseSafety(dedicatedDbUrl);
 
-    // 2. Connect to base instance to verify health and provision isolated database
+    // 3. Connect to base instance to verify health and PostgreSQL 16 container
     basePool = new Pool({
       connectionString: baseDbUrl,
       connectionTimeoutMillis: 3000,
     });
 
+    let client;
     try {
-      const client = await basePool.connect();
-      await client.query('SELECT 1');
-      client.release();
-      isPostgresAvailable = true;
+      client = await basePool.connect();
     } catch (err: any) {
-      isPostgresAvailable = false;
-      if (isCiEnvironment) {
-        throw new Error(
-          `FAIL-CLOSED GATE: Real PostgreSQL 16 service container is unreachable in CI environment (${err.message}). Migration validation gate cannot pass without a verified real PostgreSQL instance.`
-        );
-      } else {
-        console.log(
-          'Notice: Real PostgreSQL 16 service offline in local non-CI environment. Migration validation gate requires an active disposable PostgreSQL container.'
-        );
-        return;
-      }
+      throw new Error(
+        `FAIL-CLOSED GATE: Real PostgreSQL service container is unreachable (${err.message}). Migration validation gate cannot pass without an active disposable PostgreSQL 16 service.`
+      );
     }
 
-    // 3. Create or reset dedicated empty test database
-    await basePool.query(`
-      SELECT pg_terminate_backend(pid)
-      FROM pg_stat_activity
-      WHERE datname = '${dedicatedDbName}' AND pid <> pg_backend_pid();
-    `);
-    await basePool.query(`DROP DATABASE IF EXISTS ${dedicatedDbName};`);
-    await basePool.query(`CREATE DATABASE ${dedicatedDbName};`);
+    try {
+      const versionRes = await client.query('SELECT version();');
+      const versionStr = versionRes.rows[0]?.version || '';
+      if (!versionStr.includes('PostgreSQL 16')) {
+        throw new Error(
+          `FAIL-CLOSED GATE: Expected PostgreSQL 16 service container, but received: "${versionStr}". Migration validation must execute against PostgreSQL 16.`
+        );
+      }
 
-    // 4. Connect to the pristine dedicated database
+      // 4. Confirm uniquely named database does not already exist
+      const existingDbCheck = await client.query(
+        'SELECT 1 FROM pg_database WHERE datname = $1;',
+        [dedicatedDbName]
+      );
+      if (existingDbCheck.rows.length > 0) {
+        throw new Error(
+          `Collision detected: Unique test database "${dedicatedDbName}" already exists. Aborting to avoid modifying an existing database.`
+        );
+      }
+
+      // 5. Create uniquely named dedicated test database
+      await client.query(`CREATE DATABASE "${dedicatedDbName}";`);
+      dbCreatedByThisRun = true;
+    } finally {
+      client.release();
+    }
+
+    // 6. Connect to the pristine dedicated database
     testPool = new Pool({
       connectionString: dedicatedDbUrl,
       connectionTimeoutMillis: 3000,
@@ -105,43 +145,56 @@ describe('Real PostgreSQL 16 Migration Validation & DDL Gate (0000-0011)', () =>
 
     testDb = drizzle(testPool, { schema });
 
-    // 5. Apply migrations 0000 through 0011 via Drizzle ORM migrator
+    // 7. Apply migrations 0000 through 0011 via Drizzle ORM migrator
     const migrationsFolder = path.resolve(__dirname, '../database/migrations');
-    console.log(`[Real PostgreSQL 16 Gate] Applying migrations 0000..0011 from: ${migrationsFolder}`);
+    console.log(`[Real PostgreSQL 16 Gate] Applying migrations 0000..0011 to "${dedicatedDbName}" from: ${migrationsFolder}`);
     await migrate(testDb, { migrationsFolder });
     console.log('[Real PostgreSQL 16 Gate] Forward migrations applied successfully.');
   });
 
   afterAll(async () => {
+    // 1. Close dedicated test database pool connections first
     if (testPool) {
-      await testPool.end();
+      try {
+        await testPool.end();
+      } catch (err: any) {
+        console.warn('[Cleanup Warning] Error closing test pool:', err?.message || err);
+      }
+      testPool = null;
     }
 
-    if (basePool && isPostgresAvailable) {
+    // 2. Only drop the database if this execution created it and its connections are closed
+    if (basePool && dbCreatedByThisRun) {
       try {
-        await basePool.query(`
-          SELECT pg_terminate_backend(pid)
-          FROM pg_stat_activity
-          WHERE datname = '${dedicatedDbName}' AND pid <> pg_backend_pid();
-        `);
-        await basePool.query(`DROP DATABASE IF EXISTS ${dedicatedDbName};`);
-      } catch (err) {
-        console.warn('Warning: Could not drop disposable validation database:', err);
-      } finally {
-        await basePool.end();
+        await basePool.query(`DROP DATABASE "${dedicatedDbName}";`);
+      } catch (err: any) {
+        console.warn(
+          `[Cleanup Warning] Could not drop disposable validation database "${dedicatedDbName}":`,
+          err?.message || err
+        );
       }
+    }
+
+    // 3. Close base pool connections
+    if (basePool) {
+      try {
+        await basePool.end();
+      } catch (err: any) {
+        console.warn('[Cleanup Warning] Error closing base pool:', err?.message || err);
+      }
+      basePool = null;
     }
   });
 
-  it('1. Migration Journal Alignment: __drizzle_migrations ledger matches disk journal exactly', async () => {
-    if (!isPostgresAvailable) {
-      if (isCiEnvironment) throw new Error('FAIL-CLOSED: Postgres offline in CI');
-      return;
-    }
+  it('1. Migration Journal Alignment: __drizzle_migrations ledger matches disk journal and migration files (0000-0011)', async () => {
+    expect(testPool).toBeDefined();
 
     const journalPath = path.resolve(__dirname, '../database/migrations/meta/_journal.json');
-    const journal = JSON.parse(fs.readFileSync(journalPath, 'utf-8'));
-    const expectedEntries = journal.entries;
+    const migrationsFolder = path.resolve(__dirname, '../database/migrations');
+
+    const journalContent = fs.readFileSync(journalPath, 'utf-8');
+    const journal = JSON.parse(journalContent);
+    const expectedEntries: Array<{ idx: number; version: string; when: number; tag: string; breakpoints?: boolean }> = journal.entries;
 
     // Verify __drizzle_migrations table exists and has exact matching count
     const migrationTableRes = await testPool!.query(`
@@ -154,19 +207,61 @@ describe('Real PostgreSQL 16 Migration Validation & DDL Gate (0000-0011)', () =>
       SELECT id, hash, created_at FROM "${schemaName}"."__drizzle_migrations" ORDER BY id ASC;
     `);
 
+    // Verify expected count (12 migrations: 0000 through 0011)
     expect(res.rows.length).toBe(expectedEntries.length);
-    expect(res.rows.length).toBe(12); // Migrations 0000 through 0011
+    expect(res.rows.length).toBe(12);
 
-    // Verify sequence through 0010 and 0011
+    // Verify every migration sequentially from 0000 through 0011
+    for (let i = 0; i < expectedEntries.length; i++) {
+      const entry = expectedEntries[i];
+      const row = res.rows[i];
+      const expectedId = i + 1;
+
+      // 1. Verify sequential id order
+      if (Number(row.id) !== expectedId) {
+        throw new Error(
+          `Migration sequence failure at index ${i} (${entry.tag}): expected id ${expectedId}, received ${row.id}`
+        );
+      }
+
+      // 2. Read migration SQL file from disk and compute Drizzle-equivalent SHA-256 hash
+      const sqlFilePath = path.join(migrationsFolder, `${entry.tag}.sql`);
+      if (!fs.existsSync(sqlFilePath)) {
+        throw new Error(
+          `Migration file missing on disk for index ${i} (${entry.tag}): ${sqlFilePath}`
+        );
+      }
+      const sqlContent = fs.readFileSync(sqlFilePath, 'utf-8');
+      const expectedHash = crypto.createHash('sha256').update(sqlContent).digest('hex');
+
+      // 3. Compare recorded migration hash against disk file hash
+      if (row.hash !== expectedHash) {
+        throw new Error(
+          `Migration hash mismatch at index ${i} (${entry.tag}): expected hash ${expectedHash}, recorded in ledger as ${row.hash}`
+        );
+      }
+
+      // 4. Compare recorded migration timestamp with journal timestamp
+      if (BigInt(row.created_at) !== BigInt(entry.when)) {
+        throw new Error(
+          `Migration timestamp mismatch at index ${i} (${entry.tag}): expected timestamp ${entry.when}, recorded in ledger as ${row.created_at}`
+        );
+      }
+
+      // Explicit Vitest assertions
+      expect(Number(row.id)).toBe(expectedId);
+      expect(row.hash).toBe(expectedHash);
+      expect(BigInt(row.created_at)).toBe(BigInt(entry.when));
+    }
+
+    // Verify boundary tags explicitly
+    expect(expectedEntries[0].tag).toBe('0000_initial_schema');
     expect(expectedEntries[10].tag).toBe('0010_monetization_ledger');
     expect(expectedEntries[11].tag).toBe('0011_discussions_and_assignments');
   });
 
   it('2. Schema Verification: All 45 required relational tables exist in information_schema', async () => {
-    if (!isPostgresAvailable) {
-      if (isCiEnvironment) throw new Error('FAIL-CLOSED: Postgres offline in CI');
-      return;
-    }
+    expect(testPool).toBeDefined();
 
     const res = await testPool!.query(`
       SELECT table_name FROM information_schema.tables
@@ -208,10 +303,7 @@ describe('Real PostgreSQL 16 Migration Validation & DDL Gate (0000-0011)', () =>
   });
 
   it('3. PostgreSQL ENUM Types: Declared ENUM types exist in pg_type with correct values', async () => {
-    if (!isPostgresAvailable) {
-      if (isCiEnvironment) throw new Error('FAIL-CLOSED: Postgres offline in CI');
-      return;
-    }
+    expect(testPool).toBeDefined();
 
     const res = await testPool!.query(`
       SELECT t.typname, array_agg(e.enumlabel::text ORDER BY e.enumsortorder) as labels
@@ -252,10 +344,7 @@ describe('Real PostgreSQL 16 Migration Validation & DDL Gate (0000-0011)', () =>
   });
 
   it('4. Real PostgreSQL Triggers: Enforces strict immutability on ledger transactions and entries', async () => {
-    if (!isPostgresAvailable) {
-      if (isCiEnvironment) throw new Error('FAIL-CLOSED: Postgres offline in CI');
-      return;
-    }
+    expect(testPool).toBeDefined();
 
     // Insert a valid transaction header and entry
     const txRes = await testPool!.query(`
@@ -300,10 +389,7 @@ describe('Real PostgreSQL 16 Migration Validation & DDL Gate (0000-0011)', () =>
   });
 
   it('5. Real PostgreSQL Constraints: CHECK constraints enforce monetary non-negativity and formatting', async () => {
-    if (!isPostgresAvailable) {
-      if (isCiEnvironment) throw new Error('FAIL-CLOSED: Postgres offline in CI');
-      return;
-    }
+    expect(testPool).toBeDefined();
 
     // Provision test user
     const uRes = await testPool!.query(`
@@ -388,10 +474,7 @@ describe('Real PostgreSQL 16 Migration Validation & DDL Gate (0000-0011)', () =>
   });
 
   it('6. Real PostgreSQL Foreign Keys: Cascades and ON DELETE RESTRICT behave as declared', async () => {
-    if (!isPostgresAvailable) {
-      if (isCiEnvironment) throw new Error('FAIL-CLOSED: Postgres offline in CI');
-      return;
-    }
+    expect(testPool).toBeDefined();
 
     // Provision category, instructor, course, and module/lesson
     const catRes = await testPool!.query(`
@@ -491,10 +574,7 @@ describe('Real PostgreSQL 16 Migration Validation & DDL Gate (0000-0011)', () =>
   });
 
   it('7. Real PostgreSQL Transaction Rollback: Rollback aborts mutations cleanly', async () => {
-    if (!isPostgresAvailable) {
-      if (isCiEnvironment) throw new Error('FAIL-CLOSED: Postgres offline in CI');
-      return;
-    }
+    expect(testPool).toBeDefined();
 
     const client = await testPool!.connect();
     try {
