@@ -397,13 +397,13 @@ describe('Real PostgreSQL 16 Migration Validation & DDL Gate (0000-0011)', () =>
     const courseId = courseRes.rows[0].id;
 
     const modRes = await testPool!.query(`
-      INSERT INTO modules (course_id, title, sort_order)
+      INSERT INTO modules (course_id, title, position)
       VALUES ($1, 'FK Module', 1) RETURNING id;
     `, [courseId]);
     const modId = modRes.rows[0].id;
 
     const lesRes = await testPool!.query(`
-      INSERT INTO lessons (module_id, title, lesson_type, sort_order)
+      INSERT INTO lessons (module_id, title, lesson_type, position)
       VALUES ($1, 'FK Lesson', 'VIDEO', 1) RETURNING id;
     `, [modId]);
     const lesId = lesRes.rows[0].id;
