@@ -2378,3 +2378,498 @@ export interface TutorRetrievalResultDto {
 
 export type TutorRetrievalResponse = ApiSuccessResponse<TutorRetrievalResultDto>;
 
+export const tutorChatRequestSchema = z
+  .object({
+    courseId: z.string().uuid({ message: 'courseId must be a valid UUID' }),
+    lessonId: z.string().uuid({ message: 'lessonId must be a valid UUID' }).optional().nullable(),
+    question: z
+      .string()
+      .min(3, 'Question must be at least 3 characters')
+      .max(500, 'Question cannot exceed 500 characters')
+      .trim(),
+  })
+  .strict();
+export type TutorChatRequestDto = z.infer<typeof tutorChatRequestSchema>;
+
+// ============================================================================
+// PHASE 7.2 AUTOMATED CHUNK INDEXING & EMBEDDING CONTRACTS (WP-P7-05)
+// ============================================================================
+
+export type ChunkIndexingTrigger =
+  | 'COURSE_PUBLISHED'
+  | 'COURSE_UNPUBLISHED'
+  | 'COURSE_ARCHIVED'
+  | 'MODULE_UPDATED'
+  | 'LESSON_UPDATED'
+  | 'MANUAL_REFRESH';
+
+export interface ChunkIndexingJobPayload {
+  jobId?: string;
+  courseId: string;
+  lessonId?: string;
+  trigger: ChunkIndexingTrigger;
+  timestamp: string;
+  attempt?: number;
+}
+
+export interface IndexedChunkDto extends ContextChunkDto {
+  chunkIndex: number;
+  contentHash: string;
+  embedding?: number[];
+  updatedAt: string;
+}
+
+export interface ChunkIndexingResultDto {
+  courseId: string;
+  trigger: ChunkIndexingTrigger;
+  chunksCreated: number;
+  chunksUpdated: number;
+  chunksDeleted: number;
+  totalActiveChunks: number;
+  durationMs: number;
+}
+
+// ============================================================================
+// PHASE 7.3 INSTRUCTOR MONETIZATION & MARKETPLACE LEDGER (WP-P7-06)
+// ============================================================================
+
+export type LedgerTransactionType =
+  | 'COURSE_PURCHASE'
+  | 'ESCROW_SETTLEMENT'
+  | 'REFUND_CLAWBACK'
+  | 'PAYOUT_REQUEST'
+  | 'PAYOUT_SETTLED'
+  | 'PAYOUT_REJECTED'
+  | 'ADJUSTMENT';
+
+export type LedgerAccountType =
+  | 'PLATFORM_CASH'
+  | 'PLATFORM_REVENUE'
+  | 'INSTRUCTOR_PENDING'
+  | 'INSTRUCTOR_AVAILABLE'
+  | 'PAYOUT_CLEARING';
+
+export type LedgerEntryDirection = 'DEBIT' | 'CREDIT';
+
+export interface LedgerEntryDto {
+  id: string;
+  transactionId: string;
+  transactionType?: LedgerTransactionType;
+  accountType: LedgerAccountType;
+  instructorId?: string | null;
+  walletId?: string | null;
+  direction: LedgerEntryDirection;
+  amountCents: number;
+  currency: Currency;
+  balanceAfterCents?: number | null;
+  description: string;
+  createdAt: string;
+}
+
+export interface LedgerTransactionDto {
+  id: string;
+  transactionNumber: string;
+  transactionType: LedgerTransactionType;
+  idempotencyKey: string;
+  currency: Currency;
+  totalAmountCents: number;
+  referenceType: string;
+  referenceId: string;
+  description: string;
+  postedAt: string;
+  createdAt: string;
+  entries?: LedgerEntryDto[];
+}
+
+export interface InstructorWalletDto {
+  id: string;
+  instructorId: string;
+  balanceCents: number;
+  pendingBalanceCents: number;
+  payoutHoldCents: number;
+  lifetimeEarningsCents: number;
+  currency: Currency;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InstructorEarningsSummaryDto {
+  wallet: InstructorWalletDto;
+  recentTransactions: LedgerEntryDto[];
+  pendingPayoutsCount: number;
+  settledPayoutsTotalCents: number;
+}
+
+export type PayoutMethod = 'BKASH' | 'NAGAD' | 'BANK_TRANSFER';
+export type PayoutStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SETTLED' | 'FAILED';
+
+export const requestPayoutSchema = z
+  .object({
+    amountCents: z
+      .number()
+      .int('Amount must be an integer minor unit (poisha)')
+      .positive('Payout amount must be greater than zero')
+      .min(5000, 'Minimum payout amount is 50.00 BDT (5000 poisha)'),
+    payoutMethod: z.enum(['BKASH', 'NAGAD', 'BANK_TRANSFER']),
+    accountDetails: z
+      .string()
+      .min(5, 'Account details must be at least 5 characters')
+      .max(500, 'Account details cannot exceed 500 characters')
+      .trim(),
+    idempotencyKey: z.string().max(120).optional(),
+  })
+  .strict();
+export type RequestPayoutDto = z.infer<typeof requestPayoutSchema>;
+
+export const approvePayoutSchema = z
+  .object({
+    adminNotes: z.string().max(1000).optional(),
+  })
+  .strict();
+export type ApprovePayoutDto = z.infer<typeof approvePayoutSchema>;
+
+export const rejectPayoutSchema = z
+  .object({
+    rejectionReason: z
+      .string()
+      .min(5, 'Rejection reason must be at least 5 characters')
+      .max(1000, 'Rejection reason cannot exceed 1000 characters')
+      .trim(),
+    adminNotes: z.string().max(1000).optional(),
+  })
+  .strict();
+export type RejectPayoutDto = z.infer<typeof rejectPayoutSchema>;
+
+export const settlePayoutSchema = z
+  .object({
+    settlementReference: z
+      .string()
+      .min(3, 'Settlement reference must be at least 3 characters')
+      .max(100, 'Settlement reference cannot exceed 100 characters')
+      .trim(),
+    adminNotes: z.string().max(1000).optional(),
+  })
+  .strict();
+export type SettlePayoutDto = z.infer<typeof settlePayoutSchema>;
+
+export interface PayoutRequestDto {
+  id: string;
+  requestNumber: string;
+  instructorId: string;
+  instructorName?: string | null;
+  instructorEmail?: string | null;
+  walletId: string;
+  amountCents: number;
+  currency: Currency;
+  payoutMethod: PayoutMethod;
+  accountDetails: string;
+  status: PayoutStatus;
+  requestedAt: string;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  adminNotes?: string | null;
+  rejectionReason?: string | null;
+  disbursedAt?: string | null;
+  settlementReference?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const payoutListQuerySchema = z
+  .object({
+    status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'SETTLED', 'FAILED']).optional(),
+    instructorId: z.string().uuid().optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+  })
+  .strict();
+export type PayoutListQuery = z.infer<typeof payoutListQuerySchema>;
+
+export interface PaginatedPayoutsDto {
+  data: PayoutRequestDto[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+// ==========================================
+// PHASE 7.4: DISCUSSIONS & ASSIGNMENTS
+// ==========================================
+
+export type DiscussionStatus = 'ACTIVE' | 'RESOLVED' | 'HIDDEN' | 'DELETED';
+export type DiscussionReplyStatus = 'ACTIVE' | 'HIDDEN' | 'DELETED';
+export type DiscussionVoteTarget = 'DISCUSSION' | 'REPLY';
+
+export interface DiscussionDto {
+  id: string;
+  courseId: string;
+  lessonId: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string | null;
+  isCourseInstructor: boolean;
+  isAdmin: boolean;
+  title: string;
+  content: string;
+  status: DiscussionStatus;
+  upvoteCount: number;
+  replyCount: number;
+  isPinned: boolean;
+  hasUpvoted?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DiscussionReplyDto {
+  id: string;
+  discussionId: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string | null;
+  isCourseInstructor: boolean;
+  isAdmin: boolean;
+  parentReplyId?: string | null;
+  content: string;
+  status: DiscussionReplyStatus;
+  upvoteCount: number;
+  hasUpvoted?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  replies?: DiscussionReplyDto[];
+}
+
+export interface PaginatedDiscussionsDto {
+  data: DiscussionDto[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export const createDiscussionSchema = z
+  .object({
+    title: z.string().min(3, 'Title must be at least 3 characters').max(255).trim(),
+    content: z.string().min(5, 'Content must be at least 5 characters').max(10000).trim(),
+  })
+  .strict();
+export type CreateDiscussionDto = z.infer<typeof createDiscussionSchema>;
+
+export const updateDiscussionSchema = z
+  .object({
+    title: z.string().min(3).max(255).trim().optional(),
+    content: z.string().min(5).max(10000).trim().optional(),
+    status: z.enum(['ACTIVE', 'RESOLVED', 'HIDDEN', 'DELETED']).optional(),
+    isPinned: z.boolean().optional(),
+  })
+  .strict();
+export type UpdateDiscussionDto = z.infer<typeof updateDiscussionSchema>;
+
+export const createDiscussionReplySchema = z
+  .object({
+    content: z.string().min(2, 'Reply must be at least 2 characters').max(5000).trim(),
+    parentReplyId: z.string().uuid().optional().nullable(),
+  })
+  .strict();
+export type CreateDiscussionReplyDto = z.infer<typeof createDiscussionReplySchema>;
+
+export const updateDiscussionReplySchema = z
+  .object({
+    content: z.string().min(2).max(5000).trim().optional(),
+    status: z.enum(['ACTIVE', 'HIDDEN', 'DELETED']).optional(),
+  })
+  .strict();
+export type UpdateDiscussionReplyDto = z.infer<typeof updateDiscussionReplySchema>;
+
+export const discussionListQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+    sort: z.enum(['recent', 'upvoted', 'unanswered']).default('recent'),
+    status: z.enum(['ACTIVE', 'RESOLVED', 'HIDDEN', 'DELETED']).optional(),
+  })
+  .strict();
+export type DiscussionListQuery = z.infer<typeof discussionListQuerySchema>;
+
+// --- Assignments ---
+
+export type AssignmentStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED';
+export type SubmissionStatus = 'SUBMITTED' | 'GRADED' | 'RESUBMITTED';
+
+export interface AssignmentRubricCriterion {
+  id: string;
+  title: string;
+  description?: string;
+  maxScore: number;
+}
+
+export interface AssignmentRubricEvaluationItem {
+  criterionId: string;
+  score: number;
+  feedback?: string;
+}
+
+export interface AssignmentDto {
+  id: string;
+  courseId: string;
+  lessonId?: string | null;
+  title: string;
+  description: string;
+  instructions?: string | null;
+  rubric?: AssignmentRubricCriterion[] | null;
+  maxScore: number;
+  dueDate?: string | null;
+  status: AssignmentStatus;
+  allowResubmission: boolean;
+  submissionCount?: number;
+  userSubmission?: AssignmentSubmissionDto | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssignmentSubmissionDto {
+  id: string;
+  assignmentId: string;
+  studentId: string;
+  studentName?: string;
+  studentEmail?: string;
+  version: number;
+  fileUrl: string;
+  fileStorageKey: string;
+  originalFilename: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  studentNotes?: string | null;
+  status: SubmissionStatus;
+  grade?: AssignmentGradeDto | null;
+  submittedAt: string;
+  updatedAt: string;
+}
+
+export interface AssignmentGradeDto {
+  id: string;
+  submissionId: string;
+  graderId: string;
+  graderName?: string;
+  score: number;
+  maxScore: number;
+  percentage: number;
+  feedback?: string | null;
+  rubricEvaluation?: AssignmentRubricEvaluationItem[] | null;
+  gradedAt: string;
+  updatedAt: string;
+}
+
+export interface PaginatedAssignmentsDto {
+  data: AssignmentDto[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface PaginatedSubmissionsDto {
+  data: AssignmentSubmissionDto[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export const createAssignmentSchema = z
+  .object({
+    lessonId: z.string().uuid().optional().nullable(),
+    title: z.string().min(3, 'Title must be at least 3 characters').max(255).trim(),
+    description: z.string().min(5, 'Description must be at least 5 characters').max(10000).trim(),
+    instructions: z.string().max(20000).optional().nullable(),
+    maxScore: z.number().int().min(1).max(1000).default(100),
+    dueDate: z.string().datetime().optional().nullable(),
+    status: z.enum(['DRAFT', 'PUBLISHED', 'CLOSED']).default('DRAFT'),
+    allowResubmission: z.boolean().default(true),
+    rubric: z
+      .array(
+        z.object({
+          id: z.string().min(1),
+          title: z.string().min(1).max(200),
+          description: z.string().max(1000).optional(),
+          maxScore: z.number().int().min(1).max(1000),
+        })
+      )
+      .optional()
+      .nullable(),
+  })
+  .strict();
+export type CreateAssignmentDto = z.infer<typeof createAssignmentSchema>;
+export type CreateAssignmentInput = z.input<typeof createAssignmentSchema>;
+
+export const updateAssignmentSchema = z
+  .object({
+    lessonId: z.string().uuid().optional().nullable(),
+    title: z.string().min(3).max(255).trim().optional(),
+    description: z.string().min(5).max(10000).trim().optional(),
+    instructions: z.string().max(20000).optional().nullable(),
+    maxScore: z.number().int().min(1).max(1000).optional(),
+    dueDate: z.string().datetime().optional().nullable(),
+    status: z.enum(['DRAFT', 'PUBLISHED', 'CLOSED']).optional(),
+    allowResubmission: z.boolean().optional(),
+    rubric: z
+      .array(
+        z.object({
+          id: z.string().min(1),
+          title: z.string().min(1).max(200),
+          description: z.string().max(1000).optional(),
+          maxScore: z.number().int().min(1).max(1000),
+        })
+      )
+      .optional()
+      .nullable(),
+  })
+  .strict();
+export type UpdateAssignmentDto = z.infer<typeof updateAssignmentSchema>;
+
+export const submitAssignmentSchema = z
+  .object({
+    studentNotes: z.string().max(2000).optional().nullable(),
+  })
+  .strict();
+export type SubmitAssignmentDto = z.infer<typeof submitAssignmentSchema>;
+
+export const gradeSubmissionSchema = z
+  .object({
+    score: z.number().int().min(0, 'Score cannot be negative'),
+    feedback: z.string().max(5000).optional().nullable(),
+    rubricEvaluation: z
+      .array(
+        z.object({
+          criterionId: z.string().min(1),
+          score: z.number().int().min(0),
+          feedback: z.string().max(1000).optional().nullable(),
+        })
+      )
+      .optional()
+      .nullable(),
+  })
+  .strict();
+export type GradeSubmissionDto = z.infer<typeof gradeSubmissionSchema>;
+
+export const assignmentListQuerySchema = z
+  .object({
+    lessonId: z.string().uuid().optional(),
+    status: z.enum(['DRAFT', 'PUBLISHED', 'CLOSED']).optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+  })
+  .strict();
+export type AssignmentListQuery = z.infer<typeof assignmentListQuerySchema>;
+
+export const submissionListQuerySchema = z
+  .object({
+    status: z.enum(['SUBMITTED', 'GRADED', 'RESUBMITTED']).optional(),
+    studentId: z.string().uuid().optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+  })
+  .strict();
+export type SubmissionListQuery = z.infer<typeof submissionListQuerySchema>;
+
+

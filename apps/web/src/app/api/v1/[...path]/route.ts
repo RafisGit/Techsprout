@@ -168,6 +168,18 @@ async function proxyRequest(
     responseHeaders.set('content-type', responseContentType);
   }
 
+  // Pass Server-Sent Events stream directly to browser without buffering
+  if (responseContentType.includes('text/event-stream')) {
+    responseHeaders.set('content-type', 'text/event-stream; charset=utf-8');
+    responseHeaders.set('cache-control', 'no-cache, no-transform');
+    responseHeaders.set('connection', 'keep-alive');
+    responseHeaders.set('x-accel-buffering', 'no');
+    return new NextResponse(backendResponse.body, {
+      status: backendResponse.status,
+      headers: responseHeaders,
+    });
+  }
+
   const responseBody = await backendResponse.arrayBuffer();
   return new NextResponse(responseBody, {
     status: backendResponse.status,

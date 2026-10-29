@@ -29,6 +29,9 @@ import { EventsModule } from './modules/events/events.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { TelemetryModule } from './modules/telemetry/telemetry.module';
+import { MonetizationModule } from './modules/monetization/monetization.module';
+import { DiscussionsModule } from './modules/discussions/discussions.module';
+import { AssignmentsModule } from './modules/assignments/assignments.module';
 import { TextBodyParserMiddleware } from './common/http/text-body-parser.middleware';
 
 import { HealthController } from './common/health/health.controller';
@@ -71,6 +74,9 @@ import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
     NotificationsModule,
     AnalyticsModule,
     TelemetryModule,
+    MonetizationModule,
+    DiscussionsModule,
+    AssignmentsModule,
   ],
   controllers: [HealthController],
   providers: [

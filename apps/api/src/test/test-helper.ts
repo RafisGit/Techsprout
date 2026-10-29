@@ -718,6 +718,172 @@ export async function createTestDatabase() {
       occurred_at timestamp with time zone NOT NULL,
       created_at timestamp with time zone DEFAULT now() NOT NULL
     );
+
+    CREATE TYPE ledger_transaction_type AS ENUM('COURSE_PURCHASE', 'ESCROW_SETTLEMENT', 'REFUND_CLAWBACK', 'PAYOUT_REQUEST', 'PAYOUT_SETTLED', 'PAYOUT_REJECTED', 'ADJUSTMENT');
+    CREATE TYPE ledger_account_type AS ENUM('PLATFORM_CASH', 'PLATFORM_REVENUE', 'INSTRUCTOR_PENDING', 'INSTRUCTOR_AVAILABLE', 'PAYOUT_CLEARING');
+    CREATE TYPE ledger_entry_direction AS ENUM('DEBIT', 'CREDIT');
+    CREATE TYPE payout_status AS ENUM('PENDING', 'APPROVED', 'REJECTED', 'SETTLED', 'FAILED');
+    CREATE TYPE payout_method AS ENUM('BKASH', 'NAGAD', 'BANK_TRANSFER');
+
+    CREATE TABLE IF NOT EXISTS instructor_wallets (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      instructor_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      balance_cents integer DEFAULT 0 NOT NULL,
+      pending_balance_cents integer DEFAULT 0 NOT NULL,
+      payout_hold_cents integer DEFAULT 0 NOT NULL,
+      lifetime_earnings_cents integer DEFAULT 0 NOT NULL,
+      currency varchar(3) DEFAULT 'BDT' NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT instructor_wallets_instructor_id_uq UNIQUE(instructor_id),
+      CONSTRAINT instructor_wallets_balance_non_negative CHECK (balance_cents >= 0),
+      CONSTRAINT instructor_wallets_pending_balance_non_negative CHECK (pending_balance_cents >= 0),
+      CONSTRAINT instructor_wallets_payout_hold_non_negative CHECK (payout_hold_cents >= 0),
+      CONSTRAINT instructor_wallets_lifetime_earnings_non_negative CHECK (lifetime_earnings_cents >= 0),
+      CONSTRAINT instructor_wallets_currency_bdt CHECK (currency = 'BDT')
+    );
+
+    CREATE TABLE IF NOT EXISTS ledger_transactions (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      transaction_number varchar(50) NOT NULL UNIQUE,
+      transaction_type ledger_transaction_type NOT NULL,
+      idempotency_key varchar(150) NOT NULL UNIQUE,
+      currency varchar(3) DEFAULT 'BDT' NOT NULL,
+      total_amount_cents integer NOT NULL,
+      reference_type varchar(50) NOT NULL,
+      reference_id varchar(100) NOT NULL,
+      description text NOT NULL,
+      posted_at timestamp with time zone DEFAULT now() NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT ledger_transactions_total_amount_cents_non_negative CHECK (total_amount_cents >= 0),
+      CONSTRAINT ledger_transactions_currency_bdt CHECK (currency = 'BDT')
+    );
+
+    CREATE TABLE IF NOT EXISTS ledger_entries (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      transaction_id uuid NOT NULL REFERENCES ledger_transactions(id) ON DELETE restrict,
+      account_type ledger_account_type NOT NULL,
+      instructor_id uuid REFERENCES users(id) ON DELETE restrict,
+      wallet_id uuid REFERENCES instructor_wallets(id) ON DELETE restrict,
+      direction ledger_entry_direction NOT NULL,
+      amount_cents integer NOT NULL,
+      currency varchar(3) DEFAULT 'BDT' NOT NULL,
+      balance_after_cents integer,
+      description text NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT ledger_entries_amount_cents_positive CHECK (amount_cents > 0),
+      CONSTRAINT ledger_entries_currency_bdt CHECK (currency = 'BDT')
+    );
+
+    CREATE TABLE IF NOT EXISTS payout_requests (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      request_number varchar(50) NOT NULL UNIQUE,
+      instructor_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      wallet_id uuid NOT NULL REFERENCES instructor_wallets(id) ON DELETE restrict,
+      amount_cents integer NOT NULL,
+      currency varchar(3) DEFAULT 'BDT' NOT NULL,
+      payout_method payout_method NOT NULL,
+      account_details text NOT NULL,
+      status payout_status DEFAULT 'PENDING' NOT NULL,
+      requested_at timestamp with time zone DEFAULT now() NOT NULL,
+      reviewed_by uuid REFERENCES users(id) ON DELETE restrict,
+      reviewed_at timestamp with time zone,
+      admin_notes text,
+      rejection_reason text,
+      disbursed_at timestamp with time zone,
+      settlement_reference varchar(100),
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT payout_requests_amount_cents_positive CHECK (amount_cents > 0),
+      CONSTRAINT payout_requests_currency_bdt CHECK (currency = 'BDT'),
+      CONSTRAINT payout_requests_settled_reference_required CHECK (status != 'SETTLED' OR (settlement_reference IS NOT NULL AND length(trim(settlement_reference)) >= 3))
+    );
+
+    CREATE TYPE discussion_status AS ENUM('ACTIVE', 'RESOLVED', 'HIDDEN', 'DELETED');
+    CREATE TYPE discussion_reply_status AS ENUM('ACTIVE', 'HIDDEN', 'DELETED');
+    CREATE TYPE discussion_vote_target AS ENUM('DISCUSSION', 'REPLY');
+    CREATE TYPE assignment_status AS ENUM('DRAFT', 'PUBLISHED', 'CLOSED');
+    CREATE TYPE submission_status AS ENUM('SUBMITTED', 'GRADED', 'RESUBMITTED');
+
+    CREATE TABLE IF NOT EXISTS discussions (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      course_id uuid NOT NULL REFERENCES courses(id) ON DELETE cascade,
+      lesson_id uuid NOT NULL REFERENCES lessons(id) ON DELETE cascade,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      title varchar(255) NOT NULL,
+      content text NOT NULL,
+      status discussion_status DEFAULT 'ACTIVE' NOT NULL,
+      upvote_count integer DEFAULT 0 NOT NULL,
+      reply_count integer DEFAULT 0 NOT NULL,
+      is_pinned boolean DEFAULT false NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS discussion_replies (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      discussion_id uuid NOT NULL REFERENCES discussions(id) ON DELETE cascade,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      parent_reply_id uuid REFERENCES discussion_replies(id) ON DELETE cascade,
+      content text NOT NULL,
+      status discussion_reply_status DEFAULT 'ACTIVE' NOT NULL,
+      upvote_count integer DEFAULT 0 NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS discussion_votes (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE cascade,
+      target_type discussion_vote_target NOT NULL,
+      target_id uuid NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT discussion_votes_user_target_uq UNIQUE(user_id, target_type, target_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS assignments (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      course_id uuid NOT NULL REFERENCES courses(id) ON DELETE cascade,
+      lesson_id uuid REFERENCES lessons(id) ON DELETE set null,
+      title varchar(255) NOT NULL,
+      description text NOT NULL,
+      instructions text,
+      rubric jsonb,
+      max_score integer DEFAULT 100 NOT NULL,
+      due_date timestamp with time zone,
+      status assignment_status DEFAULT 'DRAFT' NOT NULL,
+      allow_resubmission boolean DEFAULT true NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS assignment_submissions (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      assignment_id uuid NOT NULL REFERENCES assignments(id) ON DELETE cascade,
+      student_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      version integer DEFAULT 1 NOT NULL,
+      file_url text NOT NULL,
+      file_storage_key varchar(255) NOT NULL,
+      original_filename varchar(255) NOT NULL,
+      mime_type varchar(100) NOT NULL,
+      file_size_bytes integer NOT NULL,
+      student_notes text,
+      status submission_status DEFAULT 'SUBMITTED' NOT NULL,
+      submitted_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS assignment_grades (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      submission_id uuid NOT NULL REFERENCES assignment_submissions(id) ON DELETE cascade,
+      grader_id uuid NOT NULL REFERENCES users(id) ON DELETE restrict,
+      score integer NOT NULL,
+      feedback text,
+      rubric_evaluation jsonb,
+      graded_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL,
+      CONSTRAINT assignment_grades_submission_id_uq UNIQUE(submission_id)
+    );
   `);
 
   // Seed baseline roles

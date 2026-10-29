@@ -281,4 +281,93 @@ describe('Phase 7.2: AI Tutoring & Contextual Retrieval Engine (WP-P7-04)', () =
       expect(result.groundingNotice).toBe('This concept is not covered in this course curriculum');
     });
   });
+
+  describe('6. Technical Synonym Expansion & Vocabulary Normalization (WP-P7-07)', () => {
+    it('6.1 should expand technical terms to related ecosystem synonyms', async () => {
+      // Query uses 'pipeline' and 'continuous integration' instead of exact 'ci/cd'
+      const result = await service.retrieveContext(
+        courseAId,
+        'Setting up continuous integration pipeline automation',
+        5,
+        { id: studentId, role: 'student' }
+      );
+
+      expect(result.isGrounded).toBe(true);
+      expect(result.citations.length).toBeGreaterThanOrEqual(1);
+      expect(result.citations[0].lessonId).toBe(lessonA1Id);
+    });
+
+    it('6.2 should match authentication security via synonym rings', async () => {
+      // Query uses 'stateless session bearer tokens'
+      const result = await service.retrieveContext(
+        courseAId,
+        'Managing stateless session bearer tokens and security cookies',
+        5,
+        { id: studentId, role: 'student' }
+      );
+
+      expect(result.isGrounded).toBe(true);
+      expect(result.citations.length).toBeGreaterThanOrEqual(1);
+      expect(result.citations[0].lessonId).toBe(lessonA2Id);
+    });
+  });
+
+  describe('7. Typo & Misspelling Resilience with Trigram Matching (WP-P7-07)', () => {
+    it('7.1 should retrieve the correct lesson despite misspelled query terms', async () => {
+      // 'authenntication' and 'coookies' have typos
+      const result = await service.retrieveContext(
+        courseAId,
+        'stateles authenntication and httponly coookies in nodejs',
+        5,
+        { id: studentId, role: 'student' }
+      );
+
+      expect(result.isGrounded).toBe(true);
+      expect(result.citations.length).toBeGreaterThanOrEqual(1);
+      expect(result.citations[0].lessonId).toBe(lessonA2Id);
+    });
+
+    it('7.2 should resolve technical acronym typos like dokker or actiions', async () => {
+      const result = await service.retrieveContext(
+        courseAId,
+        'automating builds with github actiions',
+        5,
+        { id: studentId, role: 'student' }
+      );
+
+      expect(result.isGrounded).toBe(true);
+      expect(result.citations.length).toBeGreaterThanOrEqual(1);
+      expect(result.citations[0].lessonId).toBe(lessonA1Id);
+    });
+  });
+
+  describe('8. BM25 Field Weighting & Ranking Stability (WP-P7-07)', () => {
+    it('8.1 should prioritize exact title matches over body-only matches', async () => {
+      const result = await service.retrieveContext(
+        courseAId,
+        'Automated CI/CD Pipelines with GitHub Actions',
+        5,
+        { id: studentId, role: 'student' }
+      );
+
+      expect(result.isGrounded).toBe(true);
+      expect(result.citations[0].lessonId).toBe(lessonA1Id);
+      expect(result.citations[0].relevanceScore).toBeGreaterThanOrEqual(0.70);
+    });
+
+    it('8.2 should deduplicate multiple chunks from the same lesson in top citations', async () => {
+      const result = await service.retrieveContext(
+        courseAId,
+        'node.js development workflows',
+        5,
+        { id: studentId, role: 'student' }
+      );
+
+      // Verify each citation in the returned list is for a unique lesson when distinct lessons exist
+      const lessonIds = result.citations.map((c) => c.lessonId);
+      const uniqueLessonIds = new Set(lessonIds);
+      expect(uniqueLessonIds.size).toBe(lessonIds.length);
+    });
+  });
 });
+

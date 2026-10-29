@@ -1,4 +1,4 @@
-import { Injectable, Inject, HttpStatus, Logger, Optional } from '@nestjs/common';
+import { Injectable, Inject, HttpStatus, Logger, Optional, forwardRef } from '@nestjs/common';
 import { eq, and, desc, count, isNull } from 'drizzle-orm';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import {
@@ -18,6 +18,7 @@ import {
 } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { OutboxService } from '../events/outbox.service';
+import { MonetizationLedgerService } from '../monetization/monetization-ledger.service';
 import { ApiException } from '../../common/errors/api-error';
 import {
   ISSLCommerzClient,
@@ -41,7 +42,8 @@ export class RefundsService {
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     @Inject(SSLCOMMERZ_CLIENT) private readonly sslcommerzClient: ISSLCommerzClient,
     @Inject(AuditService) private readonly auditService: AuditService,
-    @Optional() @Inject(OutboxService) private readonly outboxService?: OutboxService
+    @Optional() @Inject(OutboxService) private readonly outboxService?: OutboxService,
+    @Optional() @Inject(forwardRef(() => MonetizationLedgerService)) private readonly ledgerService?: MonetizationLedgerService
   ) {}
 
   public formatRefundDto(refund: Refund, orderNumber?: string): RefundDto {
@@ -590,6 +592,27 @@ export class RefundsService {
         userAgent: reqMeta?.userAgent,
         requestId: reqMeta?.requestId,
       });
+
+      // 13. Double-entry ledger refund clawback posting
+      if (this.ledgerService && finalizedRefund.amountCents > 0) {
+        try {
+          await this.ledgerService.postRefundClawback(finalizedRefund.id, tx);
+        } catch (ledgerErr: any) {
+          if (
+            ledgerErr?.message?.includes('duplicate key') ||
+            ledgerErr?.message?.includes('unique constraint') ||
+            ledgerErr?.message?.includes('idempotencyKey')
+          ) {
+            this.logger.warn(`Refund clawback ledger transaction already posted for refund ${finalizedRefund.id}`);
+          } else {
+            this.logger.error(
+              `Failed to post refund clawback ledger transaction for refund ${finalizedRefund.id}: ${ledgerErr.message}`,
+              ledgerErr.stack
+            );
+            throw ledgerErr;
+          }
+        }
+      }
 
       return {
         dto: this.formatRefundDto(finalizedRefund, order.orderNumber),

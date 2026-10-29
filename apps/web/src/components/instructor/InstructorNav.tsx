@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, BookOpen, User, UserCheck, LogOut } from 'lucide-react';
+import { LayoutDashboard, BookOpen, User, Wallet, UserCheck, LogOut } from 'lucide-react';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { logoutUser } from '@/lib/session';
 
@@ -21,6 +21,11 @@ export function InstructorNav() {
       title: 'My Courses',
       href: '/instructor/courses',
       icon: BookOpen,
+    },
+    {
+      title: 'Earnings & Payouts',
+      href: '/instructor/earnings',
+      icon: Wallet,
     },
     {
       title: 'Profile',

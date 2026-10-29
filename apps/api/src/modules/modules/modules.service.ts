@@ -1,9 +1,10 @@
-import { Injectable, Inject, HttpStatus } from '@nestjs/common';
+import { Injectable, Inject, Optional, HttpStatus } from '@nestjs/common';
 import { eq, and, not } from 'drizzle-orm';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import { modules, courses, Module as CourseModule } from '../../database/schema';
 import { AuditService } from '../audit/audit.service';
 import { CoursesService, UserContext } from '../courses/courses.service';
+import { TutorIndexingQueueService } from '../learning/tutor-indexing-queue.service';
 import { ApiException } from '../../common/errors/api-error';
 import { CreateModuleDto } from './dto/create-module.dto';
 import { UpdateModuleDto } from './dto/update-module.dto';
@@ -13,7 +14,8 @@ export class ModulesService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     @Inject(AuditService) private readonly auditService: AuditService,
-    @Inject(CoursesService) private readonly coursesService: CoursesService
+    @Inject(CoursesService) private readonly coursesService: CoursesService,
+    @Optional() @Inject(TutorIndexingQueueService) private readonly tutorIndexingQueueService?: TutorIndexingQueueService
   ) {}
 
   /**
@@ -113,6 +115,10 @@ export class ModulesService {
       },
     });
 
+    if (this.tutorIndexingQueueService && course.status === 'PUBLISHED') {
+      await this.tutorIndexingQueueService.enqueueIndexCourse(courseId, 'MODULE_UPDATED');
+    }
+
     return created;
   }
 
@@ -197,6 +203,10 @@ export class ModulesService {
       },
     });
 
+    if (this.tutorIndexingQueueService && courseStatus === 'PUBLISHED') {
+      await this.tutorIndexingQueueService.enqueueIndexCourse(existing.courseId, 'MODULE_UPDATED');
+    }
+
     return updated;
   }
 
@@ -233,6 +243,10 @@ export class ModulesService {
         position: existing.position,
       },
     });
+
+    if (this.tutorIndexingQueueService && courseStatus === 'PUBLISHED') {
+      await this.tutorIndexingQueueService.enqueueIndexCourse(existing.courseId, 'MODULE_UPDATED');
+    }
 
     return { deleted: true, id };
   }

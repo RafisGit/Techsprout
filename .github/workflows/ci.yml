@@ -79,6 +79,13 @@ jobs:
         run: |
           npx @redocly/cli lint packages/contracts/openapi.yaml
 
+      - name: Verify Real PostgreSQL 16 Migration Validation & DDL Gate (0000-0011)
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/techsprout_test
+          CI_DISPOSABLE_POSTGRES: 'true'
+        run: |
+          pnpm --filter @techsprout/api test:migration:postgres
+
       - name: Run Database Migrations
         env:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/techsprout_test
@@ -89,6 +96,7 @@ jobs:
       - name: Run P1 Master Security & RBAC Test Suite
         env:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/techsprout_test
+          CI_DISPOSABLE_POSTGRES: 'true'
           REDIS_URL: redis://localhost:6379
           AUTH_SECRET: ci_secret_key_minimum_32_characters_for_tests
           CLOUDINARY_CLOUD_NAME: test-cloud

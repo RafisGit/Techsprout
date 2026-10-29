@@ -11,6 +11,7 @@
     "test:security": "vitest run src/test/security.spec.ts",
     "test:e2e": "vitest run src/test/http-e2e.spec.ts",
     "test:benchmark": "vitest run src/test/telemetry-load-benchmark.spec.ts",
+    "test:migration:postgres": "vitest run src/test/real-postgres-migration.spec.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/database/migrate.ts",
     "db:migrate:prod": "node dist/database/migrate.js",

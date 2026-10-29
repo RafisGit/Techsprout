@@ -16,6 +16,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { OrdersService } from '../orders/orders.service';
 import { OutboxService } from '../events/outbox.service';
+import { MonetizationLedgerService } from '../monetization/monetization-ledger.service';
 import { ApiException } from '../../common/errors/api-error';
 import { env } from '../../config/env.config';
 import {
@@ -65,7 +66,8 @@ export class PaymentsService {
     @Inject(AuditService) private readonly auditService: AuditService,
     @Inject(forwardRef(() => OrdersService)) private readonly ordersService: OrdersService,
     @Inject(SSLCOMMERZ_CLIENT) private readonly sslcommerzClient: ISSLCommerzClient,
-    @Optional() @Inject(OutboxService) private readonly outboxService?: OutboxService
+    @Optional() @Inject(OutboxService) private readonly outboxService?: OutboxService,
+    @Optional() @Inject(forwardRef(() => MonetizationLedgerService)) private readonly ledgerService?: MonetizationLedgerService
   ) {}
 
   public formatPaymentDto(payment: Payment): PaymentDto {
@@ -931,10 +933,31 @@ export class PaymentsService {
         }
       }
 
+      // 13. Double-entry ledger course purchase posting
+      if (this.ledgerService && updatedOrder.payableCents > 0) {
+        try {
+          await this.ledgerService.postCoursePurchase(lockedOrder.id, tx);
+        } catch (ledgerErr: any) {
+          if (
+            ledgerErr?.message?.includes('duplicate key') ||
+            ledgerErr?.message?.includes('unique constraint') ||
+            ledgerErr?.message?.includes('idempotencyKey')
+          ) {
+            this.logger.warn(`Ledger transaction already posted for order ${lockedOrder.id}`);
+          } else {
+            this.logger.error(
+              `Failed to post course purchase ledger transaction for order ${lockedOrder.id}: ${ledgerErr.message}`,
+              ledgerErr.stack
+            );
+            throw ledgerErr;
+          }
+        }
+      }
+
       return { order: updatedOrder, payment: updatedPayment, isDuplicate: false };
     });
 
-    // 13. Audit logging
+    // 14. Audit logging
     if (fulfillment.isDuplicate) {
       await this.auditService.record({
         actorId: fulfillment.order.studentId,

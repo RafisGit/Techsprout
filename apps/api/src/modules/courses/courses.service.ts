@@ -16,6 +16,7 @@ import {
 import { InstructorProfileDto, UpdateInstructorProfileRequest } from '@techsprout/contracts';
 import { AuditService } from '../audit/audit.service';
 import { OutboxService } from '../events/outbox.service';
+import { TutorIndexingQueueService } from '../learning/tutor-indexing-queue.service';
 import { ApiException } from '../../common/errors/api-error';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
@@ -37,7 +38,8 @@ export class CoursesService {
   constructor(
     @Inject(DRIZZLE_DB) private readonly db: DrizzleDB,
     @Inject(AuditService) private readonly auditService: AuditService,
-    @Optional() @Inject(OutboxService) private readonly outboxService?: OutboxService
+    @Optional() @Inject(OutboxService) private readonly outboxService?: OutboxService,
+    @Optional() @Inject(TutorIndexingQueueService) private readonly tutorIndexingQueueService?: TutorIndexingQueueService
   ) {}
 
   /**
@@ -526,6 +528,10 @@ export class CoursesService {
       },
     });
 
+    if (this.tutorIndexingQueueService) {
+      await this.tutorIndexingQueueService.enqueueIndexCourse(id, 'COURSE_PUBLISHED');
+    }
+
     return published;
   }
 
@@ -579,6 +585,10 @@ export class CoursesService {
         previousStatus: 'PUBLISHED',
       },
     });
+
+    if (this.tutorIndexingQueueService) {
+      await this.tutorIndexingQueueService.enqueuePurgeCourse(id, 'COURSE_UNPUBLISHED');
+    }
 
     return unpublished;
   }
@@ -634,6 +644,10 @@ export class CoursesService {
         archivedAt: now.toISOString(),
       },
     });
+
+    if (this.tutorIndexingQueueService) {
+      await this.tutorIndexingQueueService.enqueuePurgeCourse(id, 'COURSE_ARCHIVED');
+    }
 
     return archived;
   }
@@ -1583,6 +1597,10 @@ export class CoursesService {
           reviewRequestId: result.updatedRequest.id,
         },
       });
+    }
+
+    if (this.tutorIndexingQueueService) {
+      await this.tutorIndexingQueueService.enqueueIndexCourse(id, 'COURSE_PUBLISHED');
     }
 
     return {

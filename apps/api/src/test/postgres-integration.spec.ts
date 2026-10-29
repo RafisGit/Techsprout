@@ -54,8 +54,11 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
       for (const role of SEED_ROLES) {
         await db.insert(schema.roles).values(role).onConflictDoNothing();
       }
-    } catch {
+    } catch (err: any) {
       isPostgresAvailable = false;
+      if (process.env.CI_DISPOSABLE_POSTGRES === 'true') {
+        throw new Error(`FAIL-CLOSED: Real PostgreSQL instance unreachable in CI (${err.message}).`);
+      }
       console.log(
         'Notice: Real PostgreSQL instance offline in local host environment. PostgreSQL integration tests run against active CI PostgreSQL container.'
       );
@@ -70,6 +73,9 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
 
   it('1. Real PostgreSQL: Migrations executed and tables exist in information_schema', async () => {
     if (!isPostgresAvailable) {
+      if (process.env.CI_DISPOSABLE_POSTGRES === 'true') {
+        throw new Error('FAIL-CLOSED: Postgres offline in CI');
+      }
       expect(true).toBe(true);
       return;
     }
@@ -81,7 +87,9 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
         'categories', 'media', 'courses', 'modules', 'lessons', 'enrollments', 'lesson_progress',
         'quizzes', 'quiz_questions', 'quiz_question_options', 'quiz_attempts', 'quiz_attempt_answers', 'certificates',
         'coupons', 'orders', 'order_items', 'payments', 'coupon_redemptions', 'invoices', 'refunds',
-        'refund_requests'
+        'refund_requests', 'instructor_wallets', 'ledger_transactions', 'ledger_entries', 'payout_requests',
+        'discussions', 'discussion_replies', 'discussion_votes',
+        'assignments', 'assignment_submissions', 'assignment_grades'
       );
     `);
 
@@ -114,6 +122,16 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
     expect(tableNames).toContain('invoices');
     expect(tableNames).toContain('refunds');
     expect(tableNames).toContain('refund_requests');
+    expect(tableNames).toContain('instructor_wallets');
+    expect(tableNames).toContain('ledger_transactions');
+    expect(tableNames).toContain('ledger_entries');
+    expect(tableNames).toContain('payout_requests');
+    expect(tableNames).toContain('discussions');
+    expect(tableNames).toContain('discussion_replies');
+    expect(tableNames).toContain('discussion_votes');
+    expect(tableNames).toContain('assignments');
+    expect(tableNames).toContain('assignment_submissions');
+    expect(tableNames).toContain('assignment_grades');
   });
 
   it('2. Real PostgreSQL: Enforces unique database constraints on users', async () => {
@@ -394,5 +412,54 @@ describe('P1 Real PostgreSQL 16 Integration Test Suite', () => {
     await db.delete(schema.learningEvents).where(eq(schema.learningEvents.id, preservedEventId));
     await db.delete(schema.courses).where(eq(schema.courses.id, preservedCourse.id));
     await db.delete(schema.categories).where(eq(schema.categories.id, cat.id));
+  });
+
+  it('9. Real PostgreSQL: Enforces ledger immutability trigger and payout check constraint', async () => {
+    if (!isPostgresAvailable) {
+      expect(true).toBe(true);
+      return;
+    }
+
+    // 1. Verify ledger_transactions immutability trigger prevents UPDATE and DELETE
+    const txNumber = `LTX-TEST-${Date.now()}`;
+    const insertRes = await pool.query(`
+      INSERT INTO ledger_transactions (id, transaction_number, transaction_type, idempotency_key, currency, total_amount_cents, reference_type, reference_id, description)
+      VALUES (gen_random_uuid(), $1, $2, $3, 'BDT', 5000, 'TEST', 'test-1', 'Test ledger transaction')
+      RETURNING id;
+    `, [txNumber, 'COURSE_PURCHASE', `idemp-${Date.now()}`]);
+    const txId = insertRes.rows[0].id;
+
+    // Direct UPDATE must fail due to prevent_ledger_mutation trigger
+    await expect(
+      pool.query('UPDATE ledger_transactions SET total_amount_cents = 9999 WHERE id = $1', [txId])
+    ).rejects.toThrow();
+
+    // Direct DELETE must fail due to prevent_ledger_mutation trigger
+    await expect(
+      pool.query('DELETE FROM ledger_transactions WHERE id = $1', [txId])
+    ).rejects.toThrow();
+
+    // 2. Verify payout_requests check constraint: SETTLED requires settlement_reference >= 3 chars
+    const userRes = await pool.query(`
+      INSERT INTO users (id, name, username, email, is_active, is_verified)
+      VALUES (gen_random_uuid(), 'Payout Test User', $1, $2, true, true)
+      RETURNING id;
+    `, [`payout_u_${Date.now()}`, `payout_${Date.now()}@techsprout.edu`]);
+    const userId = userRes.rows[0].id;
+
+    const walletRes = await pool.query(`
+      INSERT INTO instructor_wallets (id, instructor_id, balance_cents, pending_balance_cents, payout_hold_cents, lifetime_earnings_cents, currency)
+      VALUES (gen_random_uuid(), $1, 10000, 0, 0, 10000, 'BDT')
+      RETURNING id;
+    `, [userId]);
+    const walletId = walletRes.rows[0].id;
+
+    // Inserting SETTLED with NULL settlement_reference must violate check constraint
+    await expect(
+      pool.query(`
+        INSERT INTO payout_requests (id, request_number, instructor_id, wallet_id, amount_cents, currency, payout_method, account_details, status, settlement_reference)
+        VALUES (gen_random_uuid(), $1, $2, $3, 5000, 'BDT', 'BKASH', '01700000000', 'SETTLED', NULL);
+      `, [`PR-TEST-${Date.now()}`, userId, walletId])
+    ).rejects.toThrow();
   });
 });

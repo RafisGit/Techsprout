@@ -29,6 +29,9 @@ export const envSchema = z.object({
   RESEND_FROM_EMAIL: z.string().default('notifications@techsprout.io'),
   TELEMETRY_ENABLED: z.coerce.boolean().default(true),
   TELEMETRY_SALT_KEY: z.string().optional(),
+  TUTOR_LLM_PROVIDER: z.enum(['mock', 'gemini', 'openai']).optional().default('mock'),
+  TUTOR_LLM_API_KEY: z.string().optional(),
+  TUTOR_EMBEDDING_PROVIDER: z.enum(['mock', 'gemini', 'openai']).optional().default('mock'),
 }).superRefine((data, ctx) => {
   if (data.WEB_PUBLIC_ORIGIN?.includes(',')) {
     ctx.addIssue({
