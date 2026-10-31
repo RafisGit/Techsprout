@@ -2,6 +2,7 @@ import Hero from '@/components/Hero';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/auth';
+import { getServerTranslations } from '@/i18n/server';
 
 async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
@@ -16,9 +17,11 @@ async function DashboardLayout({ children }: { children: React.ReactNode }) {
     redirect('/login');
   }
 
+  const { t } = await getServerTranslations();
+
   return (
     <>
-      <Hero pageName='Dashboard' />
+      <Hero pageName={t('nav.dashboard')} />
       <section className='container mx-auto px-4 py-8'>{children}</section>
     </>
   );

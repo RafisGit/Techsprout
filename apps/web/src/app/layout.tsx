@@ -6,6 +6,7 @@ import Footer from '@/components/Footer';
 import { Header } from '@/components/header/Header';
 import RouteLoader from '@/components/RouteLoader';
 import QueryProvider from '@/lib/QueryProvider';
+import { LocaleProvider } from '@/i18n';
 
 const lexendDeca = Lexend_Deca({
   variable: '--font-lexend-deca',
@@ -65,12 +66,14 @@ export default function RootLayout({
     <html lang='en' className={`${lexendDeca.variable} ${hind.variable} `}>
       <body className='font-hind bg-[#F4F7FB] text-[1.125rem] antialiased'>
         <QueryProvider>
-          <Header />
-          {children}
-          <Footer />
+          <LocaleProvider>
+            <Header />
+            {children}
+            <Footer />
 
-          <MouseFollower />
-          <RouteLoader />
+            <MouseFollower />
+            <RouteLoader />
+          </LocaleProvider>
         </QueryProvider>
       </body>
     </html>

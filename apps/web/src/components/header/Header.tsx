@@ -2,7 +2,19 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ChevronDown, Grid3X3, Menu, Search, ShoppingCart, User, BookOpen, Receipt, GraduationCap, LayoutDashboard, LogOut } from 'lucide-react';
+import {
+  ChevronDown,
+  Grid3X3,
+  Menu,
+  Search,
+  ShoppingCart,
+  User,
+  BookOpen,
+  Receipt,
+  GraduationCap,
+  LayoutDashboard,
+  LogOut,
+} from 'lucide-react';
 import Image from 'next/image';
 import logo from '@/assets/img/logo.png';
 
@@ -24,47 +36,50 @@ import { fetchPublicCategories } from '@/lib/api/catalog';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { logoutUser } from '@/lib/session';
 import { NotificationBell } from './NotificationBell';
-
-const navigationItems = [
-  {
-    title: 'Home',
-    href: '/',
-    dropdown: false,
-  },
-  {
-    title: 'Courses',
-    href: '/courses',
-    dropdown: false,
-  },
-  {
-    title: 'Contact',
-    href: '/contact',
-    dropdown: false,
-  },
-  {
-    title: 'Blog',
-    href: '/blogs',
-    dropdown: false,
-  },
-  {
-    title: 'Information',
-    href: '/about-us',
-    dropdown: true,
-    items: [
-      { title: 'About Us', href: '/about-us' },
-      { title: 'FAQ', href: '/faq' },
-      { title: 'Privacy Policy', href: '/privacy-policy' },
-    ],
-  },
-];
+import { useTranslation } from '@/i18n';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 export function Header() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [cartCount] = React.useState(0);
-  const [selectedCategory, setSelectedCategory] = React.useState('Categories');
+  const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
   const [searchInput, setSearchInput] = React.useState('');
   const [isScrolled, setIsScrolled] = React.useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = React.useState(false);
+
+  const navigationItems = [
+    {
+      title: t('nav.home'),
+      href: '/',
+      dropdown: false,
+    },
+    {
+      title: t('nav.courses'),
+      href: '/courses',
+      dropdown: false,
+    },
+    {
+      title: t('nav.contact'),
+      href: '/contact',
+      dropdown: false,
+    },
+    {
+      title: t('nav.blog'),
+      href: '/blogs',
+      dropdown: false,
+    },
+    {
+      title: t('nav.information'),
+      href: '/about-us',
+      dropdown: true,
+      items: [
+        { title: t('nav.aboutUs'), href: '/about-us' },
+        { title: t('nav.faq'), href: '/faq' },
+        { title: t('nav.privacyPolicy'), href: '/privacy-policy' },
+      ],
+    },
+  ];
 
   const { data: categories = [] } = useQuery({
     queryKey: ['publicCategories'],
@@ -97,6 +112,8 @@ export function Header() {
     };
   }, []);
 
+  const categoryDisplayLabel = selectedCategory || t('nav.categories');
+
   return (
     <header
       className={`absolute top-0 z-50 w-full ${isScrolled ? 'animate-slide-down fixed bg-white shadow-md' : ''}`}
@@ -104,7 +121,7 @@ export function Header() {
       <div className='mx-auto flex h-16 max-w-[1670px] items-center justify-between px-4 lg:px-6'>
         {/* Logo */}
         <Link href='/' className='me-2 flex-shrink-0'>
-          <Image width={150} height={40} src={logo} alt='Tech Sprout' />
+          <Image width={150} height={40} src={logo} alt={t('a11y.logo')} />
         </Link>
 
         {/* Desktop Navigation (visible on xl and up) */}
@@ -139,18 +156,18 @@ export function Header() {
                 className='flex h-10 items-center space-x-2 text-sm whitespace-nowrap capitalize'
               >
                 <Grid3X3 className='h-4 w-4' />
-                <span>{selectedCategory}</span>
+                <span>{categoryDisplayLabel}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align='start' className='w-[200px]'>
               <DropdownMenuItem
                 className='cursor-pointer'
                 onClick={() => {
-                  setSelectedCategory('All Categories');
+                  setSelectedCategory(t('nav.allCategories'));
                   router.push('/courses');
                 }}
               >
-                All Categories
+                {t('nav.allCategories')}
               </DropdownMenuItem>
               {categories.map((category) => (
                 <DropdownMenuItem
@@ -173,14 +190,16 @@ export function Header() {
               type='text'
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder='Search courses...'
+              placeholder={t('actions.searchPlaceholder')}
               className='focus:border-primary focus:ring-primary h-10 w-full rounded-md border border-gray-300 pr-10 pl-4 text-sm focus:ring-2 focus:outline-none'
+              aria-label={t('a11y.search')}
             />
             <Button
               type='submit'
               size={'icon'}
               variant={'ghost'}
               className='hover:text-primary absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 transform text-gray-400 hover:bg-transparent'
+              aria-label={t('actions.search')}
             >
               <Search />
             </Button>
@@ -189,8 +208,11 @@ export function Header() {
 
         {/* Right Side Actions */}
         <div className='flex items-center space-x-2 sm:space-x-3'>
+          {/* Language Switcher (Desktop & Tablet) */}
+          <LanguageSwitcher variant='header' className='hidden sm:flex' />
+
           {/* Cart */}
-          <Button className='relative' variant={'ghost'} size={'icon'}>
+          <Button className='relative' variant={'ghost'} size={'icon'} aria-label={t('a11y.cart')}>
             <ShoppingCart className='size-6' />
             {cartCount > 0 && (
               <Badge className='absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 text-xs'>
@@ -208,7 +230,7 @@ export function Header() {
                   className='hover:text-primary whitespace-nowrap text-sm font-semibold text-primary flex items-center gap-1.5'
                 >
                   <GraduationCap className='w-4 h-4' />
-                  Instructor Portal
+                  {t('nav.instructorPortal')}
                 </Link>
               )}
               {currentUser.role === 'admin' && (
@@ -217,29 +239,30 @@ export function Header() {
                   className='hover:text-primary whitespace-nowrap text-sm font-semibold text-primary flex items-center gap-1.5'
                 >
                   <LayoutDashboard className='w-4 h-4' />
-                  Admin Portal
+                  {t('nav.adminPortal')}
                 </Link>
               )}
               <Link
                 href='/my-courses'
                 className='hover:text-primary whitespace-nowrap text-sm font-semibold text-gray-700'
               >
-                My Courses
+                {t('nav.myCourses')}
               </Link>
               <Link
                 href='/orders'
                 className='hover:text-primary whitespace-nowrap text-sm font-semibold text-gray-700'
               >
-                Orders
+                {t('nav.orders')}
               </Link>
               <NotificationBell />
               <button
                 onClick={() => logoutUser()}
                 className='hover:text-red-600 whitespace-nowrap text-sm font-semibold text-gray-700 transition-colors cursor-pointer flex items-center gap-1'
-                title='Sign Out'
+                title={t('actions.signOut')}
+                aria-label={t('actions.signOut')}
               >
                 <LogOut className='w-4 h-4' />
-                <span className='hidden lg:inline'>Sign Out</span>
+                <span className='hidden lg:inline'>{t('actions.signOut')}</span>
               </button>
             </div>
           ) : (
@@ -247,15 +270,15 @@ export function Header() {
               {/* Log In */}
               <Link
                 href='/login'
-                className='hover:text-accent hidden whitespace-nowrap text-gray-700 uppercase hover:underline sm:block'
+                className='hover:text-accent hidden whitespace-nowrap text-gray-700 uppercase hover:underline sm:block text-sm font-semibold'
               >
-                LogIn
+                {t('actions.login')}
               </Link>
 
               {/* Register Button */}
               <Link href={'/register'}>
                 <Button className='bg-primary hidden px-3 text-sm whitespace-nowrap sm:flex'>
-                  Register
+                  {t('actions.register')}
                 </Button>
               </Link>
             </>
@@ -268,30 +291,42 @@ export function Header() {
             </div>
           )}
 
-          {/* Mobile Menu Trigger (visible on screens smaller than lg) */}
+          {/* Mobile Menu Trigger (visible on screens smaller than xl) */}
           <Sheet open={isMobileNavOpen} onOpenChange={setIsMobileNavOpen}>
             <SheetTrigger asChild>
-              <Button variant={'ghost'} size={'icon'} className='xl:hidden'>
+              <Button
+                variant={'ghost'}
+                size={'icon'}
+                className='xl:hidden'
+                aria-label={t('a11y.openMenu')}
+              >
                 <Menu className='size-6' />
               </Button>
             </SheetTrigger>
             <SheetContent side='right' className='w-[300px] px-4 sm:w-[400px]'>
-              <DialogTitle className='sr-only'>Mobile Navigation Menu</DialogTitle>
-              <div className='mt-12 flex flex-col space-y-4'>
+              <DialogTitle className='sr-only'>{t('a11y.openMenu')}</DialogTitle>
+              <div className='mt-8 flex flex-col space-y-4'>
+                {/* Mobile Language Switcher (inside sheet) */}
+                <div className='pt-2 pb-2 border-b border-gray-100'>
+                  <LanguageSwitcher variant='sheet' />
+                </div>
+
                 {/* Mobile Search (inside sheet) */}
                 <form onSubmit={handleSearch} className='relative'>
                   <input
                     type='text'
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
-                    placeholder='Search courses...'
-                    className='focus:border-primary focus:ring-primary h-10 w-full rounded-md border border-gray-300 pr-10 pl-4 focus:ring-2 focus:outline-none'
+                    placeholder={t('actions.searchPlaceholder')}
+                    className='focus:border-primary focus:ring-primary h-10 w-full rounded-md border border-gray-300 pr-10 pl-4 focus:ring-2 focus:outline-none text-sm'
+                    aria-label={t('a11y.search')}
                   />
                   <Button
                     type='submit'
                     size={'icon'}
                     variant={'ghost'}
                     className='hover:text-primary absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 transform text-gray-400 hover:bg-transparent'
+                    aria-label={t('actions.search')}
                   >
                     <Search />
                   </Button>
@@ -303,7 +338,7 @@ export function Header() {
                     <Button className='bg-primary hover:bg-accent w-full justify-between'>
                       <div className='flex items-center'>
                         <Grid3X3 className='mr-2 h-4 w-4' />
-                        {selectedCategory}
+                        {categoryDisplayLabel}
                       </div>
                     </Button>
                   </DropdownMenuTrigger>
@@ -311,12 +346,12 @@ export function Header() {
                     <DropdownMenuItem
                       className='cursor-pointer'
                       onClick={() => {
-                        setSelectedCategory('All Categories');
+                        setSelectedCategory(t('nav.allCategories'));
                         setIsMobileNavOpen(false);
                         router.push('/courses');
                       }}
                     >
-                      All Categories
+                      {t('nav.allCategories')}
                     </DropdownMenuItem>
                     {categories.map((category) => (
                       <DropdownMenuItem
@@ -381,7 +416,7 @@ export function Header() {
                         >
                           <Button variant='default' className='w-full justify-start bg-primary text-white'>
                             <GraduationCap className='mr-2 h-4 w-4' />
-                            Instructor Portal
+                            {t('nav.instructorPortal')}
                           </Button>
                         </Link>
                       )}
@@ -393,7 +428,7 @@ export function Header() {
                         >
                           <Button variant='default' className='w-full justify-start bg-primary text-white'>
                             <LayoutDashboard className='mr-2 h-4 w-4' />
-                            Admin Portal
+                            {t('nav.adminPortal')}
                           </Button>
                         </Link>
                       )}
@@ -404,7 +439,7 @@ export function Header() {
                       >
                         <Button variant='outline' className='w-full justify-start'>
                           <BookOpen className='mr-2 h-4 w-4' />
-                          My Courses
+                          {t('nav.myCourses')}
                         </Button>
                       </Link>
                       <Link
@@ -414,7 +449,7 @@ export function Header() {
                       >
                         <Button variant='outline' className='w-full justify-start'>
                           <Receipt className='mr-2 h-4 w-4' />
-                          Orders
+                          {t('nav.orders')}
                         </Button>
                       </Link>
                       <button
@@ -425,7 +460,7 @@ export function Header() {
                         }}
                       >
                         <LogOut className='mr-2 h-4 w-4' />
-                        Sign Out
+                        {t('actions.signOut')}
                       </button>
                     </>
                   ) : (
@@ -437,7 +472,7 @@ export function Header() {
                       >
                         <Button variant='ghost' className='w-full justify-start'>
                           <User className='mr-2 h-4 w-4' />
-                          Log In
+                          {t('actions.login')}
                         </Button>
                       </Link>
                       <Link
@@ -445,7 +480,9 @@ export function Header() {
                         className='block'
                         onClick={() => setIsMobileNavOpen(false)}
                       >
-                        <Button className='bg-primary hover:bg-accent w-full'>Register</Button>
+                        <Button className='bg-primary hover:bg-accent w-full'>
+                          {t('actions.register')}
+                        </Button>
                       </Link>
                     </>
                   )}

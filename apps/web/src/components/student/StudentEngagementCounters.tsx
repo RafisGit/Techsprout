@@ -11,15 +11,16 @@ import {
   Award,
   ArrowRight,
   AlertCircle,
-  Loader2,
   Sparkles,
 } from 'lucide-react';
+import { useTranslation } from '@/i18n';
 
 export function StudentEngagementCounters() {
+  const { t, formatNumber } = useTranslation();
+
   const {
     data: engagement,
     isLoading,
-    isFetching,
     isError,
     error,
     refetch,
@@ -32,7 +33,7 @@ export function StudentEngagementCounters() {
   const errorMessage =
     (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
     (error as { message?: string })?.message ||
-    'Failed to load engagement counters.';
+    t('states.loadFailed');
 
   if (isLoading) {
     return (
@@ -54,7 +55,7 @@ export function StudentEngagementCounters() {
         <div className='flex items-center gap-3'>
           <AlertCircle className='w-5 h-5 text-rose-600 flex-shrink-0' />
           <div>
-            <h4 className='text-sm font-bold'>Unable to load your learning activity</h4>
+            <h4 className='text-sm font-bold'>{t('dashboard.unableToLoadActivity')}</h4>
             <p className='text-xs text-rose-700 mt-0.5'>{errorMessage}</p>
           </div>
         </div>
@@ -62,9 +63,9 @@ export function StudentEngagementCounters() {
           variant='outline'
           size='sm'
           onClick={() => refetch()}
-          className='text-xs text-rose-800 border-rose-300 hover:bg-rose-100 self-start sm:self-auto'
+          className='text-xs text-rose-800 border-rose-300 hover:bg-rose-100 self-start sm:self-auto cursor-pointer'
         >
-          Retry
+          {t('actions.retry')}
         </Button>
       </div>
     );
@@ -81,17 +82,19 @@ export function StudentEngagementCounters() {
         {/* Card 1: Enrolled Courses */}
         <div className='p-6 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between hover:border-gray-300 transition-colors'>
           <div className='flex items-center justify-between'>
-            <span className='text-sm font-semibold text-gray-600'>Enrolled Courses</span>
+            <span className='text-sm font-semibold text-gray-600'>{t('dashboard.enrolledCourses')}</span>
             <div className='w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center'>
               <BookOpen className='w-5 h-5' />
             </div>
           </div>
           <div className='mt-4'>
-            <div className='text-3xl font-extrabold text-gray-900'>{enrolledCount}</div>
+            <div className='text-3xl font-extrabold text-gray-900'>{formatNumber(enrolledCount)}</div>
             <p className='text-xs text-gray-500 mt-1'>
               {enrolledCount === 0
-                ? 'No active course enrollments yet'
-                : `${enrolledCount} ${enrolledCount === 1 ? 'course' : 'courses'} currently in your study list`}
+                ? t('dashboard.noEnrolled')
+                : enrolledCount === 1
+                  ? t('dashboard.enrolledCountSingle')
+                  : t('dashboard.enrolledCountPlural', { count: enrolledCount })}
             </p>
           </div>
           <div className='mt-4 pt-3 border-t border-gray-100'>
@@ -99,7 +102,7 @@ export function StudentEngagementCounters() {
               href='/my-courses'
               className='text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1'
             >
-              <span>View My Courses</span>
+              <span>{t('actions.viewMyCourses')}</span>
               <ArrowRight className='w-3 h-3' />
             </Link>
           </div>
@@ -108,17 +111,19 @@ export function StudentEngagementCounters() {
         {/* Card 2: In Progress */}
         <div className='p-6 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between hover:border-gray-300 transition-colors'>
           <div className='flex items-center justify-between'>
-            <span className='text-sm font-semibold text-gray-600'>In Progress</span>
+            <span className='text-sm font-semibold text-gray-600'>{t('dashboard.inProgress')}</span>
             <div className='w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center'>
               <Clock className='w-5 h-5' />
             </div>
           </div>
           <div className='mt-4'>
-            <div className='text-3xl font-extrabold text-gray-900'>{inProgressCount}</div>
+            <div className='text-3xl font-extrabold text-gray-900'>{formatNumber(inProgressCount)}</div>
             <p className='text-xs text-gray-500 mt-1'>
               {inProgressCount === 0
-                ? 'No active study sessions in progress'
-                : `${inProgressCount} ${inProgressCount === 1 ? 'course' : 'courses'} with lessons underway`}
+                ? t('dashboard.noInProgress')
+                : inProgressCount === 1
+                  ? t('dashboard.inProgressCountSingle')
+                  : t('dashboard.inProgressCountPlural', { count: inProgressCount })}
             </p>
           </div>
           <div className='mt-4 pt-3 border-t border-gray-100'>
@@ -126,7 +131,7 @@ export function StudentEngagementCounters() {
               href='/my-courses'
               className='text-xs font-semibold text-amber-700 hover:underline inline-flex items-center gap-1'
             >
-              <span>Resume Study Sessions</span>
+              <span>{t('actions.resumeLearning')}</span>
               <ArrowRight className='w-3 h-3' />
             </Link>
           </div>
@@ -135,17 +140,19 @@ export function StudentEngagementCounters() {
         {/* Card 3: Certificates */}
         <div className='p-6 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between hover:border-gray-300 transition-colors'>
           <div className='flex items-center justify-between'>
-            <span className='text-sm font-semibold text-gray-600'>Certificates</span>
+            <span className='text-sm font-semibold text-gray-600'>{t('dashboard.certificates')}</span>
             <div className='w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center'>
               <Award className='w-5 h-5' />
             </div>
           </div>
           <div className='mt-4'>
-            <div className='text-3xl font-extrabold text-gray-900'>{certificatesCount}</div>
+            <div className='text-3xl font-extrabold text-gray-900'>{formatNumber(certificatesCount)}</div>
             <p className='text-xs text-gray-500 mt-1'>
               {certificatesCount === 0
-                ? 'Complete 100% of curriculum to earn your first certificate'
-                : `${certificatesCount} verified course completion ${certificatesCount === 1 ? 'certificate' : 'certificates'} earned`}
+                ? t('dashboard.noCertificates')
+                : certificatesCount === 1
+                  ? t('dashboard.certificatesCountSingle')
+                  : t('dashboard.certificatesCountPlural', { count: certificatesCount })}
             </p>
           </div>
           <div className='mt-4 pt-3 border-t border-gray-100'>
@@ -153,7 +160,7 @@ export function StudentEngagementCounters() {
               href='/my-courses'
               className='text-xs font-semibold text-emerald-700 hover:underline inline-flex items-center gap-1'
             >
-              <span>Review Achievements</span>
+              <span>{t('actions.reviewAchievements')}</span>
               <ArrowRight className='w-3 h-3' />
             </Link>
           </div>
@@ -166,15 +173,15 @@ export function StudentEngagementCounters() {
           <div className='space-y-1'>
             <div className='flex items-center gap-2'>
               <Sparkles className='w-5 h-5 text-primary' />
-              <h4 className='text-base font-bold text-gray-900'>Ready to begin learning?</h4>
+              <h4 className='text-base font-bold text-gray-900'>{t('dashboard.readyToLearn')}</h4>
             </div>
             <p className='text-xs text-gray-600 max-w-xl'>
-              Explore the TechSprout catalog of project-based web development, robotics, and game design courses. Enroll today to track your progress and earn verified certificates.
+              {t('dashboard.readyToLearnDescription')}
             </p>
           </div>
           <Link href='/courses'>
-            <Button className='bg-primary text-white hover:bg-primary/90 text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-xs'>
-              <span>Browse Catalog</span>
+            <Button className='bg-primary text-white hover:bg-primary/90 text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-xs cursor-pointer'>
+              <span>{t('actions.browseCatalog')}</span>
               <ArrowRight className='w-3.5 h-3.5' />
             </Button>
           </Link>
