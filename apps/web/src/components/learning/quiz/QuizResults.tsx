@@ -23,6 +23,7 @@ import {
   getAdjacentCurriculumItems,
   getCurriculumItemHref,
 } from '@/lib/curriculumUtils';
+import { useTranslation } from '@/i18n';
 
 interface QuizResultsProps {
   result: StudentQuizResultDto;
@@ -45,6 +46,7 @@ export function QuizResults({
   isRetrying = false,
   isEnrollmentCompleted = false,
 }: QuizResultsProps) {
+  const { t, formatNumber } = useTranslation();
   const isPassed = result.isPassed;
   const isUnlimitedAttempts = quiz.maxAttempts === null || quiz.maxAttempts === undefined;
   const attemptsUsed = Math.max(quiz.userAttemptsCount || 0, result.attemptNumber);
@@ -90,21 +92,24 @@ export function QuizResults({
                   : 'bg-rose-200/60 text-rose-800'
               }`}
             >
-              {isPassed ? 'Passed' : 'Not Passed'}
+              {isPassed ? t('quiz.passed') : t('quiz.notPassed')}
             </span>
-            <span className='text-xs text-gray-500'>Attempt #{result.attemptNumber}</span>
+            <span className='text-xs text-gray-500'>
+              {t('quiz.attemptNumber', { number: formatNumber(result.attemptNumber) })}
+            </span>
           </div>
 
           <h2 className='text-xl sm:text-2xl font-bold leading-tight'>
-            {isPassed
-              ? 'Congratulations! You passed the assessment.'
-              : 'Keep going! Passing grade not yet achieved.'}
+            {isPassed ? t('quiz.congratsPassed') : t('quiz.keepGoingFailed')}
           </h2>
 
           <p className='text-xs sm:text-sm text-gray-600 leading-relaxed'>
             {isPassed
-              ? 'Your score meets the passing requirements. Progress has been saved to your course record.'
-              : `You scored ${result.percentage}%. The passing threshold for this quiz is ${quiz.passingScorePercentage}%. You can review your answers and retry if attempts remain.`}
+              ? t('quiz.passedFeedback')
+              : t('quiz.failedFeedback', {
+                  score: formatNumber(result.percentage),
+                  threshold: formatNumber(quiz.passingScorePercentage),
+                })}
           </p>
         </div>
       </div>
@@ -115,7 +120,7 @@ export function QuizResults({
         <div className='p-4 rounded-2xl bg-gray-50 border border-gray-100 flex flex-col gap-1'>
           <span className='text-[11px] font-medium text-gray-500 flex items-center gap-1.5'>
             <TrendingUp className='w-3.5 h-3.5 text-gray-400' />
-            Your Score
+            {t('quiz.yourScore')}
           </span>
           <span
             className={`text-xl sm:text-2xl font-bold ${
@@ -123,7 +128,7 @@ export function QuizResults({
             }`}
             data-testid='stat-result-percentage'
           >
-            {result.percentage}%
+            {formatNumber(result.percentage)}%
           </span>
         </div>
 
@@ -131,10 +136,10 @@ export function QuizResults({
         <div className='p-4 rounded-2xl bg-gray-50 border border-gray-100 flex flex-col gap-1'>
           <span className='text-[11px] font-medium text-gray-500 flex items-center gap-1.5'>
             <ShieldCheck className='w-3.5 h-3.5 text-gray-400' />
-            Passing Threshold
+            {t('quiz.passingThreshold')}
           </span>
           <span className='text-xl sm:text-2xl font-bold text-gray-900'>
-            {quiz.passingScorePercentage}%
+            {formatNumber(quiz.passingScorePercentage)}%
           </span>
         </div>
 
@@ -142,10 +147,10 @@ export function QuizResults({
         <div className='p-4 rounded-2xl bg-gray-50 border border-gray-100 flex flex-col gap-1'>
           <span className='text-[11px] font-medium text-gray-500 flex items-center gap-1.5'>
             <Award className='w-3.5 h-3.5 text-gray-400' />
-            Points
+            {t('quiz.points')}
           </span>
           <span className='text-xl sm:text-2xl font-bold text-gray-900' data-testid='stat-result-points'>
-            {result.score} / {result.totalPoints}
+            {formatNumber(result.score)} / {formatNumber(result.totalPoints)}
           </span>
         </div>
 
@@ -153,10 +158,10 @@ export function QuizResults({
         <div className='p-4 rounded-2xl bg-gray-50 border border-gray-100 flex flex-col gap-1'>
           <span className='text-[11px] font-medium text-gray-500 flex items-center gap-1.5'>
             <Trophy className='w-3.5 h-3.5 text-amber-500' />
-            Course Progress
+            {t('myCourses.progress')}
           </span>
           <span className='text-xl sm:text-2xl font-bold text-primary'>
-            {result.courseProgressPercentage}%
+            {formatNumber(result.courseProgressPercentage)}%
           </span>
         </div>
       </div>
@@ -166,23 +171,25 @@ export function QuizResults({
         <div className='p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs text-amber-950 flex items-center gap-3'>
           <Trophy className='w-5 h-5 text-amber-600 shrink-0' />
           <div>
-            <span className='font-bold'>All Curriculum Requirements Satisfied! </span>
-            You have successfully completed 100% of the lessons and assessments in this course.
+            <span className='font-bold'>{t('quiz.allCurriculumSatisfied')} </span>
+            {t('quiz.allCurriculumSatisfiedDesc')}
           </div>
         </div>
       )}
 
       {/* Attempts Feedback Info */}
       <div className='p-3.5 rounded-xl bg-gray-50 text-xs text-gray-600 flex items-center justify-between'>
-        <span>Remaining Attempts:</span>
+        <span>{t('quiz.remainingAttempts')}</span>
         <span className='font-bold text-gray-900'>
-          {isUnlimitedAttempts ? (
-            'Unlimited'
-          ) : attemptsRemaining !== null && attemptsRemaining > 0 ? (
-            `${attemptsRemaining} remaining (${attemptsUsed} of ${maxAttempts} used)`
-          ) : (
-            'No attempts remaining'
-          )}
+          {isUnlimitedAttempts
+            ? t('quiz.unlimitedAttempts')
+            : attemptsRemaining !== null && attemptsRemaining > 0
+            ? t('quiz.attemptsCountUsed', {
+                used: formatNumber(attemptsUsed),
+                max: formatNumber(maxAttempts || 0),
+                remaining: formatNumber(attemptsRemaining),
+              })
+            : t('quiz.attemptsExhausted')}
         </span>
       </div>
 
@@ -198,7 +205,7 @@ export function QuizResults({
             data-testid='btn-view-review'
           >
             <Eye className='w-4 h-4 text-gray-500' />
-            <span>Review Answers</span>
+            <span>{t('quiz.reviewAnswers')}</span>
           </Button>
 
           {/* Retry Button */}
@@ -212,7 +219,7 @@ export function QuizResults({
               data-testid='btn-retry-quiz'
             >
               <RotateCcw className='w-4 h-4' />
-              <span>{isRetrying ? 'Starting Attempt...' : 'Retry Quiz'}</span>
+              <span>{isRetrying ? t('quiz.startingAttempt') : t('quiz.retakeQuiz')}</span>
             </Button>
           )}
         </div>
@@ -221,7 +228,11 @@ export function QuizResults({
         {nextItem ? (
           <Link href={getCurriculumItemHref(courseSlug, nextItem)} data-testid='btn-next-curriculum-item'>
             <Button className='rounded-xl text-xs font-bold px-5 py-2.5 bg-primary text-white hover:bg-primary/90 shadow-xs flex items-center gap-1.5'>
-              <span>Continue to Next {nextItem.type === 'QUIZ' ? 'Quiz' : 'Lesson'}</span>
+              <span>
+                {t('quiz.continueToNext', {
+                  type: nextItem.type === 'QUIZ' ? t('learning.previousQuiz').replace('Previous:', '').trim() : t('learning.lessonTab'),
+                })}
+              </span>
               <ArrowRight className='w-4 h-4' />
             </Button>
           </Link>
@@ -229,7 +240,7 @@ export function QuizResults({
           <Link href='/my-courses'>
             <Button className='rounded-xl text-xs font-bold px-5 py-2.5 bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs flex items-center gap-1.5'>
               <Trophy className='w-4 h-4 text-amber-300' />
-              <span>Return to My Courses</span>
+              <span>{t('quiz.returnToMyCourses')}</span>
             </Button>
           </Link>
         )}

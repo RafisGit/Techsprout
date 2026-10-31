@@ -1,7 +1,5 @@
 'use client';
 
-import { formatMoney } from '@/lib/money';
-
 import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -30,34 +28,18 @@ import {
   ArrowLeft,
   AlertCircle,
   BookOpen,
-  CheckCircle2,
   FileCheck,
   User,
-  ExternalLink,
 } from 'lucide-react';
 import type { LessonDto, ModuleDto } from '@techsprout/contracts';
 import { InstructorBioCard } from '@/components/public/InstructorBioCard';
-
-function formatDuration(minutes?: number | null): string {
-  if (!minutes) return 'Self-paced';
-  if (minutes < 60) return `${minutes} mins`;
-  const hours = Math.floor(minutes / 60);
-  const remaining = minutes % 60;
-  return remaining > 0 ? `${hours}h ${remaining}m` : `${hours}h`;
-}
-
-function formatLessonDuration(seconds?: number | null): string {
-  if (!seconds) return '5 mins';
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  if (mins === 0) return `${secs}s`;
-  return secs > 0 ? `${mins}m ${secs}s` : `${mins} mins`;
-}
+import { useTranslation } from '@/i18n';
 
 export default function CourseDetailPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params?.slug as string;
+  const { t, locale, formatNumber, formatCurrency, formatPercent } = useTranslation();
 
   const [activePreviewLesson, setActivePreviewLesson] = useState<LessonDto | null>(null);
 
@@ -101,6 +83,26 @@ export default function CourseDetailPage() {
   const isCompleted = enrollment?.status === 'COMPLETED';
   const isArchived = course?.status === 'ARCHIVED';
 
+  function formatDuration(minutes?: number | null): string {
+    if (!minutes) return t('courseDetails.selfPaced');
+    if (minutes < 60) return t('catalog.mins', { count: formatNumber(minutes) });
+    const hours = Math.floor(minutes / 60);
+    const remaining = minutes % 60;
+    return remaining > 0
+      ? t('catalog.hoursMins', { hours: formatNumber(hours), mins: formatNumber(remaining) })
+      : t('catalog.hoursOnly', { hours: formatNumber(hours) });
+  }
+
+  function formatLessonDuration(seconds?: number | null): string {
+    if (!seconds) return t('catalog.mins', { count: formatNumber(5) });
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (mins === 0) return `${formatNumber(secs)}s`;
+    return secs > 0
+      ? `${formatNumber(mins)}m ${formatNumber(secs)}s`
+      : t('catalog.mins', { count: formatNumber(mins) });
+  }
+
   if (isLoading) {
     return (
       <div className='min-h-screen bg-gray-50/50 pb-20'>
@@ -137,7 +139,7 @@ export default function CourseDetailPage() {
     const errorMessage =
       statusCode === 404
         ? 'This course is currently unavailable or does not exist. It may be in draft mode, archived, or marked as private.'
-        : (error as any)?.response?.data?.message || 'An unexpected error occurred while loading course details.';
+        : (error as any)?.response?.data?.message || t('states.loadFailed');
 
     return (
       <div className='min-h-[70vh] flex items-center justify-center px-4 py-16 bg-gray-50'>
@@ -145,18 +147,18 @@ export default function CourseDetailPage() {
           <div className='w-16 h-16 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center mx-auto'>
             <AlertCircle className='w-8 h-8' />
           </div>
-          <h2 className='text-2xl font-bold text-gray-900'>Course Not Found</h2>
+          <h2 className='text-2xl font-bold text-gray-900'>{t('courseDetails.courseNotFound')}</h2>
           <p className='text-xs text-gray-500 leading-relaxed'>{errorMessage}</p>
           <div className='pt-2 flex justify-center gap-3'>
             <Link href='/courses'>
               <Button variant='outline' size='sm' className='rounded-xl text-xs'>
                 <ArrowLeft className='w-3.5 h-3.5 mr-1.5' />
-                Back to Catalog
+                {t('courseDetails.backToCatalog')}
               </Button>
             </Link>
             {statusCode !== 404 && (
               <Button onClick={() => refetch()} size='sm' className='rounded-xl text-xs'>
-                Retry
+                {t('actions.retry')}
               </Button>
             )}
           </div>
@@ -168,11 +170,21 @@ export default function CourseDetailPage() {
   const isFree = Number(course.price) === 0 || course.price === '0.00';
   const currency = course.currency || 'BDT';
   const formattedPrice = isFree
-    ? 'Free'
-    : formatMoney(course.price, currency);
+    ? t('catalog.free')
+    : formatCurrency(course.price, currency);
 
   const modules = (course.modules || []).slice().sort((a, b) => a.position - b.position);
   const totalLessons = modules.reduce((acc, m) => acc + (m.lessons?.length || 0), 0);
+
+  const levelKey = (course.level || '').toLowerCase();
+  const levelText =
+    levelKey === 'beginner'
+      ? t('catalog.beginner')
+      : levelKey === 'intermediate'
+      ? t('catalog.intermediate')
+      : levelKey === 'advanced'
+      ? t('catalog.advanced')
+      : t('catalog.allLevels');
 
   return (
     <div className='min-h-screen bg-[#F8FAFC] pb-24'>
@@ -183,7 +195,7 @@ export default function CourseDetailPage() {
           <div className='mb-6 flex items-center gap-2 text-xs text-white/70'>
             <Link href='/courses' className='hover:text-white transition-colors flex items-center gap-1'>
               <ArrowLeft className='w-3.5 h-3.5' />
-              <span>Catalog</span>
+              <span>{t('catalog.pageTitle')}</span>
             </Link>
             <span>/</span>
             {course.category && (
@@ -221,11 +233,11 @@ export default function CourseDetailPage() {
             <div className='flex flex-wrap items-center gap-4 sm:gap-6 pt-2 text-xs sm:text-sm text-white/90'>
               <div className='flex items-center gap-2'>
                 <User className='w-4 h-4 text-accent-foreground/80' />
-                <span>Instructor: <strong>{course.instructor?.name || 'TechSprout Faculty'}</strong></span>
+                <span>{t('courseDetails.instructor')}: <strong>{course.instructor?.name || 'TechSprout Faculty'}</strong></span>
               </div>
               <div className='flex items-center gap-1.5'>
                 <FileText className='w-4 h-4' />
-                <span>{totalLessons} {totalLessons === 1 ? 'lesson' : 'lessons'}</span>
+                <span>{t('catalog.lessonsCount', { count: formatNumber(totalLessons) })}</span>
               </div>
               <div className='flex items-center gap-1.5'>
                 <Clock className='w-4 h-4' />
@@ -233,7 +245,7 @@ export default function CourseDetailPage() {
               </div>
               <div className='flex items-center gap-1.5 capitalize'>
                 <Layers className='w-4 h-4' />
-                <span>{course.level?.toLowerCase().replace('_', ' ') || 'All levels'}</span>
+                <span>{levelText}</span>
               </div>
               <div className='flex items-center gap-1.5'>
                 <Globe className='w-4 h-4' />
@@ -255,13 +267,13 @@ export default function CourseDetailPage() {
                 <div className='flex items-center justify-between pb-3 border-b border-gray-100'>
                   <div className='flex items-center space-x-2 text-xs font-bold text-primary uppercase tracking-wider'>
                     <PlayCircle className='w-4 h-4' />
-                    <span>Free Lesson Preview</span>
+                    <span>{t('courseDetails.openPreview')}</span>
                   </div>
                   <button
                     onClick={() => setActivePreviewLesson(null)}
-                    className='text-xs text-gray-400 hover:text-gray-600 underline'
+                    className='text-xs text-gray-400 hover:text-gray-600 underline cursor-pointer'
                   >
-                    Close Preview
+                    {t('actions.cancel')}
                   </button>
                 </div>
 
@@ -284,7 +296,7 @@ export default function CourseDetailPage() {
                   </div>
                 ) : (
                   <p className='text-xs text-gray-500 italic p-4 bg-gray-50 rounded-xl'>
-                    Preview media is currently processing or unavailable for this lesson.
+                    {t('learning.videoUnavailableDesc')}
                   </p>
                 )}
               </div>
@@ -293,7 +305,7 @@ export default function CourseDetailPage() {
             {/* Course Overview / Description */}
             <div className='bg-white rounded-3xl border border-gray-200/80 shadow-xs p-6 sm:p-8 space-y-4'>
               <Title h={3} className='text-xl font-bold text-gray-900'>
-                Course Overview
+                {t('courseDetails.aboutCourse')}
               </Title>
               <div className='text-sm sm:text-base text-gray-600 leading-relaxed space-y-3 whitespace-pre-line'>
                 {course.description || course.shortDescription || 'No detailed syllabus text provided.'}
@@ -305,10 +317,10 @@ export default function CourseDetailPage() {
               <div className='flex items-center justify-between'>
                 <div>
                   <Title h={3} className='text-xl font-bold text-gray-900'>
-                    Curriculum Content
+                    {t('courseDetails.curriculum')}
                   </Title>
                   <p className='text-xs text-gray-500 mt-1'>
-                    {modules.length} {modules.length === 1 ? 'module' : 'modules'} • {totalLessons} {totalLessons === 1 ? 'lesson' : 'lessons'} • {formatDuration(course.durationMinutes)} total
+                    {t('courseDetails.modulesCount', { count: formatNumber(modules.length) })} • {t('catalog.lessonsCount', { count: formatNumber(totalLessons) })}
                   </p>
                 </div>
               </div>
@@ -316,7 +328,7 @@ export default function CourseDetailPage() {
               {modules.length === 0 ? (
                 <div className='p-8 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200'>
                   <BookOpen className='w-8 h-8 text-gray-300 mx-auto mb-2' />
-                  <p className='text-xs text-gray-500'>Curriculum structure is currently being updated by the instructor.</p>
+                  <p className='text-xs text-gray-500'>{t('states.empty')}</p>
                 </div>
               ) : (
                 <Accordion type='multiple' defaultValue={modules.map((m) => m.id)} className='space-y-3'>
@@ -332,10 +344,10 @@ export default function CourseDetailPage() {
                         <AccordionTrigger className='hover:no-underline py-3 text-left font-semibold text-gray-900'>
                           <div className='flex flex-col sm:flex-row sm:items-center justify-between w-full pr-4 text-sm gap-1'>
                             <span>
-                              Section {mIdx + 1}: {mod.title}
+                              {formatNumber(mIdx + 1)}. {mod.title}
                             </span>
                             <span className='text-xs text-gray-400 font-normal'>
-                              {sortedLessons.length} {sortedLessons.length === 1 ? 'lesson' : 'lessons'}
+                              {t('catalog.lessonsCount', { count: formatNumber(sortedLessons.length) })}
                             </span>
                           </div>
                         </AccordionTrigger>
@@ -348,7 +360,7 @@ export default function CourseDetailPage() {
                           )}
 
                           {sortedLessons.length === 0 ? (
-                            <p className='text-xs text-gray-400 px-2'>No lessons in this module.</p>
+                            <p className='text-xs text-gray-400 px-2'>{t('states.empty')}</p>
                           ) : (
                             sortedLessons.map((lesson: LessonDto, lIdx: number) => {
                               const hasPreview = lesson.isPreview === true;
@@ -377,7 +389,7 @@ export default function CourseDetailPage() {
 
                                     <div className='truncate'>
                                       <p className={`text-xs font-medium truncate ${hasPreview ? 'text-gray-900' : 'text-gray-600'}`}>
-                                        {lIdx + 1}. {lesson.title}
+                                        {formatNumber(lIdx + 1)}. {lesson.title}
                                       </p>
                                     </div>
                                   </div>
@@ -390,10 +402,10 @@ export default function CourseDetailPage() {
                                     {hasPreview ? (
                                       <span className='inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200'>
                                         <PlayCircle className='w-3 h-3' />
-                                        <span>Preview</span>
+                                        <span>{t('courseDetails.preview')}</span>
                                       </span>
                                     ) : (
-                                      <span title='Lesson locked until enrollment'>
+                                      <span title={t('courseDetails.locked')}>
                                         <Lock className='w-3.5 h-3.5 text-gray-300' />
                                       </span>
                                     )}
@@ -436,7 +448,7 @@ export default function CourseDetailPage() {
 
               {/* Price Display */}
               <div className='flex items-baseline justify-between border-b border-gray-100 pb-4'>
-                <span className='text-xs font-semibold text-gray-400 uppercase tracking-wider'>Tuition</span>
+                <span className='text-xs font-semibold text-gray-400 uppercase tracking-wider'>{t('courseDetails.priceLabel')}</span>
                 <span className='text-3xl font-extrabold text-primary font-lexend'>
                   {formattedPrice}
                 </span>
@@ -445,12 +457,12 @@ export default function CourseDetailPage() {
               {/* Specification List */}
               <div className='space-y-3 text-xs text-gray-600'>
                 <div className='flex items-center justify-between'>
-                  <span className='text-gray-400'>Instructor:</span>
+                  <span className='text-gray-400'>{t('courseDetails.instructor')}:</span>
                   <span className='font-semibold text-gray-800'>{course.instructor?.name || 'TechSprout Faculty'}</span>
                 </div>
                 {course.category && (
                   <div className='flex items-center justify-between'>
-                    <span className='text-gray-400'>Category:</span>
+                    <span className='text-gray-400'>{t('catalog.categories')}:</span>
                     <Link
                       href={`/categories/${course.category.slug}`}
                       className='font-semibold text-primary hover:underline'
@@ -460,25 +472,25 @@ export default function CourseDetailPage() {
                   </div>
                 )}
                 <div className='flex items-center justify-between'>
-                  <span className='text-gray-400'>Difficulty:</span>
+                  <span className='text-gray-400'>{t('catalog.level')}:</span>
                   <span className='font-semibold text-gray-800 capitalize'>
-                    {course.level?.toLowerCase().replace('_', ' ') || 'All levels'}
+                    {levelText}
                   </span>
                 </div>
                 <div className='flex items-center justify-between'>
-                  <span className='text-gray-400'>Language:</span>
+                  <span className='text-gray-400'>{t('language.label')}:</span>
                   <span className='font-semibold text-gray-800'>{course.language || 'English'}</span>
                 </div>
                 <div className='flex items-center justify-between'>
-                  <span className='text-gray-400'>Modules:</span>
-                  <span className='font-semibold text-gray-800'>{modules.length}</span>
+                  <span className='text-gray-400'>{t('courseDetails.modulesCount', { count: '' })}:</span>
+                  <span className='font-semibold text-gray-800'>{formatNumber(modules.length)}</span>
                 </div>
                 <div className='flex items-center justify-between'>
-                  <span className='text-gray-400'>Total Lessons:</span>
-                  <span className='font-semibold text-gray-800'>{totalLessons}</span>
+                  <span className='text-gray-400'>{t('catalog.lessonsCount', { count: '' })}:</span>
+                  <span className='font-semibold text-gray-800'>{formatNumber(totalLessons)}</span>
                 </div>
                 <div className='flex items-center justify-between'>
-                  <span className='text-gray-400'>Duration:</span>
+                  <span className='text-gray-400'>{t('catalog.flexibleDuration')}:</span>
                   <span className='font-semibold text-gray-800'>{formatDuration(course.durationMinutes)}</span>
                 </div>
               </div>
@@ -488,7 +500,7 @@ export default function CourseDetailPage() {
                 {!isAuthLoading && !currentUser ? (
                   <>
                     <Button
-                      className='w-full rounded-2xl py-6 text-sm font-bold bg-primary text-white hover:bg-primary/90 shadow-md'
+                      className='w-full rounded-2xl py-6 text-sm font-bold bg-primary text-white hover:bg-primary/90 shadow-md cursor-pointer'
                       onClick={() =>
                         router.push(
                           `/login?redirect=${encodeURIComponent(
@@ -497,28 +509,26 @@ export default function CourseDetailPage() {
                         )
                       }
                     >
-                      {isFree ? 'Log in to enroll' : 'Log in to purchase'}
+                      {t('actions.login')}
                     </Button>
                     <p className='text-[11px] text-gray-400 text-center'>
-                      {isFree
-                        ? 'Sign in with your TechSprout account to enroll and start learning.'
-                        : 'Sign in with your TechSprout account to proceed to checkout.'}
+                      {t('myCourses.signInDescription')}
                     </p>
                   </>
                 ) : isEnrolled ? (
                   <>
                     <Button
-                      className={`w-full rounded-2xl py-6 text-sm font-bold shadow-md transition ${
+                      className={`w-full rounded-2xl py-6 text-sm font-bold shadow-md transition cursor-pointer ${
                         isCompleted
                           ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                           : 'bg-primary text-white hover:bg-primary/90'
                       }`}
                       onClick={() => router.push(`/learn/${course.slug}`)}
                     >
-                      {isCompleted ? 'View Course' : 'Continue Learning'}
+                      {isCompleted ? t('actions.viewDetails') : t('courseDetails.resumeCourse')}
                     </Button>
                     <p className='text-[11px] text-gray-500 text-center font-medium'>
-                      You are enrolled • {enrollment?.progressPercentage ?? 0}% completed
+                      {t('courseDetails.enrolled')} • {formatPercent((enrollment?.progressPercentage ?? 0) / 100)} {t('courseDetails.completed')}
                     </p>
                   </>
                 ) : isArchived ? (
@@ -527,40 +537,33 @@ export default function CourseDetailPage() {
                       disabled
                       className='w-full rounded-2xl py-6 text-sm font-bold bg-gray-200 text-gray-500 cursor-not-allowed shadow-none'
                     >
-                      Enrollment Closed (Archived)
+                      {t('courseDetails.archivedNotice')}
                     </Button>
                     <p className='text-[11px] text-amber-600 text-center'>
-                      This course has been archived. New enrollments are closed.
+                      {t('courseDetails.archivedNotice')}
                     </p>
                   </>
                 ) : !isFree ? (
                   <>
                     <Button
-                      className='w-full rounded-2xl py-6 text-sm font-bold bg-primary text-white hover:bg-primary/90 shadow-md transition'
+                      className='w-full rounded-2xl py-6 text-sm font-bold bg-primary text-white hover:bg-primary/90 shadow-md transition cursor-pointer'
                       onClick={() => router.push(`/checkout/${course.slug}`)}
                     >
-                      Buy Now
+                      {t('courseDetails.enrollNow')}
                     </Button>
-                    <p className='text-[11px] text-gray-400 text-center'>
-                      Secure checkout • Instant lifetime course access.
-                    </p>
                   </>
                 ) : (
                   <>
                     <Button
                       disabled={enrollMutation.isPending}
-                      className='w-full rounded-2xl py-6 text-sm font-bold bg-primary text-white hover:bg-primary/90 shadow-md transition'
+                      className='w-full rounded-2xl py-6 text-sm font-bold bg-primary text-white hover:bg-primary/90 shadow-md transition cursor-pointer'
                       onClick={() => enrollMutation.mutate()}
                     >
-                      {enrollMutation.isPending ? 'Enrolling...' : 'Enroll Now'}
+                      {enrollMutation.isPending ? t('courseDetails.enrolling') : t('courseDetails.enrollNow')}
                     </Button>
-                    {enrollErrorMsg ? (
+                    {enrollErrorMsg && (
                       <p className='text-[11px] text-red-500 text-center font-medium'>
                         {enrollErrorMsg}
-                      </p>
-                    ) : (
-                      <p className='text-[11px] text-gray-400 text-center'>
-                        Instant enrollment • Lifetime access to study curriculum.
                       </p>
                     )}
                   </>

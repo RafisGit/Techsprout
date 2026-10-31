@@ -111,3 +111,4 @@ export function LanguageSwitcher({ className, variant = 'header' }: LanguageSwit
 }
 
 export default LanguageSwitcher;
+

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { verifyCertificate } from '@/lib/api/certificates';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from '@/i18n/client';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -20,15 +21,14 @@ import {
   GraduationCap,
   RotateCcw,
 } from 'lucide-react';
-import { formatCertificateDate } from '@/components/certificate/CertificateDocument';
 
 export default function PublicCertificateVerificationResultPage() {
+  const { t, formatDate, formatNumber } = useTranslation();
   const params = useParams();
   const rawCertNumber = params?.certificateNumber as string;
   const certificateNumber = decodeURIComponent(rawCertNumber || '').trim();
 
   // Call GET /api/v1/certificates/verify/:certificateNumber
-  // Strict Privacy: Only uses public verification endpoint; no student endpoints or private data.
   const {
     data: verification,
     isLoading,
@@ -49,7 +49,7 @@ export default function PublicCertificateVerificationResultPage() {
       <div className='min-h-[85vh] flex flex-col items-center justify-center px-4 bg-[#F8FAFC] py-16 space-y-4'>
         <div className='w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin' />
         <p className='text-xs sm:text-sm font-semibold text-gray-600 animate-pulse'>
-          Authenticating credential in official registry...
+          {t.certificate.authenticating}
         </p>
       </div>
     );
@@ -73,15 +73,15 @@ export default function PublicCertificateVerificationResultPage() {
           <div className='space-y-2'>
             <span className='inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900'>
               <AlertTriangle className='w-3.5 h-3.5' />
-              Verification Failed
+              {t.certificate.verificationFailed}
             </span>
             <h1 className='text-2xl font-black text-gray-900 tracking-tight'>
-              {isNotFound ? 'Certificate Not Found' : 'Verification Unavailable'}
+              {isNotFound ? t.certificate.certificateNotFound : t.certificate.verificationUnavailable}
             </h1>
             <p className='text-xs sm:text-sm text-gray-500 leading-relaxed'>
               {isNotFound
-                ? `No record was found for certificate number "${certificateNumber}". Please verify that the code was typed correctly.`
-                : 'An unexpected network error occurred while verifying this certificate.'}
+                ? t.certificate.notFoundDesc.replace('{id}', certificateNumber)
+                : t.certificate.networkErrorDesc}
             </p>
           </div>
 
@@ -95,7 +95,7 @@ export default function PublicCertificateVerificationResultPage() {
             <Link href='/verify'>
               <Button className='w-full sm:w-auto rounded-xl text-xs font-bold px-6 py-2.5 bg-primary text-white hover:bg-primary/90'>
                 <Search className='w-3.5 h-3.5 mr-1.5' />
-                Verify Another Certificate
+                {t.certificate.verifyAnother}
               </Button>
             </Link>
             {!isNotFound && (
@@ -105,7 +105,7 @@ export default function PublicCertificateVerificationResultPage() {
                 className='w-full sm:w-auto rounded-xl text-xs font-semibold px-4 py-2.5'
               >
                 <RotateCcw className='w-3.5 h-3.5 mr-1.5' />
-                Try Again
+                {t.certificate.tryAgain}
               </Button>
             )}
           </div>
@@ -127,11 +127,11 @@ export default function PublicCertificateVerificationResultPage() {
               className='inline-flex items-center text-xs font-semibold text-gray-500 hover:text-gray-900 transition'
             >
               <ArrowLeft className='w-3.5 h-3.5 mr-1' />
-              <span>Back to Verification Search</span>
+              <span>{t.certificate.backToVerificationSearch}</span>
             </Link>
 
             <span className='text-xs text-gray-400 font-mono'>
-              Registry ID: {verification.certificateNumber}
+              {t.certificate.registryId.replace('{id}', verification.certificateNumber)}
             </span>
           </div>
         </div>
@@ -176,27 +176,27 @@ export default function PublicCertificateVerificationResultPage() {
                     {isRevoked ? (
                       <>
                         <AlertTriangle className='w-3.5 h-3.5 text-rose-700' />
-                        <span>REVOKED CREDENTIAL</span>
+                        <span>{t.certificate.revokedCredential}</span>
                       </>
                     ) : (
                       <>
                         <CheckCircle2 className='w-3.5 h-3.5 text-emerald-700' />
-                        <span>AUTHENTIC & VERIFIED</span>
+                        <span>{t.certificate.authenticAndVerified}</span>
                       </>
                     )}
                   </span>
                 </div>
                 <h1 className='text-xl sm:text-2xl font-black text-gray-900 tracking-tight mt-1'>
                   {isRevoked
-                    ? 'Credential Has Been Revoked'
-                    : 'Official TechSprout Credential'}
+                    ? t.certificate.credentialRevokedHeading
+                    : t.certificate.officialCredentialHeading}
                 </h1>
               </div>
             </div>
 
             <div className='sm:text-right'>
               <span className='block text-[11px] font-bold text-gray-400 uppercase tracking-wider'>
-                Certificate Number
+                {t.certificate.certificateNo}
               </span>
               <span
                 className='block font-mono text-sm sm:text-base font-extrabold text-gray-900 select-all'
@@ -215,21 +215,20 @@ export default function PublicCertificateVerificationResultPage() {
             >
               <div className='text-xs font-bold text-rose-900 flex items-center gap-1.5'>
                 <AlertTriangle className='w-4 h-4 text-rose-600' />
-                <span>Revocation Notice</span>
+                <span>{t.certificate.revocationNotice}</span>
               </div>
               <p className='text-xs sm:text-sm text-rose-800 leading-relaxed'>
-                This certificate was revoked by an administrator on{' '}
-                <strong className='font-semibold'>
-                  {formatCertificateDate(verification.revokedAt)}
-                </strong>
-                .
+                {t.certificate.revokedByAdmin.replace(
+                  '{date}',
+                  verification.revokedAt ? formatDate(verification.revokedAt) : '—'
+                )}
               </p>
               {verification.revocationReason && (
                 <p
                   className='text-xs text-rose-950 font-medium'
                   data-testid='public-revocation-reason'
                 >
-                  <strong className='font-semibold'>Reason: </strong>
+                  <strong className='font-semibold'>{t.certificate.revocationReason} </strong>
                   {verification.revocationReason}
                 </p>
               )}
@@ -240,7 +239,7 @@ export default function PublicCertificateVerificationResultPage() {
         {/* Credential Snapshot Data Grid */}
         <div className='bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-xs space-y-6'>
           <h2 className='text-base font-bold text-gray-900 border-b border-gray-100 pb-3'>
-            Verified Achievement Details
+            {t.certificate.verifiedAchievementDetails}
           </h2>
 
           <div className='grid grid-cols-1 sm:grid-cols-2 gap-6'>
@@ -248,7 +247,7 @@ export default function PublicCertificateVerificationResultPage() {
             <div className='space-y-1'>
               <span className='text-xs font-medium text-gray-400 flex items-center gap-1.5'>
                 <User className='w-3.5 h-3.5' />
-                Recipient / Student Name
+                {t.certificate.studentNameLabel}
               </span>
               <p
                 className='text-lg sm:text-xl font-bold text-gray-900'
@@ -262,7 +261,7 @@ export default function PublicCertificateVerificationResultPage() {
             <div className='space-y-1'>
               <span className='text-xs font-medium text-gray-400 flex items-center gap-1.5'>
                 <BookOpen className='w-3.5 h-3.5' />
-                Course Title
+                {t.certificate.courseTitleLabel}
               </span>
               <p
                 className='text-lg sm:text-xl font-bold text-gray-900'
@@ -277,7 +276,7 @@ export default function PublicCertificateVerificationResultPage() {
               <div className='space-y-1'>
                 <span className='text-xs font-medium text-gray-400 flex items-center gap-1.5'>
                   <GraduationCap className='w-3.5 h-3.5' />
-                  Instructor
+                  {t.certificate.leadInstructor}
                 </span>
                 <p
                   className='text-sm sm:text-base font-semibold text-gray-800'
@@ -294,13 +293,13 @@ export default function PublicCertificateVerificationResultPage() {
                 <div className='space-y-1'>
                   <span className='text-xs font-medium text-gray-400 flex items-center gap-1.5'>
                     <Award className='w-3.5 h-3.5 text-amber-500' />
-                    Final Assessment Score
+                    {t.certificate.finalScore.split(':')[0]}
                   </span>
                   <p
                     className='text-sm sm:text-base font-bold text-amber-900'
                     data-testid='public-final-score'
                   >
-                    {verification.finalScorePercentage}%
+                    {formatNumber(verification.finalScorePercentage)}%
                   </p>
                 </div>
               )}
@@ -310,13 +309,13 @@ export default function PublicCertificateVerificationResultPage() {
               <div className='space-y-1'>
                 <span className='text-xs font-medium text-gray-400 flex items-center gap-1.5'>
                   <Calendar className='w-3.5 h-3.5' />
-                  Completion Date
+                  {t.certificate.completionDateLabel}
                 </span>
                 <p
                   className='text-sm sm:text-base font-semibold text-gray-800'
                   data-testid='public-completed-date'
                 >
-                  {formatCertificateDate(verification.completedAt)}
+                  {formatDate(verification.completedAt)}
                 </p>
               </div>
             )}
@@ -326,13 +325,13 @@ export default function PublicCertificateVerificationResultPage() {
               <div className='space-y-1'>
                 <span className='text-xs font-medium text-gray-400 flex items-center gap-1.5'>
                   <Calendar className='w-3.5 h-3.5' />
-                  Issuance Date
+                  {t.certificate.issuanceDateLabel}
                 </span>
                 <p
                   className='text-sm sm:text-base font-semibold text-gray-800'
                   data-testid='public-issued-date'
                 >
-                  {formatCertificateDate(verification.issuedAt)}
+                  {formatDate(verification.issuedAt)}
                 </p>
               </div>
             )}
@@ -342,9 +341,9 @@ export default function PublicCertificateVerificationResultPage() {
         {/* Verification Action / Footer */}
         <div className='flex flex-col sm:flex-row items-center justify-between gap-4 p-6 bg-white rounded-3xl border border-gray-200/80 shadow-xs'>
           <div className='text-center sm:text-left'>
-            <h3 className='text-sm font-bold text-gray-900'>Want to verify another credential?</h3>
+            <h3 className='text-sm font-bold text-gray-900'>{t.certificate.wantToVerifyAnother}</h3>
             <p className='text-xs text-gray-500'>
-              Search our public registry to validate any TechSprout certificate.
+              {t.certificate.searchRegistrySubtitle}
             </p>
           </div>
 
@@ -355,7 +354,7 @@ export default function PublicCertificateVerificationResultPage() {
               data-testid='btn-verify-another'
             >
               <Search className='w-3.5 h-3.5 mr-1.5' />
-              <span>Verify Another Code</span>
+              <span>{t.certificate.verifyAnotherCode}</span>
             </Button>
           </Link>
         </div>

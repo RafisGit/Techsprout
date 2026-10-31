@@ -13,10 +13,11 @@ export function toBanglaDigits(str: string | number): string {
 
 /** Format a date according to the specified locale */
 export function formatDate(
-  date: Date | string | number,
+  date: Date | string | number | null | undefined,
   locale: Locale = 'en',
   options: Intl.DateTimeFormatOptions = { dateStyle: 'medium' }
 ): string {
+  if (date === null || date === undefined || date === '') return '';
   try {
     const d = date instanceof Date ? date : new Date(date);
     if (isNaN(d.getTime())) return '';
@@ -97,3 +98,4 @@ export function formatCurrency(
   });
   return `${code} ${grouped}`;
 }
+

@@ -10,9 +10,9 @@ import {
   fetchOrderRefundEligibility,
   submitOrderRefundRequest,
 } from '@/lib/api/orders';
-import { formatMinorUnits } from '@/lib/money';
 import Hero from '@/components/Hero';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from '@/i18n/client';
 import {
   Dialog,
   DialogContent,
@@ -33,8 +33,6 @@ import {
   Clock,
   XCircle,
   Tag,
-  CreditCard,
-  HelpCircle,
   LogIn,
   RefreshCw,
   Send,
@@ -66,6 +64,7 @@ const REASON_CATEGORIES: { value: RefundRequestReasonCategory; label: string }[]
 ];
 
 export default function StudentOrderDetailPage() {
+  const { t, formatDate, formatNumber, formatCurrency } = useTranslation();
   const params = useParams();
   const router = useRouter();
   const orderId = params?.orderId as string;
@@ -145,25 +144,9 @@ export default function StudentOrderDetailPage() {
 
   const isLoading = isAuthLoading || (!!currentUser && isOrderLoading);
 
-  const formatDate = (dateString?: string | null) => {
-    if (!dateString) return '—';
-    try {
-      const d = new Date(dateString);
-      return d.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return dateString;
-    }
-  };
-
   return (
     <div className='min-h-screen bg-[#F8FAFC] pb-24'>
-      <Hero pageName='Order Details' />
+      <Hero pageName={t.orders.pageTitle} />
 
       <main className='container mx-auto px-4 max-w-5xl pt-8 sm:pt-10'>
         {/* Top Back Action */}
@@ -174,7 +157,7 @@ export default function StudentOrderDetailPage() {
             data-testid='back-to-orders-link'
           >
             <ArrowLeft className='w-4 h-4 mr-1.5' />
-            Back to Purchase History
+            {t.orders.backToHistory}
           </Link>
         </div>
 
@@ -185,16 +168,16 @@ export default function StudentOrderDetailPage() {
               <Receipt className='w-8 h-8' />
             </div>
             <h2 className='text-2xl font-bold text-gray-900'>
-              Sign in to view this order
+              {t.orders.signInToViewOrder}
             </h2>
             <p className='text-xs sm:text-sm text-gray-500 leading-relaxed'>
-              You must be logged in to access authoritative purchase details and invoices.
+              {t.orders.signInToViewOrderDesc}
             </p>
             <div className='pt-2'>
               <Link href={`/login?redirect=/orders/${orderId}`}>
                 <Button className='rounded-xl text-xs font-semibold px-6 py-2.5 bg-primary text-white hover:bg-primary/90 shadow-sm'>
                   <LogIn className='w-4 h-4 mr-2' />
-                  Log In to Continue
+                  {t.orders.loginToContinue}
                 </Button>
               </Link>
             </div>
@@ -221,12 +204,12 @@ export default function StudentOrderDetailPage() {
               <AlertCircle className='w-8 h-8' />
             </div>
             <h2 className='text-xl font-bold text-gray-900' data-testid='order-not-found-heading'>
-              Order Not Available
+              {t.orders.orderNotAvailable}
             </h2>
             <p className='text-xs sm:text-sm text-gray-600 max-w-md mx-auto'>
               {(error as any)?.response?.status === 403
-                ? 'Access denied: You do not have permission to view orders belonging to another student account.'
-                : 'The requested order could not be located or may have expired.'}
+                ? t.orders.orderDeniedDesc
+                : t.orders.orderNotFoundDesc}
             </p>
             <div className='pt-2 flex justify-center gap-3'>
               <Button
@@ -236,11 +219,11 @@ export default function StudentOrderDetailPage() {
                 className='rounded-xl text-xs font-semibold'
               >
                 <RefreshCw className='w-3.5 h-3.5 mr-1.5' />
-                Retry
+                {t.orders.retry}
               </Button>
               <Link href='/orders'>
                 <Button className='rounded-xl text-xs font-semibold px-5 bg-primary text-white hover:bg-primary/90'>
-                  View My Orders
+                  {t.orders.viewMyOrders}
                 </Button>
               </Link>
             </div>
@@ -258,10 +241,10 @@ export default function StudentOrderDetailPage() {
                     <span className='font-mono text-xs sm:text-sm font-bold text-gray-800 bg-gray-100 px-3 py-1 rounded-lg'>
                       {order.orderNumber}
                     </span>
-                    {getOrderStatusBadge(order.status)}
+                    {getOrderStatusBadge(order.status, t.orders)}
                   </div>
                   <h1 className='text-xl sm:text-2xl font-extrabold text-gray-900 mt-2'>
-                    Order Summary
+                    {t.orders.orderSummary}
                   </h1>
                 </div>
 
@@ -275,7 +258,7 @@ export default function StudentOrderDetailPage() {
                       data-testid='view-invoice-btn'
                     >
                       <FileText className='w-4 h-4 mr-1.5' />
-                      View Tax Invoice
+                      {t.orders.viewTaxInvoice}
                     </Button>
                   </Link>
                 )}
@@ -284,25 +267,25 @@ export default function StudentOrderDetailPage() {
               {/* Order Timestamps & Key Meta */}
               <div className='grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 text-xs'>
                 <div>
-                  <span className='text-gray-400 block font-medium'>Placed On</span>
+                  <span className='text-gray-400 block font-medium'>{t.orders.placedOn}</span>
                   <span className='font-bold text-gray-800 mt-1 block'>
                     {formatDate(order.createdAt)}
                   </span>
                 </div>
                 <div>
-                  <span className='text-gray-400 block font-medium'>Payment Status</span>
+                  <span className='text-gray-400 block font-medium'>{t.orders.paymentStatus}</span>
                   <span className='font-bold text-gray-800 mt-1 block'>
-                    {order.status === 'PAID' ? 'Settled (SSLCommerz)' : order.status}
+                    {order.status === 'PAID' ? t.orders.settledGateway : order.status}
                   </span>
                 </div>
                 <div>
-                  <span className='text-gray-400 block font-medium'>Settled At</span>
+                  <span className='text-gray-400 block font-medium'>{t.orders.settledAt}</span>
                   <span className='font-bold text-gray-800 mt-1 block'>
-                    {formatDate(order.paidAt)}
+                    {order.paidAt ? formatDate(order.paidAt) : '—'}
                   </span>
                 </div>
                 <div>
-                  <span className='text-gray-400 block font-medium'>Currency</span>
+                  <span className='text-gray-400 block font-medium'>{t.orders.currency}</span>
                   <span className='font-bold text-gray-800 mt-1 block'>
                     {order.currency || 'BDT'}
                   </span>
@@ -315,9 +298,9 @@ export default function StudentOrderDetailPage() {
               <div className='p-5 bg-purple-50 border border-purple-200/80 rounded-2xl flex items-start gap-3.5'>
                 <RotateCcw className='w-5 h-5 text-purple-700 shrink-0 mt-0.5' />
                 <div className='text-xs space-y-1'>
-                  <h4 className='font-bold text-purple-900'>Order Refunded</h4>
+                  <h4 className='font-bold text-purple-900'>{t.orders.orderRefundedTitle}</h4>
                   <p className='text-purple-800 leading-relaxed'>
-                    This purchase has been authoritatively refunded via the original payment method. Course curriculum access and related certifications have been permanently revoked.
+                    {t.orders.orderRefundedDesc}
                   </p>
                 </div>
               </div>
@@ -326,7 +309,7 @@ export default function StudentOrderDetailPage() {
             {/* Line Items Card */}
             <div className='bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-xs space-y-4'>
               <h3 className='text-sm font-bold uppercase tracking-wider text-gray-400'>
-                Purchased Course Items
+                {t.orders.purchasedCourseItems}
               </h3>
 
               <div className='divide-y divide-gray-100'>
@@ -342,18 +325,18 @@ export default function StudentOrderDetailPage() {
                       </h4>
                       <div className='flex items-center gap-2 text-xs text-gray-500'>
                         <BookOpen className='w-3.5 h-3.5 text-gray-400' />
-                        <span>Online Professional Course • Full Access</span>
+                        <span>{t.orders.onlineCourseAccess}</span>
                       </div>
                     </div>
 
                     <div className='flex items-center justify-between sm:justify-end gap-6'>
                       <div className='text-right'>
                         <span className='text-sm sm:text-base font-bold text-gray-900'>
-                          {formatMinorUnits(item.payableCents, order.currency)}
+                          {formatCurrency(item.payableCents / 100, order.currency)}
                         </span>
                         {item.discountCents > 0 && (
                           <span className='text-xs text-gray-400 line-through block'>
-                            {formatMinorUnits(item.unitPriceCents, order.currency)}
+                            {formatCurrency(item.unitPriceCents / 100, order.currency)}
                           </span>
                         )}
                       </div>
@@ -364,7 +347,7 @@ export default function StudentOrderDetailPage() {
                             size='sm'
                             className='rounded-xl text-xs font-semibold bg-primary text-white hover:bg-primary/90'
                           >
-                            Go to Course
+                            {t.orders.goToCourse}
                           </Button>
                         </Link>
                       )}
@@ -377,14 +360,14 @@ export default function StudentOrderDetailPage() {
             {/* Financial Breakdown Summary */}
             <div className='bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-xs space-y-4'>
               <h3 className='text-sm font-bold uppercase tracking-wider text-gray-400'>
-                Payment Summary
+                {t.orders.paymentSummary}
               </h3>
 
               <div className='space-y-2.5 text-xs text-gray-600 max-w-md ml-auto'>
                 <div className='flex justify-between items-center py-1'>
-                  <span>Subtotal</span>
+                  <span>{t.orders.subtotal}</span>
                   <span className='font-semibold text-gray-900'>
-                    {formatMinorUnits(order.subtotalCents, order.currency)}
+                    {formatCurrency(order.subtotalCents / 100, order.currency)}
                   </span>
                 </div>
 
@@ -392,38 +375,38 @@ export default function StudentOrderDetailPage() {
                   <div className='flex justify-between items-center py-1 text-emerald-700'>
                     <span className='flex items-center gap-1.5'>
                       <Tag className='w-3.5 h-3.5' />
-                      Discount {order.couponCode ? `(${order.couponCode})` : ''}
+                      {t.orders.discount} {order.couponCode ? `(${order.couponCode})` : ''}
                     </span>
                     <span className='font-semibold'>
-                      - {formatMinorUnits(order.discountCents, order.currency)}
+                      - {formatCurrency(order.discountCents / 100, order.currency)}
                     </span>
                   </div>
                 )}
 
                 <div className='border-t border-gray-100 pt-3 flex justify-between items-center text-sm font-extrabold text-gray-900'>
-                  <span>Total Paid</span>
+                  <span>{t.orders.totalPaid}</span>
                   <span className='text-base text-primary'>
-                    {formatMinorUnits(order.payableCents, order.currency)}
+                    {formatCurrency(order.payableCents / 100, order.currency)}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* P5.5.3: Active Refund Workflow & Policy Section */}
+            {/* Active Refund Workflow & Policy Section */}
             {order.status === 'PAID' && (
               <div className='bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-xs space-y-4'>
                 <div className='flex items-center justify-between flex-wrap gap-2'>
                   <div className='flex items-center gap-2.5'>
                     <ShieldCheck className='w-5 h-5 text-primary' />
                     <h3 className='text-sm font-bold text-gray-900'>
-                      Refund Policy & Satisfaction Guarantee
+                      {t.orders.refundPolicyTitle}
                     </h3>
                   </div>
 
                   {isEligibilityLoading && (
                     <span className='inline-flex items-center text-xs text-gray-400 gap-1.5'>
                       <RefreshCw className='w-3 h-3 animate-spin' />
-                      Checking eligibility...
+                      {t.orders.checkingEligibility}
                     </span>
                   )}
                 </div>
@@ -437,12 +420,11 @@ export default function StudentOrderDetailPage() {
                     <div className='flex items-center gap-2'>
                       <Clock className='w-4 h-4 text-amber-600' />
                       <h4 className='text-xs font-bold uppercase tracking-wider text-amber-800'>
-                        Refund Application Under Review
+                        {t.orders.refundUnderReviewTitle}
                       </h4>
                     </div>
                     <p className='text-xs text-amber-800/90 leading-relaxed'>
-                      Your refund application has been submitted and is currently being adjudicated by our administrative review team.
-                      Your access to course content will be preserved until an official decision is reached.
+                      {t.orders.refundUnderReviewDesc}
                     </p>
                   </div>
                 )}
@@ -456,11 +438,11 @@ export default function StudentOrderDetailPage() {
                     <div className='flex items-center gap-2'>
                       <CheckCircle2 className='w-4 h-4 text-emerald-600' />
                       <h4 className='text-xs font-bold uppercase tracking-wider text-emerald-800'>
-                        Refund Request Approved
+                        {t.orders.refundApprovedTitle}
                       </h4>
                     </div>
                     <p className='text-xs text-emerald-800/90 leading-relaxed'>
-                      Your refund request was approved by the administration team. Payment gateway processing is underway to restore funds to your original payment method.
+                      {t.orders.refundApprovedDesc}
                     </p>
                   </div>
                 )}
@@ -474,11 +456,11 @@ export default function StudentOrderDetailPage() {
                     <div className='flex items-center gap-2'>
                       <XCircle className='w-4 h-4 text-rose-600' />
                       <h4 className='text-xs font-bold uppercase tracking-wider text-rose-800'>
-                        Refund Request Declined
+                        {t.orders.refundDeclinedTitle}
                       </h4>
                     </div>
                     <p className='text-xs text-rose-800/90 leading-relaxed'>
-                      Your previous refund request was declined. If your purchase is still within the 7-day policy window and you have not exceeded 20% course progress, you may submit a revised application below.
+                      {t.orders.refundDeclinedDesc}
                     </p>
                   </div>
                 )}
@@ -486,21 +468,23 @@ export default function StudentOrderDetailPage() {
                 {/* Policy description & Eligibility Metrics */}
                 <div className='p-4 rounded-2xl bg-gray-50 border border-gray-100 text-xs text-gray-600 space-y-2'>
                   <p className='leading-relaxed'>
-                    TechSprout provides a full 7-calendar-day refund guarantee from the time of purchase for courses with strictly less than 20% progress.
+                    {t.orders.refundPolicyGuarantee}
                   </p>
 
                   {eligibility && (
                     <div className='grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-gray-200/60 font-medium'>
                       <div className='flex items-center gap-2'>
-                        <span className='text-gray-400'>Policy Window:</span>
+                        <span className='text-gray-400'>{t.orders.policyWindow}</span>
                         <span className={eligibility.daysRemaining > 0 ? 'text-gray-900 font-semibold' : 'text-rose-600 font-semibold'}>
-                          {eligibility.daysRemaining > 0 ? `${eligibility.daysRemaining} days remaining` : 'Expired'}
+                          {eligibility.daysRemaining > 0
+                            ? t.orders.daysRemaining.replace('{count}', formatNumber(eligibility.daysRemaining))
+                            : t.orders.expired}
                         </span>
                       </div>
                       <div className='flex items-center gap-2'>
-                        <span className='text-gray-400'>Curriculum Progress:</span>
+                        <span className='text-gray-400'>{t.orders.curriculumProgress}</span>
                         <span className={eligibility.courseProgressPercentage < 20 ? 'text-gray-900 font-semibold' : 'text-rose-600 font-semibold'}>
-                          {eligibility.courseProgressPercentage}% (Max: 20%)
+                          {formatNumber(eligibility.courseProgressPercentage)}% ({t.orders.maxProgressLimit})
                         </span>
                       </div>
                     </div>
@@ -523,7 +507,7 @@ export default function StudentOrderDetailPage() {
                       data-testid='request-refund-btn'
                     >
                       <RotateCcw className='w-3.5 h-3.5 mr-1.5' />
-                      {eligibility.existingRequestStatus === 'REJECTED' ? 'Re-apply for Refund' : 'Request Refund'}
+                      {eligibility.existingRequestStatus === 'REJECTED' ? t.orders.reapplyRefund : t.orders.requestRefund}
                     </Button>
                   ) : (
                     <Button
@@ -534,16 +518,16 @@ export default function StudentOrderDetailPage() {
                       data-testid='request-refund-disabled-btn'
                     >
                       {eligibility?.existingRequestStatus === 'PENDING'
-                        ? 'Request Pending Review'
+                        ? t.orders.requestPendingReview
                         : eligibility?.existingRequestStatus === 'APPROVED'
-                        ? 'Refund Approved'
-                        : 'Refund Ineligible'}
+                        ? t.orders.refundApprovedTitle
+                        : t.orders.refundIneligible}
                     </Button>
                   )}
 
                   <Link href='/contact'>
                     <Button variant='ghost' size='sm' className='text-xs text-gray-600 hover:text-gray-900'>
-                      Contact Support
+                      {t.orders.contactSupport}
                     </Button>
                   </Link>
                 </div>
@@ -558,10 +542,10 @@ export default function StudentOrderDetailPage() {
         <DialogContent className='sm:max-w-lg rounded-3xl p-6 sm:p-8'>
           <DialogHeader>
             <DialogTitle className='text-lg font-bold text-gray-900'>
-              Request Course Refund
+              {t.orders.requestCourseRefund}
             </DialogTitle>
             <DialogDescription className='text-xs text-gray-500 mt-1'>
-              Please select the primary reason for your refund request and provide additional details.
+              {t.orders.refundModalDesc}
             </DialogDescription>
           </DialogHeader>
 
@@ -570,9 +554,9 @@ export default function StudentOrderDetailPage() {
               <div className='w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto'>
                 <CheckCircle2 className='w-6 h-6' />
               </div>
-              <h4 className='text-sm font-bold text-gray-900'>Refund Request Submitted!</h4>
+              <h4 className='text-sm font-bold text-gray-900'>{t.orders.refundSubmittedTitle}</h4>
               <p className='text-xs text-gray-500 max-w-sm mx-auto'>
-                Your request has been queued for administrative adjudication. You can check updates on this order page.
+                {t.orders.refundSubmittedDesc}
               </p>
             </div>
           ) : (
@@ -582,7 +566,7 @@ export default function StudentOrderDetailPage() {
                   className='p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-start gap-2'
                   data-testid='refund-submit-error-alert'
                 >
-                  <AlertCircle className='w-4 h-4 flex-shrink-0 mt-0.5' />
+                  <AlertCircle className='w-4 h-4 shrink-0 mt-0.5' />
                   <span>{refundSubmitError}</span>
                 </div>
               )}
@@ -590,7 +574,7 @@ export default function StudentOrderDetailPage() {
               {/* Reason Category Selector */}
               <div className='space-y-1.5'>
                 <label className='text-xs font-bold text-gray-700'>
-                  Reason Category <span className='text-rose-500'>*</span>
+                  {t.orders.reasonCategory} <span className='text-rose-500'>*</span>
                 </label>
                 <select
                   value={selectedCategory}
@@ -610,17 +594,17 @@ export default function StudentOrderDetailPage() {
               <div className='space-y-1.5'>
                 <div className='flex justify-between items-center'>
                   <label className='text-xs font-bold text-gray-700'>
-                    Explanation Details <span className='text-rose-500'>*</span>
+                    {t.orders.explanationDetails} <span className='text-rose-500'>*</span>
                   </label>
                   <span className='text-[10px] text-gray-400'>
-                    {reasonDetail.length}/1000 (min 10)
+                    {formatNumber(reasonDetail.length)}/1000 ({t.orders.minChars})
                   </span>
                 </div>
                 <textarea
                   rows={4}
                   value={reasonDetail}
                   onChange={(e) => setReasonDetail(e.target.value)}
-                  placeholder='Please describe why you are requesting a refund in detail (at least 10 characters)...'
+                  placeholder={t.orders.explanationPlaceholder}
                   className='w-full rounded-xl border border-gray-300 p-3 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary'
                   data-testid='refund-reason-detail-textarea'
                   maxLength={1000}
@@ -630,7 +614,7 @@ export default function StudentOrderDetailPage() {
               {/* Policy Warning */}
               <div className='p-3 rounded-xl bg-amber-50/70 border border-amber-200/60 text-[11px] text-amber-800 leading-relaxed'>
                 <p>
-                  <strong>Important Notice:</strong> Upon approval of your refund request by our administration team, course access and enrollment will be permanently revoked, and the full payment amount will be returned to your original payment account.
+                  {t.orders.refundImportantNotice}
                 </p>
               </div>
 
@@ -643,7 +627,7 @@ export default function StudentOrderDetailPage() {
                   disabled={isSubmittingRefund}
                   className='rounded-xl text-xs font-semibold'
                 >
-                  Cancel
+                  {t.common.cancel}
                 </Button>
                 <Button
                   type='submit'
@@ -655,12 +639,12 @@ export default function StudentOrderDetailPage() {
                   {isSubmittingRefund ? (
                     <>
                       <RefreshCw className='w-3.5 h-3.5 mr-1.5 animate-spin' />
-                      Submitting...
+                      {t.orders.submitting}
                     </>
                   ) : (
                     <>
                       <Send className='w-3.5 h-3.5 mr-1.5' />
-                      Submit Request
+                      {t.orders.submitRequest}
                     </>
                   )}
                 </Button>

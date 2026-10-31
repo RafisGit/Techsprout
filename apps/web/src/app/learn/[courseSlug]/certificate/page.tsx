@@ -10,6 +10,7 @@ import { fetchCourseEnrollmentStatus } from '@/lib/api/learning';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { CertificateDocument } from '@/components/certificate/CertificateDocument';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from '@/i18n/client';
 import {
   ArrowLeft,
   Printer,
@@ -25,6 +26,7 @@ import {
 } from 'lucide-react';
 
 export default function StudentCertificatePage() {
+  const { t, formatNumber } = useTranslation();
   const params = useParams();
   const courseSlug = params?.courseSlug as string;
 
@@ -104,9 +106,9 @@ export default function StudentCertificatePage() {
           <div className='w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto'>
             <GraduationCap className='w-8 h-8' />
           </div>
-          <h2 className='text-xl font-bold text-gray-900'>Authentication Required</h2>
+          <h2 className='text-xl font-bold text-gray-900'>{t.learning.authRequired}</h2>
           <p className='text-xs sm:text-sm text-gray-500 leading-relaxed'>
-            Please log in with your student account to view your official course certificate.
+            {t.learning.authRequiredDesc}
           </p>
           <div className='pt-2 flex justify-center gap-3'>
             <Link
@@ -116,12 +118,12 @@ export default function StudentCertificatePage() {
             >
               <Button className='rounded-xl text-xs font-semibold px-6 py-2.5 bg-primary text-white hover:bg-primary/90'>
                 <LogIn className='w-4 h-4 mr-2' />
-                Log In
+                {t.learning.logIn}
               </Button>
             </Link>
             <Link href={`/courses/${courseSlug}`}>
               <Button variant='outline' className='rounded-xl text-xs font-semibold px-4 py-2.5'>
-                Course Overview
+                {t.learning.courseDetails}
               </Button>
             </Link>
           </div>
@@ -136,7 +138,7 @@ export default function StudentCertificatePage() {
       <div className='min-h-[85vh] flex flex-col items-center justify-center px-4 bg-[#F8FAFC] py-16 space-y-4'>
         <div className='w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin' />
         <p className='text-xs sm:text-sm font-semibold text-gray-600 animate-pulse'>
-          Retrieving official certificate records...
+          {t.certificate.retrievingRecords}
         </p>
       </div>
     );
@@ -150,21 +152,20 @@ export default function StudentCertificatePage() {
           <div className='w-16 h-16 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center mx-auto'>
             <AlertCircle className='w-8 h-8' />
           </div>
-          <h2 className='text-xl font-bold text-gray-900'>Course Unavailable</h2>
+          <h2 className='text-xl font-bold text-gray-900'>{t.learning.courseUnavailable}</h2>
           <p className='text-xs text-gray-500'>
-            {(courseError as any)?.response?.data?.message ||
-              'We could not find this course in our records.'}
+            {(courseError as any)?.response?.data?.message || t.learning.courseUnavailableDesc}
           </p>
           <div className='pt-2 flex justify-center gap-3'>
             <Link href='/my-courses'>
               <Button variant='outline' className='rounded-xl text-xs'>
                 <ArrowLeft className='w-3.5 h-3.5 mr-1.5' />
-                My Courses
+                {t.learning.backToMyCourses}
               </Button>
             </Link>
             <Button onClick={() => refetchCourse()} className='rounded-xl text-xs'>
               <RotateCcw className='w-3.5 h-3.5 mr-1.5' />
-              Retry
+              {t.common.retry}
             </Button>
           </div>
         </div>
@@ -186,19 +187,19 @@ export default function StudentCertificatePage() {
             <div className='w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto'>
               <GraduationCap className='w-8 h-8' />
             </div>
-            <h2 className='text-xl font-bold text-gray-900'>Certificate In Progress</h2>
+            <h2 className='text-xl font-bold text-gray-900'>{t.certificate.inProgressTitle}</h2>
             <p className='text-xs sm:text-sm text-gray-600 leading-relaxed'>
-              Your official certificate for <strong>{course.title}</strong> will be automatically issued once you complete all required course lessons and pass all mandatory assessments.
+              {t.certificate.inProgressDesc.replace('{course}', course.title)}
             </p>
             <div className='pt-2 flex justify-center gap-3'>
               <Link href={`/learn/${courseSlug}`}>
                 <Button className='rounded-xl text-xs font-semibold px-5 py-2.5 bg-primary text-white hover:bg-primary/90'>
-                  Continue Learning
+                  {t.certificate.continueLearning}
                 </Button>
               </Link>
               <Link href='/my-courses'>
                 <Button variant='outline' className='rounded-xl text-xs font-semibold px-4 py-2.5'>
-                  Dashboard
+                  {t.certificate.dashboard}
                 </Button>
               </Link>
             </div>
@@ -215,19 +216,19 @@ export default function StudentCertificatePage() {
             <div className='w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto'>
               <AlertCircle className='w-8 h-8' />
             </div>
-            <h2 className='text-xl font-bold text-gray-900'>Enrollment Required</h2>
+            <h2 className='text-xl font-bold text-gray-900'>{t.certificate.enrollmentRequiredTitle}</h2>
             <p className='text-xs sm:text-sm text-gray-500 leading-relaxed'>
-              You are not currently enrolled in <strong>{course.title}</strong>. Enroll in this course to earn your verified credential upon completion.
+              {t.certificate.enrollmentRequiredDesc.replace('{course}', course.title)}
             </p>
             <div className='pt-2 flex justify-center gap-3'>
               <Link href={`/courses/${courseSlug}`}>
                 <Button className='rounded-xl text-xs font-semibold px-5 py-2.5 bg-primary text-white hover:bg-primary/90'>
-                  View Course
+                  {t.certificate.viewCourse}
                 </Button>
               </Link>
               <Link href='/my-courses'>
                 <Button variant='outline' className='rounded-xl text-xs font-semibold px-4 py-2.5'>
-                  My Courses
+                  {t.learning.backToMyCourses}
                 </Button>
               </Link>
             </div>
@@ -243,20 +244,19 @@ export default function StudentCertificatePage() {
           <div className='w-16 h-16 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center mx-auto'>
             <AlertCircle className='w-8 h-8' />
           </div>
-          <h2 className='text-xl font-bold text-gray-900'>Certificate Record Unavailable</h2>
+          <h2 className='text-xl font-bold text-gray-900'>{t.certificate.unavailableTitle}</h2>
           <p className='text-xs text-gray-500'>
-            {errorResponse?.data?.message ||
-              'We were unable to locate your certificate record for this course.'}
+            {errorResponse?.data?.message || t.certificate.unavailableDesc}
           </p>
           <div className='pt-2 flex justify-center gap-3'>
             <Link href={`/learn/${courseSlug}`}>
               <Button variant='outline' className='rounded-xl text-xs'>
-                Back to Course
+                {t.certificate.backToCourseWorkspace}
               </Button>
             </Link>
             <Button onClick={() => refetchCertificate()} className='rounded-xl text-xs'>
               <RotateCcw className='w-3.5 h-3.5 mr-1.5' />
-              Retry
+              {t.common.retry}
             </Button>
           </div>
         </div>
@@ -276,7 +276,7 @@ export default function StudentCertificatePage() {
             <Link
               href={`/learn/${courseSlug}`}
               className='p-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition'
-              title='Back to Course Workspace'
+              title={t.certificate.backToCourseWorkspace}
               data-testid='btn-back-to-course'
             >
               <ArrowLeft className='w-4 h-4' />
@@ -286,7 +286,7 @@ export default function StudentCertificatePage() {
                 {course.title}
               </h1>
               <span className='text-[11px] text-gray-400'>
-                Verified Certificate of Completion
+                {t.certificate.pageTitle}
               </span>
             </div>
           </div>
@@ -299,17 +299,17 @@ export default function StudentCertificatePage() {
               onClick={handleCopyLink}
               className='rounded-xl text-xs font-semibold px-3 py-2 border-gray-200 hover:bg-gray-50 flex items-center gap-1.5'
               data-testid='btn-copy-verification-link'
-              title='Copy Public Verification Link'
+              title={t.certificate.copyLink}
             >
               {isCopied ? (
                 <>
                   <Check className='w-3.5 h-3.5 text-emerald-600' />
-                  <span className='text-emerald-700 font-bold'>Copied</span>
+                  <span className='text-emerald-700 font-bold'>{t.certificate.copied}</span>
                 </>
               ) : (
                 <>
                   <Copy className='w-3.5 h-3.5 text-gray-500' />
-                  <span className='hidden sm:inline'>Copy Link</span>
+                  <span className='hidden sm:inline'>{t.certificate.copyLink}</span>
                 </>
               )}
             </Button>
@@ -326,7 +326,7 @@ export default function StudentCertificatePage() {
                 className='rounded-xl text-xs font-semibold px-3 py-2 border-gray-200 hover:bg-gray-50 flex items-center gap-1.5'
               >
                 <ShieldCheck className='w-3.5 h-3.5 text-gray-500' />
-                <span className='hidden sm:inline'>Public View</span>
+                <span className='hidden sm:inline'>{t.certificate.publicView}</span>
                 <ExternalLink className='w-3 h-3 text-gray-400' />
               </Button>
             </Link>
@@ -338,7 +338,7 @@ export default function StudentCertificatePage() {
               data-testid='btn-print-certificate'
             >
               <Printer className='w-3.5 h-3.5' />
-              <span>Print / Save PDF</span>
+              <span>{t.certificate.printSavePdf}</span>
             </Button>
           </div>
         </div>
@@ -361,13 +361,19 @@ export default function StudentCertificatePage() {
               <div className='space-y-1'>
                 <div className='flex items-center gap-2'>
                   <span className='font-bold text-xs sm:text-sm tracking-wide uppercase text-amber-900'>
-                    Historical Credential • Course In Progress
+                    {t.certificate.historicalCredentialTitle}
                   </span>
                 </div>
                 <p className='text-xs sm:text-sm text-amber-800 leading-relaxed'>
-                  New curriculum items have been added to this course since this certificate was earned. Your previously earned credential remains authentic and valid.
+                  {t.certificate.historicalCredentialDesc}
                   {enrollmentData?.enrollment?.progressPercentage !== undefined && (
-                    <span className='font-semibold'> Current course progress: {enrollmentData.enrollment.progressPercentage}%.</span>
+                    <span className='font-semibold'>
+                      {' '}
+                      {t.certificate.currentCourseProgress.replace(
+                        '{progress}',
+                        formatNumber(enrollmentData.enrollment.progressPercentage)
+                      )}
+                    </span>
                   )}
                 </p>
               </div>
@@ -378,7 +384,7 @@ export default function StudentCertificatePage() {
                 className='w-full sm:w-auto rounded-xl text-xs font-bold px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
                 data-testid='btn-resume-expanded-course'
               >
-                Resume Course Material
+                {t.certificate.resumeCourseMaterial}
               </Button>
             </Link>
           </div>

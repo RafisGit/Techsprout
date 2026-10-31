@@ -15,6 +15,7 @@ import {
   Eye,
 } from 'lucide-react';
 import type { StudentQuizDto, StudentActiveAttemptDto } from '@techsprout/contracts';
+import { useTranslation } from '@/i18n';
 
 interface QuizOverviewProps {
   quiz: StudentQuizDto;
@@ -35,6 +36,7 @@ export function QuizOverview({
   onViewReview,
   isEnrollmentCompleted = false,
 }: QuizOverviewProps) {
+  const { t, formatNumber } = useTranslation();
   const isFinalExam = quiz.quizType === 'FINAL_EXAM';
   const isUnlimitedAttempts = quiz.maxAttempts === null || quiz.maxAttempts === undefined;
   const attemptsUsed = quiz.userAttemptsCount || 0;
@@ -62,12 +64,12 @@ export function QuizOverview({
             {isFinalExam ? (
               <>
                 <Award className='w-3.5 h-3.5 text-amber-600' />
-                <span>Final Examination</span>
+                <span>{t('quiz.finalExam')}</span>
               </>
             ) : (
               <>
                 <HelpCircle className='w-3.5 h-3.5 text-indigo-600' />
-                <span>Knowledge Check</span>
+                <span>{t('quiz.knowledgeCheck')}</span>
               </>
             )}
           </span>
@@ -78,14 +80,14 @@ export function QuizOverview({
               data-testid='badge-passed'
             >
               <CheckCircle2 className='w-3.5 h-3.5 text-emerald-600' />
-              <span>Passed</span>
+              <span>{t('quiz.passed')}</span>
             </span>
           )}
         </div>
 
         {quiz.bestScorePercentage !== null && (
           <div className='text-xs font-semibold text-gray-500'>
-            Best Score:{' '}
+            {t('quiz.bestScore')}{' '}
             <span className='font-bold text-gray-900' data-testid='best-score'>
               {quiz.bestScorePercentage}%
             </span>
@@ -110,11 +112,11 @@ export function QuizOverview({
         <div className='bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3'>
           <CheckCircle2 className='w-5 h-5 text-emerald-600 shrink-0 mt-0.5' />
           <div className='text-xs text-emerald-900 space-y-0.5'>
-            <p className='font-bold'>Assessment Requirement Satisfied</p>
-            <p className='text-emerald-700'>
-              You have successfully achieved the passing grade for this assessment. Your progress has been
-              recorded towards course completion.
-            </p>
+            <p className='font-bold'>{t('quiz.assessmentRequirementSatisfied')}</p>
+            <p className='text-emerald-700'>{t('quiz.assessmentPassedDesc')}</p>
+
+
+
           </div>
         </div>
       )}
@@ -136,10 +138,10 @@ export function QuizOverview({
         <div className='p-3.5 rounded-2xl bg-gray-50 border border-gray-100 flex flex-col gap-1'>
           <span className='text-[11px] font-medium text-gray-500 flex items-center gap-1.5'>
             <Award className='w-3.5 h-3.5 text-gray-400' />
-            Total Points
+            {t('quiz.totalPoints')}
           </span>
           <span className='text-sm sm:text-base font-bold text-gray-900' data-testid='stat-total-points'>
-            {quiz.totalPoints} pts
+            {formatNumber(quiz.totalPoints)} {t('quiz.pts')}
           </span>
         </div>
 
@@ -147,7 +149,7 @@ export function QuizOverview({
         <div className='p-3.5 rounded-2xl bg-gray-50 border border-gray-100 flex flex-col gap-1'>
           <span className='text-[11px] font-medium text-gray-500 flex items-center gap-1.5'>
             <ShieldCheck className='w-3.5 h-3.5 text-gray-400' />
-            Passing Score
+            {t('quiz.passingScore')}
           </span>
           <span className='text-sm sm:text-base font-bold text-gray-900' data-testid='stat-passing-score'>
             {quiz.passingScorePercentage}%
@@ -158,23 +160,27 @@ export function QuizOverview({
         <div className='p-3.5 rounded-2xl bg-gray-50 border border-gray-100 flex flex-col gap-1'>
           <span className='text-[11px] font-medium text-gray-500 flex items-center gap-1.5'>
             <Clock className='w-3.5 h-3.5 text-gray-400' />
-            Time Limit
+            {t('quiz.timeLimit')}
           </span>
           <span className='text-sm sm:text-base font-bold text-gray-900' data-testid='stat-time-limit'>
-            {quiz.timeLimitMinutes ? `${quiz.timeLimitMinutes} mins` : 'Untimed'}
+            {quiz.timeLimitMinutes ? t('catalog.mins', { count: formatNumber(quiz.timeLimitMinutes) }) : t('quiz.untimed')}
           </span>
         </div>
       </div>
 
       {/* Attempts Configuration & Status */}
       <div className='p-4 rounded-2xl bg-gray-50/70 border border-gray-100 flex items-center justify-between text-xs text-gray-600'>
-        <span>Attempts Used:</span>
+        <span>{t('quiz.attemptsUsed')}</span>
         <span className='font-bold text-gray-900' data-testid='attempts-status'>
           {isUnlimitedAttempts ? (
-            <span>{attemptsUsed} (Unlimited allowed)</span>
+            <span>{t('quiz.unlimitedAllowed', { count: formatNumber(attemptsUsed) })}</span>
           ) : (
             <span>
-              {attemptsUsed} of {maxAttempts} used ({attemptsRemaining} remaining)
+              {t('quiz.attemptsCountUsed', {
+                used: formatNumber(attemptsUsed),
+                max: formatNumber(maxAttempts || 0),
+                remaining: formatNumber(attemptsRemaining || 0),
+              })}
             </span>
           )}
         </span>
@@ -185,11 +191,12 @@ export function QuizOverview({
         <div className='bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3'>
           <AlertCircle className='w-5 h-5 text-amber-600 shrink-0 mt-0.5' />
           <div className='text-xs text-amber-900 space-y-1'>
-            <p className='font-bold'>Course Completed</p>
-            <p className='text-amber-800'>
-              Your course enrollment is marked as completed. You can review your previous assessment
-              results below, but additional attempts are locked.
-            </p>
+            <p className='font-bold'>{t('myCourses.completed')}</p>
+            <p className='text-amber-800'>{t('quiz.courseCompletedNotice')}</p>
+
+
+
+
           </div>
         </div>
       )}
@@ -198,11 +205,11 @@ export function QuizOverview({
         <div className='bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3' data-testid='notice-exhausted'>
           <AlertCircle className='w-5 h-5 text-rose-600 shrink-0 mt-0.5' />
           <div className='text-xs text-rose-900 space-y-1'>
-            <p className='font-bold'>Attempt Limit Reached</p>
-            <p className='text-rose-700'>
-              You have reached the maximum number of attempts allowed for this quiz ({maxAttempts}). If you
-              need to review your submitted answers, you may access the attempt review.
-            </p>
+            <p className='font-bold'>{t('quiz.attemptLimitReached')}</p>
+            <p className='text-rose-700'>{t('quiz.attemptLimitReachedDesc', { max: formatNumber(maxAttempts || 0) })}</p>
+
+
+
           </div>
         </div>
       )}
@@ -217,7 +224,11 @@ export function QuizOverview({
             data-testid='btn-resume-attempt'
           >
             <PlayCircle className='w-4 h-4' />
-            <span>Resume Attempt #{activeAttempt.attemptNumber}</span>
+            <span>
+              {t('quiz.resumeAttemptNumber', {
+                number: formatNumber(activeAttempt.attemptNumber),
+              })}
+            </span>
           </Button>
         ) : isEnrollmentCompleted || isExhausted ? (
           onViewReview && (
@@ -228,7 +239,7 @@ export function QuizOverview({
               data-testid='btn-review-answers'
             >
               <Eye className='w-4 h-4 text-gray-500' />
-              <span>Review Previous Attempt</span>
+              <span>{t('quiz.reviewPreviousAttempt')}</span>
             </Button>
           )
         ) : (
@@ -241,12 +252,12 @@ export function QuizOverview({
             {attemptsUsed > 0 ? (
               <>
                 <RotateCcw className='w-4 h-4' />
-                <span>{isStartingAttempt ? 'Starting...' : 'Retake Quiz'}</span>
+                <span>{isStartingAttempt ? t('quiz.starting') : t('quiz.retakeQuiz')}</span>
               </>
             ) : (
               <>
                 <PlayCircle className='w-4 h-4' />
-                <span>{isStartingAttempt ? 'Starting...' : 'Start Quiz'}</span>
+                <span>{isStartingAttempt ? t('quiz.starting') : t('quiz.startQuiz')}</span>
               </>
             )}
           </Button>
@@ -261,7 +272,7 @@ export function QuizOverview({
             data-testid='btn-review-previous'
           >
             <Eye className='w-4 h-4 text-gray-400' />
-            <span>Review Last Attempt</span>
+            <span>{t('quiz.reviewLastAttempt')}</span>
           </Button>
         )}
       </div>

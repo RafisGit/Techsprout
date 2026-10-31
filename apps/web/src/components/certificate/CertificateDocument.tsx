@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { CertificateDto } from '@techsprout/contracts';
 import { CertificateQRCode } from './CertificateQRCode';
+import { useTranslation } from '@/i18n/client';
 
 interface CertificateDocumentProps {
   certificate: CertificateDto;
@@ -18,11 +19,19 @@ interface CertificateDocumentProps {
   showActions?: boolean;
 }
 
-export function formatCertificateDate(isoString?: string | null): string {
+export function formatCertificateDate(isoString?: string | null, locale: string = 'en'): string {
   if (!isoString) return '—';
   try {
     const d = new Date(isoString);
     if (isNaN(d.getTime())) return isoString;
+    if (locale === 'bn') {
+      return d.toLocaleDateString('bn-BD', {
+        timeZone: 'UTC',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    }
     return d.toLocaleDateString('en-US', {
       timeZone: 'UTC',
       year: 'numeric',
@@ -38,6 +47,7 @@ export function CertificateDocument({
   certificate,
   verificationBaseUrl,
 }: CertificateDocumentProps) {
+  const { t, locale, formatNumber } = useTranslation();
   const isRevoked = certificate.status === 'REVOKED';
 
   // Construct absolute or relative public verification URL
@@ -67,25 +77,24 @@ export function CertificateDocument({
             <div className='space-y-1'>
               <div className='flex items-center gap-2'>
                 <span className='font-extrabold text-sm sm:text-base tracking-wide uppercase text-rose-900'>
-                  Status: Certificate Revoked
+                  {t.certificate.statusRevoked}
                 </span>
                 <span className='inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-rose-200 text-rose-900 uppercase'>
-                  Void
+                  {t.certificate.void}
                 </span>
               </div>
               <p className='text-xs sm:text-sm text-rose-800 leading-relaxed'>
-                This credential was revoked on{' '}
-                <strong className='font-semibold'>
-                  {formatCertificateDate(certificate.revokedAt)}
-                </strong>
-                .
+                {t.certificate.credentialRevokedOn.replace(
+                  '{date}',
+                  formatCertificateDate(certificate.revokedAt, locale)
+                )}
               </p>
               {certificate.revocationReason && (
                 <p
                   className='text-xs text-rose-900 bg-rose-100/80 px-3 py-1.5 rounded-lg border border-rose-200 mt-1 font-medium'
                   data-testid='certificate-revocation-reason'
                 >
-                  <strong className='font-semibold'>Revocation Reason: </strong>
+                  <strong className='font-semibold'>{t.certificate.revocationReason} </strong>
                   {certificate.revocationReason}
                 </p>
               )}
@@ -124,7 +133,7 @@ export function CertificateDocument({
             className='pointer-events-none absolute inset-0 flex items-center justify-center select-none overflow-hidden z-10'
           >
             <div className='transform -rotate-12 bg-rose-600/10 text-rose-700/40 border-y-4 border-rose-700/30 text-5xl sm:text-7xl md:text-8xl font-black uppercase tracking-widest py-3 px-12'>
-              REVOKED
+              {t.certificate.watermarkRevoked}
             </div>
           </div>
         )}
@@ -145,10 +154,10 @@ export function CertificateDocument({
               </div>
               <div>
                 <span className='block text-lg sm:text-xl font-black tracking-tight text-gray-900 font-lexend'>
-                  TechSprout
+                  {t.brand.name}
                 </span>
                 <span className='block text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-[#64748B]'>
-                  Academy of Software Engineering
+                  {t.certificate.academyTitle}
                 </span>
               </div>
             </div>
@@ -161,7 +170,7 @@ export function CertificateDocument({
                   data-testid='certificate-status-revoked'
                 >
                   <AlertTriangle className='w-3.5 h-3.5 text-rose-600' />
-                  <span>REVOKED CREDENTIAL</span>
+                  <span>{t.certificate.revokedCredential}</span>
                 </div>
               ) : (
                 <div
@@ -169,7 +178,7 @@ export function CertificateDocument({
                   data-testid='certificate-status-active'
                 >
                   <CheckCircle2 className='w-3.5 h-3.5 text-emerald-600' />
-                  <span>OFFICIAL CREDENTIAL • ACTIVE</span>
+                  <span>{t.certificate.officialCredentialActive}</span>
                 </div>
               )}
             </div>
@@ -179,18 +188,18 @@ export function CertificateDocument({
           <div className='text-center space-y-3 sm:space-y-4 my-auto py-2'>
             <div className='inline-block'>
               <span className='text-[10px] sm:text-xs font-bold uppercase tracking-[0.25em] text-[#C5A059]'>
-                Formal Recognition of Mastery
+                {t.certificate.formalRecognition}
               </span>
               <h1
                 className='text-2xl sm:text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight font-lexend mt-1 uppercase'
                 data-testid='certificate-title'
               >
-                Certificate of Completion
+                {t.certificate.pageTitle}
               </h1>
             </div>
 
             <p className='text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-widest pt-1'>
-              This is proudly presented to
+              {t.certificate.presentedTo}
             </p>
 
             {/* Student Name */}
@@ -204,7 +213,7 @@ export function CertificateDocument({
             </div>
 
             <p className='text-xs sm:text-sm text-gray-600 max-w-xl mx-auto leading-relaxed'>
-              for successfully completing all coursework, practical requirements, and comprehensive assessments for
+              {t.certificate.courseCompletionStatement}
             </p>
 
             {/* Course Title */}
@@ -225,7 +234,12 @@ export function CertificateDocument({
                   data-testid='certificate-final-score'
                 >
                   <Award className='w-3.5 h-3.5 text-amber-600' />
-                  <span>{`Final Assessment Score: ${certificate.finalScorePercentage}%`}</span>
+                  <span>
+                    {t.certificate.finalScore.replace(
+                      '{score}',
+                      formatNumber(certificate.finalScorePercentage)
+                    )}
+                  </span>
                 </div>
               )}
           </div>
@@ -246,7 +260,7 @@ export function CertificateDocument({
                 {certificate.instructorName}
               </p>
               <p className='text-[10px] text-gray-500 uppercase tracking-wider'>
-                Lead Instructor
+                {t.certificate.leadInstructor}
               </p>
             </div>
 
@@ -254,33 +268,33 @@ export function CertificateDocument({
             <div className='text-center space-y-1 text-xs text-gray-600 order-3 md:order-2'>
               <div>
                 <span className='text-[11px] text-gray-400 uppercase tracking-wider'>
-                  Completed:{' '}
+                  {t.certificate.completed}{' '}
                 </span>
                 <span
                   className='font-semibold text-gray-900'
                   data-testid='certificate-completed-date'
                 >
-                  {formatCertificateDate(certificate.completedAt)}
+                  {formatCertificateDate(certificate.completedAt, locale)}
                 </span>
               </div>
               <div>
                 <span className='text-[11px] text-gray-400 uppercase tracking-wider'>
-                  Issued:{' '}
+                  {t.certificate.issued}{' '}
                 </span>
                 <span
                   className='font-semibold text-gray-900'
                   data-testid='certificate-issued-date'
                 >
-                  {formatCertificateDate(certificate.issuedAt)}
+                  {formatCertificateDate(certificate.issuedAt, locale)}
                 </span>
               </div>
               {isRevoked && certificate.revokedAt && (
                 <div className='text-rose-700 font-bold'>
                   <span className='text-[11px] text-rose-500 uppercase tracking-wider'>
-                    Revoked:{' '}
+                    {t.certificate.revoked}{' '}
                   </span>
                   <span data-testid='certificate-revoked-date'>
-                    {formatCertificateDate(certificate.revokedAt)}
+                    {formatCertificateDate(certificate.revokedAt, locale)}
                   </span>
                 </div>
               )}
@@ -293,7 +307,7 @@ export function CertificateDocument({
               </div>
               <div className='text-left space-y-0.5 max-w-[150px] sm:max-w-[170px]'>
                 <span className='block text-[10px] font-bold text-gray-400 uppercase tracking-wider'>
-                  Certificate No.
+                  {t.certificate.certificateNo}
                 </span>
                 <span
                   className='block font-mono text-xs font-extrabold text-gray-900 tracking-tight select-all truncate'
@@ -308,7 +322,7 @@ export function CertificateDocument({
                   className='inline-flex items-center gap-1 text-[10px] text-primary hover:underline font-semibold'
                   data-testid='certificate-verification-link'
                 >
-                  <span>Verify Authenticity</span>
+                  <span>{t.certificate.verifyAuthenticity}</span>
                   <ExternalLink className='w-2.5 h-2.5' />
                 </Link>
               </div>

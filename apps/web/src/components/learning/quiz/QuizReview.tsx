@@ -12,6 +12,7 @@ import {
   Award,
 } from 'lucide-react';
 import type { StudentQuizReviewDto } from '@techsprout/contracts';
+import { useTranslation } from '@/i18n';
 
 interface QuizReviewProps {
   review: StudentQuizReviewDto;
@@ -19,6 +20,7 @@ interface QuizReviewProps {
 }
 
 export function QuizReview({ review, onBackToResults }: QuizReviewProps) {
+  const { t, formatNumber } = useTranslation();
   const questions = review.questions || [];
 
   return (
@@ -31,7 +33,7 @@ export function QuizReview({ review, onBackToResults }: QuizReviewProps) {
         <div className='space-y-1'>
           <div className='flex items-center gap-2'>
             <span className='text-xs font-bold text-gray-900'>
-              Attempt #{review.attemptNumber} Review
+              {t('quiz.attemptReview', { number: formatNumber(review.attemptNumber) })}
             </span>
             <span className='text-gray-300'>•</span>
             <span
@@ -39,11 +41,14 @@ export function QuizReview({ review, onBackToResults }: QuizReviewProps) {
                 review.isPassed ? 'text-emerald-600' : 'text-rose-600'
               }`}
             >
-              {review.isPassed ? 'Passed' : 'Failed'} ({review.percentage}%)
+              {review.isPassed ? t('quiz.passed') : t('quiz.failed')} ({formatNumber(review.percentage)}%)
             </span>
           </div>
           <p className='text-xs text-gray-500'>
-            Scored {review.score} of {review.totalPoints} points
+            {t('quiz.scoredPoints', {
+              score: formatNumber(review.score),
+              total: formatNumber(review.totalPoints),
+            })}
           </p>
         </div>
 
@@ -55,7 +60,7 @@ export function QuizReview({ review, onBackToResults }: QuizReviewProps) {
           data-testid='btn-back-to-results'
         >
           <ArrowLeft className='w-4 h-4' />
-          <span>Back to Summary</span>
+          <span>{t('quiz.backToSummary')}</span>
         </Button>
       </div>
 
@@ -75,7 +80,10 @@ export function QuizReview({ review, onBackToResults }: QuizReviewProps) {
               <div className='flex flex-wrap items-center justify-between gap-3'>
                 <div className='flex items-center gap-2'>
                   <span className='text-xs font-bold text-gray-900'>
-                    Question {idx + 1}
+                    {t('quiz.question', {
+                      current: formatNumber(idx + 1),
+                      total: formatNumber(questions.length),
+                    })}
                   </span>
 
                   {/* Question Outcome Badge */}
@@ -85,7 +93,7 @@ export function QuizReview({ review, onBackToResults }: QuizReviewProps) {
                       data-testid={`badge-unanswered-${q.questionId}`}
                     >
                       <AlertCircle className='w-3 h-3 text-amber-600' />
-                      <span>Unanswered</span>
+                      <span>{t('quiz.unanswered')}</span>
                     </span>
                   ) : isCorrect ? (
                     <span
@@ -93,7 +101,7 @@ export function QuizReview({ review, onBackToResults }: QuizReviewProps) {
                       data-testid={`badge-correct-${q.questionId}`}
                     >
                       <CheckCircle2 className='w-3 h-3 text-emerald-600' />
-                      <span>Correct</span>
+                      <span>{t('quiz.correct')}</span>
                     </span>
                   ) : (
                     <span
@@ -101,7 +109,7 @@ export function QuizReview({ review, onBackToResults }: QuizReviewProps) {
                       data-testid={`badge-incorrect-${q.questionId}`}
                     >
                       <XCircle className='w-3 h-3 text-rose-600' />
-                      <span>Incorrect</span>
+                      <span>{t('quiz.incorrect')}</span>
                     </span>
                   )}
                 </div>
@@ -109,7 +117,8 @@ export function QuizReview({ review, onBackToResults }: QuizReviewProps) {
                 <div className='text-xs font-bold text-gray-700 flex items-center gap-1'>
                   <Award className='w-3.5 h-3.5 text-gray-400' />
                   <span>
-                    {q.pointsAwarded} / {q.points} {q.points === 1 ? 'pt' : 'pts'}
+                    {formatNumber(q.pointsAwarded)} / {formatNumber(q.points)}{' '}
+                    {q.points === 1 ? t('quiz.point') : t('quiz.points')}
                   </span>
                 </div>
               </div>
@@ -134,7 +143,7 @@ export function QuizReview({ review, onBackToResults }: QuizReviewProps) {
                     icon = <CheckCircle2 className='w-4 h-4 text-emerald-600 shrink-0 mt-0.5' />;
                     badge = (
                       <span className='text-[10px] font-bold text-emerald-800 bg-emerald-200/60 px-2 py-0.5 rounded-full shrink-0'>
-                        Your Answer (Correct)
+                        {t('quiz.yourAnswerCorrect')}
                       </span>
                     );
                   } else if (isSelected && !isOptCorrect) {
@@ -142,7 +151,7 @@ export function QuizReview({ review, onBackToResults }: QuizReviewProps) {
                     icon = <XCircle className='w-4 h-4 text-rose-600 shrink-0 mt-0.5' />;
                     badge = (
                       <span className='text-[10px] font-bold text-rose-800 bg-rose-200/60 px-2 py-0.5 rounded-full shrink-0'>
-                        Your Answer (Incorrect)
+                        {t('quiz.yourAnswerIncorrect')}
                       </span>
                     );
                   } else if (!isSelected && isOptCorrect) {
@@ -150,7 +159,7 @@ export function QuizReview({ review, onBackToResults }: QuizReviewProps) {
                     icon = <CheckCircle2 className='w-4 h-4 text-emerald-500 shrink-0 mt-0.5' />;
                     badge = (
                       <span className='text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full shrink-0'>
-                        Correct Answer
+                        {t('quiz.correctAnswer')}
                       </span>
                     );
                   }
@@ -179,7 +188,7 @@ export function QuizReview({ review, onBackToResults }: QuizReviewProps) {
                 >
                   <Info className='w-4 h-4 text-blue-600 shrink-0 mt-0.5' />
                   <div className='space-y-0.5'>
-                    <span className='font-bold text-blue-900'>Explanation: </span>
+                    <span className='font-bold text-blue-900'>{t('quiz.explanationPrefix')} </span>
                     <span className='text-blue-800 leading-relaxed'>{q.explanation}</span>
                   </div>
                 </div>
@@ -197,7 +206,7 @@ export function QuizReview({ review, onBackToResults }: QuizReviewProps) {
           className='rounded-xl text-xs font-semibold px-5 py-2.5 bg-primary text-white hover:bg-primary/90'
         >
           <ArrowLeft className='w-4 h-4 mr-1.5' />
-          <span>Back to Results</span>
+          <span>{t('quiz.backToResults')}</span>
         </Button>
       </div>
     </div>

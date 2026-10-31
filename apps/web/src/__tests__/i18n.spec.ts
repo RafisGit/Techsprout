@@ -359,4 +359,123 @@ describe('Phase 10.1 / WP-P10-01: Internationalization Foundation & Localization
       consoleSpy.mockRestore();
     });
   });
+
+  // =========================================================================
+  // 11. COMPLETE STUDENT PORTAL DOMAIN TRANSLATIONS (WP-P10-02)
+  // =========================================================================
+  describe('11. Student Portal Domain Translations (WP-P10-02)', () => {
+    it('provides complete catalog translations in English and Bangla', () => {
+      expect(en.catalog.pageTitle).toBe('Courses');
+      expect(bn.catalog.pageTitle).toBe('কোর্সসমূহ');
+      expect(en.catalog.searchPlaceholder).toBe('Search courses by topic, skill, or title...');
+      expect(bn.catalog.searchPlaceholder).toBe('বিষয়, দক্ষতা বা শিরোনাম দিয়ে কোর্স খুঁজুন...');
+      expect(en.catalog.categories).toBe('Categories');
+      expect(bn.catalog.categories).toBe('ক্যাটাগরি');
+    });
+
+    it('provides complete course details translations in English and Bangla', () => {
+      expect(en.courseDetails.enrollNow).toBe('Enroll Now');
+      expect(bn.courseDetails.enrollNow).toBe('এখনই এনরোল করুন');
+      expect(en.courseDetails.curriculum).toBe('Course Curriculum');
+      expect(bn.courseDetails.curriculum).toBe('কোর্স পাঠ্যক্রম');
+      expect(en.courseDetails.aboutCourse).toBe('About This Course');
+      expect(bn.courseDetails.aboutCourse).toBe('কোর্স সম্পর্কে');
+    });
+
+    it('provides complete learning workspace translations in English and Bangla', () => {
+      expect(en.learning.askAiTutor).toBe('Ask AI Tutor');
+      expect(bn.learning.askAiTutor).toBe('এআই টিউটরকে জিজ্ঞাসা করুন');
+      expect(en.learning.nextLesson).toBe('Next Lesson');
+      expect(bn.learning.nextLesson).toBe('পরবর্তী পাঠ');
+      expect(en.learning.previousLesson).toBe('Previous Lesson');
+      expect(bn.learning.previousLesson).toBe('পূর্ববর্তী পাঠ');
+    });
+
+    it('provides complete quiz runner and assessment translations in English and Bangla', () => {
+      expect(en.quiz.startQuiz).toBe('Start Quiz');
+      expect(bn.quiz.startQuiz).toBe('কুইজ শুরু করুন');
+      expect(en.quiz.submitQuiz).toBe('Submit Quiz');
+      expect(bn.quiz.submitQuiz).toBe('কুইজ জমা দিন');
+      expect(en.quiz.passed).toBe('Congratulations, you passed!');
+      expect(bn.quiz.passed).toBe('অভিনন্দন, আপনি উত্তীর্ণ হয়েছেন!');
+      expect(en.quiz.failed).toBe('You did not meet the passing score.');
+      expect(bn.quiz.failed).toBe('আপনি পাসের নম্বর অর্জন করতে পারেননি।');
+    });
+
+    it('provides complete assignment translations in English and Bangla', () => {
+      expect(en.assignments.title).toBe('Assignments');
+      expect(bn.assignments.title).toBe('অ্যাসাইনমেন্ট');
+      expect(en.assignments.submitAssignment).toBe('Submit Assignment');
+      expect(bn.assignments.submitAssignment).toBe('অ্যাসাইনমেন্ট জমা দিন');
+      expect(en.assignments.uploadFile).toBe('Upload File');
+      expect(bn.assignments.uploadFile).toBe('ফাইল আপলোড করুন');
+    });
+
+    it('provides complete lesson discussion translations in English and Bangla', () => {
+      expect(en.discussions.lessonDiscussionsAndQa).toBe('Lesson Discussions & Q&A');
+      expect(bn.discussions.lessonDiscussionsAndQa).toBe('পাঠ আলোচনা ও প্রশ্নোত্তর');
+      expect(en.discussions.askQuestion).toBe('Ask a Question');
+      expect(bn.discussions.askQuestion).toBe('প্রশ্ন জিজ্ঞাসা করুন');
+      expect(en.discussions.recent).toBe('Recent');
+      expect(bn.discussions.recent).toBe('সাম্প্রতিক');
+      expect(en.discussions.upvoted).toBe('Most Upvoted');
+      expect(bn.discussions.upvoted).toBe('সর্বোচ্চ ভোটপ্রাপ্ত');
+    });
+
+    it('provides complete orders and invoice translations in English and Bangla', () => {
+      expect(en.orders.pageTitle).toBe('Orders');
+      expect(bn.orders.pageTitle).toBe('অর্ডারসমূহ');
+      expect(en.orders.purchaseHistory).toBe('My Purchase History');
+      expect(bn.orders.purchaseHistory).toBe('আমার ক্রয়ের ইতিহাস');
+      expect(en.orders.paid).toBe('Paid');
+      expect(bn.orders.paid).toBe('পরিশোধিত');
+      expect(en.orders.viewInvoice).toBe('View Invoice');
+      expect(bn.orders.viewInvoice).toBe('ইনভয়েস দেখুন');
+      expect(en.orders.refundPolicyTitle).toBe('Refund Policy & Satisfaction Guarantee');
+      expect(bn.orders.refundPolicyTitle).toBe('রিফান্ড নীতি ও সন্তুষ্টির নিশ্চয়তা');
+    });
+
+    it('provides complete certificate and verification translations in English and Bangla', () => {
+      expect(en.certificate.pageTitle).toBe('Verified Certificate of Completion');
+      expect(bn.certificate.pageTitle).toBe('সত্যায়িত কোর্স সমাপনী সার্টিফিকেট');
+      expect(en.certificate.officialCredentials).toBe('Authorized Certificate by TechSprout School');
+      expect(bn.certificate.officialCredentials).toBe('টেকস্প্রাউট স্কুলের অনুমোদিত সার্টিফিকেট');
+      expect(en.certificate.verifyOnline).toBe('Verify Authenticity');
+      expect(bn.certificate.verifyOnline).toBe('সত্যতা যাচাই করুন');
+      expect(en.certificate.verifyTitle).toBe('Verify TechSprout Certificate');
+      expect(bn.certificate.verifyTitle).toBe('টেকস্প্রাউট সার্টিফিকেট যাচাই করুন');
+    });
+
+    it('verifies 100% dictionary key parity between English and Bangla', () => {
+      function compareKeys(objEn: any, objBn: any, path: string = ''): string[] {
+        const missing: string[] = [];
+        for (const key of Object.keys(objEn)) {
+          const currentPath = path ? `${path}.${key}` : key;
+          if (objBn[key] === undefined) {
+            missing.push(`Missing in Bangla: ${currentPath}`);
+          } else if (typeof objEn[key] === 'object' && objEn[key] !== null) {
+            missing.push(...compareKeys(objEn[key], objBn[key], currentPath));
+          }
+        }
+        return missing;
+      }
+
+      const missingKeys = compareKeys(en, bn);
+      expect(missingKeys).toEqual([]);
+    });
+
+    it('correctly handles student portal parameter substitution across both locales', () => {
+      const tEn = createTranslate('en');
+      const tBn = createTranslate('bn');
+
+      expect(tEn('quiz.questionsCount', { count: 10 })).toBe('10 Questions');
+      expect(tBn('quiz.questionsCount', { count: 10 })).toBe('১০টি প্রশ্ন');
+
+      expect(tEn('certificate.finalScore', { score: 95 })).toBe('Final Assessment Score: 95%');
+      expect(tBn('certificate.finalScore', { score: 95 })).toBe('চূড়ান্ত মূল্যায়ন স্কোর: ৯৫%');
+
+      expect(tEn('orders.paidOn', { date: 'Oct 31, 2026' })).toBe('Paid on Oct 31, 2026');
+      expect(tBn('orders.paidOn', { date: '৩১ অক্টোবর, ২০২৬' })).toBe('পরিশোধের তারিখ: ৩১ অক্টোবর, ২০২৬');
+    });
+  });
 });

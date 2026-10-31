@@ -15,6 +15,7 @@ import {
 } from '@/lib/api/discussions';
 import { SafeMarkdown } from './SafeMarkdown';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from '@/i18n/client';
 import {
   MessageSquare,
   ThumbsUp,
@@ -22,16 +23,13 @@ import {
   CheckCircle,
   CornerDownRight,
   Send,
-  MoreVertical,
   Trash2,
   ShieldAlert,
   GraduationCap,
-  Sparkles,
   HelpCircle,
   Loader2,
   AlertCircle,
 } from 'lucide-react';
-import type { DiscussionDto, DiscussionReplyDto } from '@techsprout/contracts';
 
 interface LessonDiscussionsProps {
   courseId: string;
@@ -48,6 +46,7 @@ export function LessonDiscussions({
   isInstructor,
   isAdmin,
 }: LessonDiscussionsProps) {
+  const { t, formatDate, formatNumber } = useTranslation();
   const queryClient = useQueryClient();
   const [activeSort, setActiveSort] = useState<'recent' | 'upvoted' | 'unanswered'>('recent');
   const [isAsking, setIsAsking] = useState(false);
@@ -175,10 +174,12 @@ export function LessonDiscussions({
         <div>
           <div className='flex items-center gap-2'>
             <MessageSquare className='w-5 h-5 text-primary' />
-            <h3 className='text-base sm:text-lg font-bold text-gray-900'>Lesson Discussions & Q&A</h3>
+            <h3 className='text-base sm:text-lg font-bold text-gray-900'>
+              {t.discussions.lessonDiscussionsAndQa}
+            </h3>
           </div>
           <p className='text-xs text-gray-500 mt-1'>
-            Ask questions, collaborate with peers, and get direct guidance from instructors.
+            {t.discussions.discussionsSubtitle}
           </p>
         </div>
 
@@ -187,7 +188,7 @@ export function LessonDiscussions({
           variant={isAsking ? 'outline' : 'default'}
           className='rounded-xl text-xs font-semibold px-4 py-2 bg-primary text-white hover:bg-primary/90'
         >
-          {isAsking ? 'Cancel' : 'Ask a Question'}
+          {isAsking ? t.discussions.cancel : t.discussions.askQuestion}
         </Button>
       </div>
 
@@ -199,16 +200,16 @@ export function LessonDiscussions({
         >
           <div className='flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wider'>
             <HelpCircle className='w-4 h-4 text-primary' />
-            <span>Start a New Thread</span>
+            <span>{t.discussions.startNewThread}</span>
           </div>
 
           <div className='space-y-1.5'>
-            <label className='text-xs font-semibold text-gray-700'>Topic / Question Summary</label>
+            <label className='text-xs font-semibold text-gray-700'>{t.discussions.topicLabel}</label>
             <input
               type='text'
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
-              placeholder='e.g., Why do we use useCallback here instead of useMemo?'
+              placeholder={t.discussions.topicPlaceholder}
               maxLength={255}
               required
               className='w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary'
@@ -216,12 +217,12 @@ export function LessonDiscussions({
           </div>
 
           <div className='space-y-1.5'>
-            <label className='text-xs font-semibold text-gray-700'>Details & Context (Markdown supported)</label>
+            <label className='text-xs font-semibold text-gray-700'>{t.discussions.detailsLabel}</label>
             <textarea
               value={newContent}
               onChange={(e) => setNewContent(e.target.value)}
               rows={4}
-              placeholder='Describe what you tried, share relevant snippets, or explain what is unclear...'
+              placeholder={t.discussions.detailsPlaceholder}
               maxLength={10000}
               required
               className='w-full rounded-xl border border-gray-200 bg-white p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary'
@@ -231,7 +232,7 @@ export function LessonDiscussions({
           {createMutation.isError && (
             <div className='p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2'>
               <AlertCircle className='w-4 h-4 shrink-0' />
-              <span>{(createMutation.error as any)?.response?.data?.message || 'Failed to submit discussion.'}</span>
+              <span>{(createMutation.error as any)?.response?.data?.message || t.discussions.failedToSubmit}</span>
             </div>
           )}
 
@@ -242,14 +243,14 @@ export function LessonDiscussions({
               onClick={() => setIsAsking(false)}
               className='rounded-xl text-xs font-semibold'
             >
-              Cancel
+              {t.discussions.cancel}
             </Button>
             <Button
               type='submit'
               disabled={createMutation.isPending || !newTitle.trim() || !newContent.trim()}
               className='rounded-xl text-xs font-semibold px-4 py-2 bg-primary text-white hover:bg-primary/90'
             >
-              {createMutation.isPending ? <Loader2 className='w-4 h-4 animate-spin' /> : 'Post Question'}
+              {createMutation.isPending ? <Loader2 className='w-4 h-4 animate-spin' /> : t.discussions.postQuestionBtn}
             </Button>
           </div>
         </form>
@@ -265,7 +266,7 @@ export function LessonDiscussions({
               : 'text-gray-500 hover:text-gray-900'
           }`}
         >
-          Recent
+          {t.discussions.recent}
         </button>
         <button
           onClick={() => setActiveSort('upvoted')}
@@ -275,7 +276,7 @@ export function LessonDiscussions({
               : 'text-gray-500 hover:text-gray-900'
           }`}
         >
-          Most Upvoted
+          {t.discussions.upvoted}
         </button>
         <button
           onClick={() => setActiveSort('unanswered')}
@@ -285,7 +286,7 @@ export function LessonDiscussions({
               : 'text-gray-500 hover:text-gray-900'
           }`}
         >
-          Unanswered
+          {t.discussions.unanswered}
         </button>
       </div>
 
@@ -293,16 +294,16 @@ export function LessonDiscussions({
       {isLoading && (
         <div className='py-12 flex flex-col items-center justify-center space-y-3 text-gray-400'>
           <Loader2 className='w-6 h-6 animate-spin text-primary' />
-          <p className='text-xs font-medium'>Loading lesson discussions...</p>
+          <p className='text-xs font-medium'>{t.discussions.loadingDiscussions}</p>
         </div>
       )}
 
       {isError && (
         <div className='p-6 text-center space-y-3 bg-red-50/50 rounded-2xl border border-red-100'>
           <AlertCircle className='w-6 h-6 text-red-500 mx-auto' />
-          <p className='text-xs font-semibold text-red-800'>Failed to load discussions.</p>
+          <p className='text-xs font-semibold text-red-800'>{t.discussions.failedToLoadDiscussions}</p>
           <Button onClick={() => refetch()} variant='outline' size='sm' className='rounded-xl text-xs'>
-            Retry
+            {t.common.retry}
           </Button>
         </div>
       )}
@@ -311,9 +312,9 @@ export function LessonDiscussions({
       {!isLoading && !isError && discussionsData?.data?.length === 0 && (
         <div className='py-12 text-center space-y-3 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200'>
           <MessageSquare className='w-8 h-8 text-gray-300 mx-auto' />
-          <p className='text-sm font-semibold text-gray-700'>No discussions yet for this lesson</p>
+          <p className='text-sm font-semibold text-gray-700'>{t.discussions.noDiscussionsTitle}</p>
           <p className='text-xs text-gray-400 max-w-sm mx-auto'>
-            Have questions about the material or code samples? Start the conversation!
+            {t.discussions.noDiscussionsSubtitle}
           </p>
           <Button
             onClick={() => setIsAsking(true)}
@@ -321,7 +322,7 @@ export function LessonDiscussions({
             size='sm'
             className='rounded-xl text-xs font-bold text-primary border-primary/20 hover:bg-primary/5'
           >
-            Ask the First Question
+            {t.discussions.askFirstQuestion}
           </Button>
         </div>
       )}
@@ -330,7 +331,6 @@ export function LessonDiscussions({
       <div className='space-y-4'>
         {discussionsData?.data?.map((item) => {
           const isExpanded = expandedDiscussionId === item.id;
-          const isAuthor = item.userId === currentUserId;
           const canModerate = isInstructor || isAdmin;
 
           return (
@@ -347,7 +347,7 @@ export function LessonDiscussions({
                 {item.isPinned && (
                   <div className='inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800'>
                     <Pin className='w-3 h-3 text-amber-600' />
-                    <span>PINNED BY INSTRUCTOR</span>
+                    <span>{t.discussions.pinnedByInstructor}</span>
                   </div>
                 )}
 
@@ -360,7 +360,7 @@ export function LessonDiscussions({
                       {item.isCourseInstructor && (
                         <span className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-primary/10 text-primary border border-primary/20'>
                           <GraduationCap className='w-3 h-3' />
-                          <span>Instructor</span>
+                          <span>{t.discussions.instructorBadge}</span>
                         </span>
                       )}
 
@@ -368,19 +368,19 @@ export function LessonDiscussions({
                       {item.isAdmin && !item.isCourseInstructor && (
                         <span className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800'>
                           <ShieldAlert className='w-3 h-3' />
-                          <span>Admin</span>
+                          <span>{t.discussions.adminBadge}</span>
                         </span>
                       )}
 
                       {item.status === 'RESOLVED' && (
                         <span className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800'>
                           <CheckCircle className='w-3 h-3 text-emerald-600' />
-                          <span>Resolved</span>
+                          <span>{t.discussions.resolved}</span>
                         </span>
                       )}
 
                       <span className='text-gray-400'>•</span>
-                      <span className='text-gray-400'>{new Date(item.createdAt).toLocaleDateString()}</span>
+                      <span className='text-gray-400'>{formatDate(item.createdAt)}</span>
                     </div>
 
                     <h4 className='text-sm sm:text-base font-bold text-gray-900 leading-snug'>
@@ -394,7 +394,7 @@ export function LessonDiscussions({
                       <Button
                         size='sm'
                         variant='ghost'
-                        title={item.isPinned ? 'Unpin' : 'Pin to top'}
+                        title={item.isPinned ? t.discussions.unpin : t.discussions.pinToTop}
                         onClick={() =>
                           moderateMutation.mutate({
                             discussionId: item.id,
@@ -408,7 +408,7 @@ export function LessonDiscussions({
                       <Button
                         size='sm'
                         variant='ghost'
-                        title='Mark Resolved'
+                        title={t.discussions.markResolved}
                         onClick={() =>
                           moderateMutation.mutate({
                             discussionId: item.id,
@@ -422,9 +422,9 @@ export function LessonDiscussions({
                       <Button
                         size='sm'
                         variant='ghost'
-                        title='Delete Thread'
+                        title={t.discussions.deleteThread}
                         onClick={() => {
-                          if (confirm('Are you sure you want to delete this thread?')) {
+                          if (confirm(t.discussions.deleteThreadConfirm)) {
                             moderateMutation.mutate({
                               discussionId: item.id,
                               updates: { status: 'DELETED' },
@@ -455,7 +455,7 @@ export function LessonDiscussions({
                     }`}
                   >
                     <ThumbsUp className={`w-3.5 h-3.5 ${item.hasUpvoted ? 'fill-current' : ''}`} />
-                    <span>{item.upvoteCount}</span>
+                    <span>{formatNumber(item.upvoteCount)}</span>
                   </Button>
 
                   <Button
@@ -465,7 +465,11 @@ export function LessonDiscussions({
                     className='h-8 px-3 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center gap-1.5'
                   >
                     <MessageSquare className='w-3.5 h-3.5 text-gray-500' />
-                    <span>{item.replyCount} {item.replyCount === 1 ? 'Reply' : 'Replies'}</span>
+                    <span>
+                      {item.replyCount === 1
+                        ? t.discussions.singleReply
+                        : t.discussions.repliesCount.replace('{count}', formatNumber(item.replyCount))}
+                    </span>
                   </Button>
                 </div>
               </div>
@@ -475,13 +479,18 @@ export function LessonDiscussions({
                 <div className='border-t border-gray-100 bg-gray-50/60 p-4 sm:p-5 space-y-4 rounded-b-2xl animate-in fade-in duration-150'>
                   <div className='text-xs font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1.5'>
                     <CornerDownRight className='w-3.5 h-3.5 text-primary' />
-                    <span>Replies ({activeThreadData?.replies?.length || 0})</span>
+                    <span>
+                      {t.discussions.repliesSection.replace(
+                        '{count}',
+                        formatNumber(activeThreadData?.replies?.length || 0)
+                      )}
+                    </span>
                   </div>
 
                   {isThreadLoading && (
                     <div className='py-4 text-center text-xs text-gray-400 flex items-center justify-center gap-2'>
                       <Loader2 className='w-4 h-4 animate-spin text-primary' />
-                      <span>Loading conversation...</span>
+                      <span>{t.discussions.loadingConversation}</span>
                     </div>
                   )}
 
@@ -498,11 +507,11 @@ export function LessonDiscussions({
                             {rep.isCourseInstructor && (
                               <span className='inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-primary/10 text-primary'>
                                 <GraduationCap className='w-2.5 h-2.5' />
-                                <span>Instructor</span>
+                                <span>{t.discussions.instructorBadge}</span>
                               </span>
                             )}
                             <span className='text-gray-400'>•</span>
-                            <span className='text-gray-400'>{new Date(rep.createdAt).toLocaleDateString()}</span>
+                            <span className='text-gray-400'>{formatDate(rep.createdAt)}</span>
                           </div>
 
                           <Button
@@ -516,7 +525,7 @@ export function LessonDiscussions({
                             }`}
                           >
                             <ThumbsUp className={`w-3 h-3 ${rep.hasUpvoted ? 'fill-current' : ''}`} />
-                            <span>{rep.upvoteCount}</span>
+                            <span>{formatNumber(rep.upvoteCount)}</span>
                           </Button>
                         </div>
 
@@ -530,9 +539,11 @@ export function LessonDiscussions({
                                 <div className='flex items-center gap-2'>
                                   <span className='font-bold text-gray-800'>{sub.userName}</span>
                                   {sub.isCourseInstructor && (
-                                    <span className='text-[9px] font-bold text-primary'>[Instructor]</span>
+                                    <span className='text-[9px] font-bold text-primary'>
+                                      [{t.discussions.instructorBadge}]
+                                    </span>
                                   )}
-                                  <span className='text-gray-400 text-[10px]'>{new Date(sub.createdAt).toLocaleDateString()}</span>
+                                  <span className='text-gray-400 text-[10px]'>{formatDate(sub.createdAt)}</span>
                                 </div>
                                 <SafeMarkdown content={sub.content} className='text-xs text-gray-600' />
                               </div>
@@ -556,7 +567,7 @@ export function LessonDiscussions({
                           handlePostReply(item.id);
                         }
                       }}
-                      placeholder='Write a reply... (Press Enter to post)'
+                      placeholder={t.discussions.writeReplyPlaceholder}
                       className='flex-1 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary'
                     />
                     <Button

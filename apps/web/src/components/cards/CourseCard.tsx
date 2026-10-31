@@ -1,7 +1,5 @@
 'use client';
 
-import { formatMoney } from '@/lib/money';
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from 'next/image';
@@ -11,21 +9,24 @@ import Title from '../Title';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import Link from 'next/link';
 import type { CourseDto } from '@techsprout/contracts';
+import { useTranslation } from '@/i18n';
 
 interface CourseCardProps {
   course: CourseDto | any;
 }
 
 export function CourseCard({ course }: CourseCardProps) {
+  const { t, locale, formatNumber, formatCurrency } = useTranslation();
+
   const slug = course.slug || course._id;
   const title = course.title || 'Untitled Course';
   const categoryName =
     course.category?.name ||
-    (typeof course.category === 'string' ? course.category : 'Course');
+    (typeof course.category === 'string' ? course.category : t('catalog.categories'));
 
   const instructorName =
     course.instructor?.name ||
-    (typeof course.instructor === 'string' ? course.instructor : 'Instructor');
+    (typeof course.instructor === 'string' ? course.instructor : t('courseDetails.instructor'));
 
   const instructorInitials = instructorName
     .split(' ')
@@ -41,25 +42,39 @@ export function CourseCard({ course }: CourseCardProps) {
       ? course.lessons.length
       : 0;
 
-  const durationText =
-    course.durationMinutes !== undefined && course.durationMinutes !== null
-      ? course.durationMinutes >= 60
-        ? `${Math.floor(course.durationMinutes / 60)}h ${
-            course.durationMinutes % 60 > 0 ? `${course.durationMinutes % 60}m` : ''
-          }`.trim()
-        : `${course.durationMinutes}m`
-      : course.duration || 'Flexible';
+  let durationText = t('catalog.flexibleDuration');
+  if (course.durationMinutes !== undefined && course.durationMinutes !== null && course.durationMinutes > 0) {
+    const mins = course.durationMinutes;
+    const hours = Math.floor(mins / 60);
+    const remMins = mins % 60;
+    if (mins < 60) {
+      durationText = t('catalog.mins', { count: formatNumber(mins) });
+    } else if (remMins > 0) {
+      durationText = t('catalog.hoursMins', {
+        hours: formatNumber(hours),
+        mins: formatNumber(remMins),
+      });
+    } else {
+      durationText = t('catalog.hoursOnly', { hours: formatNumber(hours) });
+    }
+  }
 
-  const levelText = course.level
-    ? course.level.toLowerCase().replace('_', ' ')
-    : 'All Levels';
+  const levelKey = (course.level || '').toLowerCase();
+  const levelText =
+    levelKey === 'beginner'
+      ? t('catalog.beginner')
+      : levelKey === 'intermediate'
+      ? t('catalog.intermediate')
+      : levelKey === 'advanced'
+      ? t('catalog.advanced')
+      : t('catalog.allLevels');
 
   const isFree =
     Number(course.price) === 0 || course.isFree === true || course.price === '0.00';
 
   const formattedPrice = isFree
-    ? 'Free'
-    : formatMoney(course.price, course.currency || 'BDT');
+    ? t('catalog.free')
+    : formatCurrency(course.price, course.currency || 'BDT');
 
   const thumbnailUrl = course.thumbnailUrl || course.thumbnail;
 
@@ -97,7 +112,11 @@ export function CourseCard({ course }: CourseCardProps) {
             <div className='flex items-center justify-between gap-2 text-xs md:text-sm text-gray-500'>
               <div className='flex items-center gap-1.5'>
                 <FileText className='w-4 h-4 text-primary shrink-0' />
-                <span>{lessonsCount} {lessonsCount === 1 ? 'lesson' : 'lessons'}</span>
+                <span>
+                  {lessonsCount === 1
+                    ? t('catalog.singleLesson')
+                    : t('catalog.lessonsCount', { count: formatNumber(lessonsCount) })}
+                </span>
               </div>
               <div className='flex items-center gap-1.5'>
                 <Clock className='w-4 h-4 text-primary shrink-0' />

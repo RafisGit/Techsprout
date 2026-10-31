@@ -21,6 +21,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { DialogTitle } from '@radix-ui/react-dialog';
+import { useTranslation } from '@/i18n';
 import {
   ArrowLeft,
   BookOpen,
@@ -36,6 +37,7 @@ import {
 } from 'lucide-react';
 
 export default function LessonLearningWorkspacePage() {
+  const { t, formatNumber } = useTranslation();
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -128,9 +130,9 @@ export default function LessonLearningWorkspacePage() {
           <div className='w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto'>
             <GraduationCap className='w-8 h-8' />
           </div>
-          <h2 className='text-xl font-bold text-gray-900'>Authentication Required</h2>
+          <h2 className='text-xl font-bold text-gray-900'>{t('learning.authRequired')}</h2>
           <p className='text-xs sm:text-sm text-gray-500 leading-relaxed'>
-            Please log in with your student account to access this lesson.
+            {t('learning.authRequiredDesc')}
           </p>
           <div className='pt-2 flex justify-center gap-3'>
             <Link
@@ -140,12 +142,12 @@ export default function LessonLearningWorkspacePage() {
             >
               <Button className='rounded-xl text-xs font-semibold px-6 py-2.5 bg-primary text-white hover:bg-primary/90'>
                 <LogIn className='w-4 h-4 mr-2' />
-                Log In
+                {t('learning.logIn')}
               </Button>
             </Link>
             <Link href={`/courses/${courseSlug}`}>
               <Button variant='outline' className='rounded-xl text-xs font-semibold px-4 py-2.5'>
-                Course Details
+                {t('learning.courseDetails')}
               </Button>
             </Link>
           </div>
@@ -178,20 +180,20 @@ export default function LessonLearningWorkspacePage() {
           <div className='w-16 h-16 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center mx-auto'>
             <AlertCircle className='w-8 h-8' />
           </div>
-          <h2 className='text-xl font-bold text-gray-900'>Course Unavailable</h2>
+          <h2 className='text-xl font-bold text-gray-900'>{t('learning.courseUnavailable')}</h2>
           <p className='text-xs text-gray-500'>
             {(courseError as any)?.response?.data?.message ||
-              'This course does not exist or is currently unavailable.'}
+              t('learning.courseUnavailableDesc')}
           </p>
           <div className='pt-2 flex justify-center gap-3'>
             <Link href='/my-courses'>
               <Button variant='outline' className='rounded-xl text-xs'>
                 <ArrowLeft className='w-3.5 h-3.5 mr-1.5' />
-                My Courses
+                {t('learning.backToMyCourses')}
               </Button>
             </Link>
             <Button onClick={() => refetchCourse()} className='rounded-xl text-xs'>
-              Retry
+              {t('learning.retry')}
             </Button>
           </div>
         </div>
@@ -210,19 +212,19 @@ export default function LessonLearningWorkspacePage() {
           <div className='w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto'>
             <GraduationCap className='w-8 h-8' />
           </div>
-          <h2 className='text-xl font-bold text-gray-900'>Enrollment Required</h2>
+          <h2 className='text-xl font-bold text-gray-900'>{t('learning.enrollmentRequired')}</h2>
           <p className='text-xs sm:text-sm text-gray-500 leading-relaxed'>
-            You must be enrolled in <strong>{course.title}</strong> to view this lesson.
+            {t('learning.enrollmentRequiredDesc', { course: course.title })}
           </p>
           <div className='pt-2 flex justify-center gap-3'>
             <Link href={`/courses/${courseSlug}`}>
               <Button className='rounded-xl text-xs font-semibold px-5 py-2.5 bg-primary text-white hover:bg-primary/90'>
-                Enroll in Course
+                {t('learning.enrollInCourse')}
               </Button>
             </Link>
             <Link href='/my-courses'>
               <Button variant='outline' className='rounded-xl text-xs font-semibold px-4 py-2.5'>
-                My Courses
+                {t('learning.backToMyCourses')}
               </Button>
             </Link>
           </div>
@@ -239,19 +241,19 @@ export default function LessonLearningWorkspacePage() {
           <div className='w-16 h-16 rounded-2xl bg-gray-100 text-gray-500 flex items-center justify-center mx-auto'>
             <BookOpen className='w-8 h-8' />
           </div>
-          <h2 className='text-xl font-bold text-gray-900'>Lesson Not Found</h2>
+          <h2 className='text-xl font-bold text-gray-900'>{t('learning.lessonNotFound')}</h2>
           <p className='text-xs text-gray-500'>
-            This lesson could not be found or has been removed from the course curriculum.
+            {t('learning.lessonNotFoundDesc')}
           </p>
           <div className='pt-2 flex justify-center gap-3'>
             <Link href={`/learn/${courseSlug}`}>
               <Button className='rounded-xl text-xs font-semibold px-5 py-2.5 bg-primary text-white hover:bg-primary/90'>
-                Resume Course
+                {t('learning.resumeCourse')}
               </Button>
             </Link>
             <Link href='/my-courses'>
               <Button variant='outline' className='rounded-xl text-xs font-semibold px-4 py-2.5'>
-                My Courses
+                {t('learning.backToMyCourses')}
               </Button>
             </Link>
           </div>
@@ -274,7 +276,7 @@ export default function LessonLearningWorkspacePage() {
             <Link
               href='/my-courses'
               className='p-2 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition shrink-0'
-              title='Back to My Courses'
+              title={t('learning.backToMyCoursesTitle')}
             >
               <ArrowLeft className='w-4 h-4' />
             </Link>
@@ -287,7 +289,7 @@ export default function LessonLearningWorkspacePage() {
                 {isArchived && (
                   <span className='inline-flex items-center gap-1 text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full shrink-0'>
                     <Archive className='w-3 h-3' />
-                    Archived
+                    {t('learning.archived')}
                   </span>
                 )}
               </div>
@@ -302,9 +304,9 @@ export default function LessonLearningWorkspacePage() {
             {/* Progress Overview */}
             <div className='hidden md:flex flex-col items-end w-36 sm:w-44'>
               <div className='flex items-center justify-between w-full text-[11px] font-bold text-gray-700 mb-1'>
-                <span>Progress</span>
+                <span>{t('learning.progress')}</span>
                 <span className={isCourseCompleted ? 'text-emerald-600' : 'text-primary'}>
-                  {progressPct}%
+                  {formatNumber(progressPct)}%
                 </span>
               </div>
               <div className='w-full bg-gray-100 rounded-full h-1.5 overflow-hidden'>
@@ -336,11 +338,11 @@ export default function LessonLearningWorkspacePage() {
                   className='lg:hidden rounded-xl text-xs font-semibold border-gray-200 text-gray-700 flex items-center gap-1.5'
                 >
                   <Menu className='w-4 h-4' />
-                  <span>Curriculum</span>
+                  <span>{t('learning.curriculum')}</span>
                 </Button>
               </SheetTrigger>
               <SheetContent side='right' className='w-[320px] sm:w-[380px] p-0 flex flex-col'>
-                <DialogTitle className='sr-only'>Course Curriculum</DialogTitle>
+                <DialogTitle className='sr-only'>{t('learning.curriculum')}</DialogTitle>
                 {curriculum && (
                   <CurriculumSidebar
                     curriculum={curriculum}
@@ -365,9 +367,9 @@ export default function LessonLearningWorkspacePage() {
               <div className='bg-amber-50 border border-amber-200/80 rounded-2xl p-4 flex items-start space-x-3 text-xs text-amber-800'>
                 <Archive className='w-4 h-4 text-amber-600 shrink-0 mt-0.5' />
                 <div>
-                  <strong className='font-bold'>Archived Course Access:</strong> This course is archived
-                  and no longer accepts new students. As an enrolled student, you retain full access to all
-                  lessons, media streaming, checkpointing, and completion.
+                  <strong className='font-bold'>{t('learning.archivedAccessTitle')}</strong> {t('learning.archivedAccessDesc')}
+
+
                 </div>
               </div>
             )}
@@ -403,14 +405,14 @@ export default function LessonLearningWorkspacePage() {
                     className='rounded-xl text-xs font-bold px-4 py-2 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-xs'
                   >
                     <MessageSquare className='w-4 h-4' />
-                    <span>Discussions & Q&A</span>
+                    <span>{t('learning.discussionsAndQa')}</span>
                   </TabsTrigger>
                   <TabsTrigger
                     value='assignments'
                     className='rounded-xl text-xs font-bold px-4 py-2 flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-xs'
                   >
                     <FileText className='w-4 h-4' />
-                    <span>Project Assignments</span>
+                    <span>{t('learning.projectAssignments')}</span>
                   </TabsTrigger>
                 </TabsList>
 

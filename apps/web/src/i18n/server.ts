@@ -49,3 +49,4 @@ export async function getServerTranslations() {
   const locale = await getServerLocale();
   return getTranslations(locale);
 }
+

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Trophy } from 'lucide-react';
 import type { LessonNavigationDto, LearningCurriculumDto } from '@techsprout/contracts';
 import { CurriculumItemNavigation } from './CurriculumItemNavigation';
+import { useTranslation } from '@/i18n';
 
 interface LessonNavigationProps {
   courseSlug: string;
@@ -22,6 +23,8 @@ export function LessonNavigation({
   curriculum,
   currentLessonId,
 }: LessonNavigationProps) {
+  const { t } = useTranslation();
+
   // If curriculum and currentLessonId are provided, use authoritative mixed curriculum ordering
   if (curriculum && currentLessonId) {
     return (
@@ -45,10 +48,10 @@ export function LessonNavigation({
         <Link href={`/learn/${courseSlug}/${navigation.previousLessonId}`}>
           <Button
             variant='outline'
-            className='rounded-xl text-xs font-semibold px-4 py-2 border-gray-200 hover:bg-gray-50 text-gray-700'
+            className='rounded-xl text-xs font-semibold px-4 py-2 border-gray-200 hover:bg-gray-50 text-gray-700 cursor-pointer'
           >
             <ArrowLeft className='w-4 h-4 mr-1.5' />
-            Previous Lesson
+            {t('learning.previousLesson')}
           </Button>
         </Link>
       ) : (
@@ -58,23 +61,23 @@ export function LessonNavigation({
           className='rounded-xl text-xs font-semibold px-4 py-2 border-gray-200 text-gray-400 cursor-not-allowed opacity-50'
         >
           <ArrowLeft className='w-4 h-4 mr-1.5' />
-          Previous Lesson
+          {t('learning.previous')}
         </Button>
       )}
 
-      {/* Next Button or Course Completed Badge */}
+      {/* Next Button or Completion State */}
       {hasNext ? (
         <Link href={`/learn/${courseSlug}/${navigation.nextLessonId}`}>
-          <Button className='rounded-xl text-xs font-bold px-5 py-2 bg-primary text-white hover:bg-primary/90 shadow-xs'>
-            Next Lesson
+          <Button className='rounded-xl text-xs font-bold px-5 py-2 bg-primary text-white hover:bg-primary/90 shadow-xs cursor-pointer'>
+            <span>{t('learning.nextLesson')}</span>
             <ArrowRight className='w-4 h-4 ml-1.5' />
           </Button>
         </Link>
       ) : isCourseCompleted ? (
-        <Link href={`/my-courses`}>
-          <Button className='rounded-xl text-xs font-bold px-5 py-2 bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs'>
-            <Trophy className='w-4 h-4 mr-1.5 text-amber-300' />
-            Course Completed • Back to Dashboard
+        <Link href={`/learn/${courseSlug}/certificate`}>
+          <Button className='rounded-xl text-xs font-bold px-5 py-2 bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs flex items-center gap-1.5 cursor-pointer'>
+            <Trophy className='w-4 h-4' />
+            <span>{t('myCourses.viewCertificate')}</span>
           </Button>
         </Link>
       ) : (
@@ -83,7 +86,7 @@ export function LessonNavigation({
           variant='outline'
           className='rounded-xl text-xs font-semibold px-4 py-2 border-gray-200 text-gray-400 cursor-not-allowed opacity-50'
         >
-          End of Curriculum
+          {t('courseDetails.completed')}
         </Button>
       )}
     </div>

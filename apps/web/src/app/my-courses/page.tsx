@@ -17,20 +17,19 @@ import {
   AlertCircle,
   ArrowRight,
   RotateCcw,
-  Clock,
-  Layers,
   Archive,
   GraduationCap,
   LogIn,
-  Award,
 } from 'lucide-react';
 import type { EnrolledCourseItemDto } from '@techsprout/contracts';
 import { EnrollmentCertificateCta } from '@/components/certificate/CertificateCta';
+import { useTranslation } from '@/i18n';
 
 type FilterTab = 'ALL' | 'ACTIVE' | 'COMPLETED';
 
 export default function MyCoursesPage() {
   const [activeTab, setActiveTab] = useState<FilterTab>('ALL');
+  const { t, formatNumber } = useTranslation();
 
   const {
     data: currentUser,
@@ -58,7 +57,7 @@ export default function MyCoursesPage() {
 
   return (
     <div className='min-h-screen bg-[#F8FAFC] pb-24'>
-      <Hero pageName='My Courses' />
+      <Hero pageName={t('myCourses.pageTitle')} />
 
       <main className='container mx-auto px-4 max-w-7xl pt-10 sm:pt-12'>
         {/* Unauthenticated State */}
@@ -68,16 +67,16 @@ export default function MyCoursesPage() {
               <GraduationCap className='w-8 h-8' />
             </div>
             <Title h={2} className='text-2xl font-bold text-gray-900'>
-              Sign in to view your courses
+              {t('myCourses.signInPrompt')}
             </Title>
             <p className='text-xs sm:text-sm text-gray-500 leading-relaxed'>
-              You must be logged in to view your active enrollments and track your learning progress.
+              {t('myCourses.signInDescription')}
             </p>
             <div className='pt-2'>
               <Link href='/login?redirect=/my-courses'>
-                <Button className='rounded-xl text-xs font-semibold px-6 py-2.5 bg-primary text-white hover:bg-primary/90 shadow-sm'>
+                <Button className='rounded-xl text-xs font-semibold px-6 py-2.5 bg-primary text-white hover:bg-primary/90 shadow-sm cursor-pointer'>
                   <LogIn className='w-4 h-4 mr-2' />
-                  Log In to Continue
+                  {t('myCourses.loginToContinue')}
                 </Button>
               </Link>
             </div>
@@ -91,10 +90,10 @@ export default function MyCoursesPage() {
             <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-200 pb-5'>
               <div>
                 <Title h={1} className='text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight'>
-                  Student Dashboard
+                  {t('myCourses.pageTitle')}
                 </Title>
                 <p className='text-xs sm:text-sm text-gray-500 mt-1'>
-                  Manage your enrolled courses, resume study sessions, and review completed subjects.
+                  {t('dashboard.description')}
                 </p>
               </div>
 
@@ -102,15 +101,15 @@ export default function MyCoursesPage() {
               <div className='inline-flex rounded-xl bg-gray-100 p-1 border border-gray-200/60 self-start sm:self-auto'>
                 {(
                   [
-                    { key: 'ALL', label: 'All Courses' },
-                    { key: 'ACTIVE', label: 'In Progress' },
-                    { key: 'COMPLETED', label: 'Completed' },
+                    { key: 'ALL', label: t('myCourses.all') },
+                    { key: 'ACTIVE', label: t('myCourses.active') },
+                    { key: 'COMPLETED', label: t('myCourses.completed') },
                   ] as const
                 ).map((tab) => (
                   <button
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key)}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                       activeTab === tab.key
                         ? 'bg-white text-gray-900 shadow-xs'
                         : 'text-gray-500 hover:text-gray-800'
@@ -146,14 +145,13 @@ export default function MyCoursesPage() {
                 <div className='w-14 h-14 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center mx-auto'>
                   <AlertCircle className='w-7 h-7' />
                 </div>
-                <h3 className='text-lg font-bold text-gray-900'>Unable to load enrollments</h3>
+                <h3 className='text-lg font-bold text-gray-900'>{t('states.error')}</h3>
                 <p className='text-xs text-gray-500'>
-                  {(error as any)?.response?.data?.message ||
-                    'An unexpected error occurred while fetching your enrolled courses.'}
+                  {(error as any)?.response?.data?.message || t('states.loadFailed')}
                 </p>
-                <Button onClick={() => refetch()} size='sm' className='rounded-xl text-xs'>
+                <Button onClick={() => refetch()} size='sm' className='rounded-xl text-xs cursor-pointer'>
                   <RotateCcw className='w-3.5 h-3.5 mr-1.5' />
-                  Try Again
+                  {t('actions.retry')}
                 </Button>
               </div>
             )}
@@ -164,18 +162,16 @@ export default function MyCoursesPage() {
                 <div className='w-16 h-16 rounded-2xl bg-gray-50 text-gray-400 flex items-center justify-center mx-auto'>
                   <BookOpen className='w-8 h-8' />
                 </div>
-                <h3 className='text-lg font-bold text-gray-900'>No enrolled courses</h3>
+                <h3 className='text-lg font-bold text-gray-900'>{t('myCourses.noCoursesTitle')}</h3>
                 <p className='text-xs sm:text-sm text-gray-500 leading-relaxed'>
                   {activeTab === 'COMPLETED'
-                    ? "You haven't completed any courses yet. Keep learning to achieve full mastery!"
-                    : activeTab === 'ACTIVE'
-                    ? 'You have no courses in progress. Explore our catalog to start learning.'
-                    : "You haven't enrolled in any courses yet. Find a course that matches your learning goals."}
+                    ? t('myCourses.noCompletedDescription')
+                    : t('myCourses.noCoursesDescription')}
                 </p>
                 <div className='pt-2'>
                   <Link href='/courses'>
-                    <Button className='rounded-xl text-xs font-semibold px-5 py-2.5 bg-primary text-white hover:bg-primary/90'>
-                      Browse Course Catalog
+                    <Button className='rounded-xl text-xs font-semibold px-5 py-2.5 bg-primary text-white hover:bg-primary/90 cursor-pointer'>
+                      {t('actions.browseCatalog')}
                       <ArrowRight className='w-3.5 h-3.5 ml-1.5' />
                     </Button>
                   </Link>
@@ -199,14 +195,14 @@ export default function MyCoursesPage() {
                       className='bg-white rounded-3xl border border-gray-200/80 shadow-xs hover:shadow-md transition flex flex-col justify-between overflow-hidden p-5 group'
                     >
                       <div className='space-y-4'>
-                        {/* Course Thumbnail */}
+                        {/* Thumbnail & Badges */}
                         <div className='relative h-44 w-full rounded-2xl overflow-hidden bg-gray-100'>
                           {item.course.thumbnailUrl ? (
                             <Image
                               src={item.course.thumbnailUrl}
                               alt={item.course.title}
                               fill
-                              className='object-cover group-hover:scale-105 transition-transform duration-300'
+                              className='object-cover group-hover:scale-105 transition duration-300'
                               sizes='(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'
                             />
                           ) : (
@@ -215,27 +211,26 @@ export default function MyCoursesPage() {
                             </div>
                           )}
 
-                          {/* Status Badge Overlays */}
-                          <div className='absolute top-3 left-3 flex flex-wrap gap-1.5'>
+                          <div className='absolute top-3 right-3 flex items-center gap-1.5'>
                             {isCompleted ? (
                               <span className='inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-600 text-white shadow-xs'>
                                 <CheckCircle2 className='w-3 h-3' />
-                                Completed
+                                {t('myCourses.completed')}
                               </span>
                             ) : (
                               <span className='inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-primary text-white shadow-xs'>
                                 <PlayCircle className='w-3 h-3' />
-                                Active
+                                {t('myCourses.active')}
                               </span>
                             )}
 
                             {isArchived && (
                               <span
                                 className='inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500 text-white shadow-xs'
-                                title='This course is archived, but you retain full learner access'
+                                title={t('courseDetails.archivedNotice')}
                               >
                                 <Archive className='w-3 h-3' />
-                                Archived
+                                {t('courseDetails.archivedNotice')}
                               </span>
                             )}
                           </div>
@@ -267,8 +262,8 @@ export default function MyCoursesPage() {
                         {/* Progress Bar & Details */}
                         <div className='space-y-1.5 pt-1'>
                           <div className='flex items-center justify-between text-xs'>
-                            <span className='text-gray-500 font-medium'>Progress</span>
-                            <span className='font-bold text-gray-800'>{progressPct}%</span>
+                            <span className='text-gray-500 font-medium'>{t('myCourses.progress')}</span>
+                            <span className='font-bold text-gray-800'>{formatNumber(progressPct)}%</span>
                           </div>
                           <div className='w-full bg-gray-100 rounded-full h-2 overflow-hidden'>
                             <div
@@ -280,11 +275,11 @@ export default function MyCoursesPage() {
                           </div>
                           <div className='flex items-center justify-between text-[11px] text-gray-400 pt-0.5'>
                             <span>
-                              {completedLessons} / {totalLessons} lessons completed
+                              {formatNumber(completedLessons)} / {formatNumber(totalLessons)} {t('catalog.lessonsCount', { count: '' })}
                             </span>
                             {item.resumePoint?.lessonTitle && (
                               <span className='truncate max-w-[150px] text-gray-500' title={item.resumePoint.lessonTitle}>
-                                Next: {item.resumePoint.lessonTitle}
+                                {t('learning.next')}: {item.resumePoint.lessonTitle}
                               </span>
                             )}
                           </div>

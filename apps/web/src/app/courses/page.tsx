@@ -28,29 +28,30 @@ import {
   AlertCircle,
   BookOpen,
   RotateCcw,
-  SlidersHorizontal,
 } from 'lucide-react';
 import type { CourseLevel } from '@techsprout/contracts';
+import { useTranslation } from '@/i18n';
 
-interface SortOption {
-  label: string;
+interface SortOptionDef {
+  key: 'sortNewest' | 'sortOldest' | 'sortTitleAsc' | 'sortTitleDesc' | 'sortPriceLow' | 'sortPriceHigh';
   sortBy: 'createdAt' | 'price' | 'title';
   sortOrder: 'asc' | 'desc';
 }
 
-const SORT_OPTIONS: SortOption[] = [
-  { label: 'Release Date (newest first)', sortBy: 'createdAt', sortOrder: 'desc' },
-  { label: 'Release Date (oldest first)', sortBy: 'createdAt', sortOrder: 'asc' },
-  { label: 'Course Title (a-z)', sortBy: 'title', sortOrder: 'asc' },
-  { label: 'Course Title (z-a)', sortBy: 'title', sortOrder: 'desc' },
-  { label: 'Price (low to high)', sortBy: 'price', sortOrder: 'asc' },
-  { label: 'Price (high to low)', sortBy: 'price', sortOrder: 'desc' },
+const SORT_OPTIONS: SortOptionDef[] = [
+  { key: 'sortNewest', sortBy: 'createdAt', sortOrder: 'desc' },
+  { key: 'sortOldest', sortBy: 'createdAt', sortOrder: 'asc' },
+  { key: 'sortTitleAsc', sortBy: 'title', sortOrder: 'asc' },
+  { key: 'sortTitleDesc', sortBy: 'title', sortOrder: 'desc' },
+  { key: 'sortPriceLow', sortBy: 'price', sortOrder: 'asc' },
+  { key: 'sortPriceHigh', sortBy: 'price', sortOrder: 'desc' },
 ];
 
 function CoursesLoadingSkeleton() {
+  const { t } = useTranslation();
   return (
     <>
-      <Hero pageName='Courses' />
+      <Hero pageName={t('catalog.pageTitle')} />
       <section className='container mx-auto px-4 py-12 lg:py-20'>
         <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8'>
           {Array.from({ length: 6 }).map((_, idx) => (
@@ -75,13 +76,14 @@ function CoursesContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { t, formatNumber } = useTranslation();
 
   // Read URL query parameters
   const pageParam = parseInt(searchParams.get('page') || '1', 10);
   const searchParam = searchParams.get('search') || '';
   const categorySlugParam = searchParams.get('categorySlug') || '';
   const levelParam = searchParams.get('level') || '';
-  const priceFilterParam = searchParams.get('priceType') || 'all'; // 'all' | 'free' | 'paid'
+  const priceFilterParam = searchParams.get('priceType') || 'all';
   const sortByParam = (searchParams.get('sortBy') as 'createdAt' | 'price' | 'title') || 'createdAt';
   const sortOrderParam = (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc';
 
@@ -171,7 +173,7 @@ function CoursesContent() {
     updateUrlParams({ priceType: nextType === 'all' ? undefined : nextType, page: 1 });
   };
 
-  const handleSortSelect = (opt: SortOption) => {
+  const handleSortSelect = (opt: SortOptionDef) => {
     updateUrlParams({ sortBy: opt.sortBy, sortOrder: opt.sortOrder, page: 1 });
   };
 
@@ -180,17 +182,19 @@ function CoursesContent() {
     router.push(pathname);
   };
 
-  const currentSortOption =
+  const currentSortDef =
     SORT_OPTIONS.find(
       (opt) => opt.sortBy === sortByParam && opt.sortOrder === sortOrderParam
     ) || SORT_OPTIONS[0];
+
+  const currentSortLabel = t(`catalog.${currentSortDef.key}`);
 
   const courses = paginatedData?.items || [];
   const pagination = paginatedData?.pagination;
 
   return (
     <>
-      <Hero pageName='Courses' />
+      <Hero pageName={t('catalog.pageTitle')} />
 
       <section className='container mx-auto px-4 py-12 lg:py-20'>
         {/* Top Control Bar: Search and Sort */}
@@ -201,8 +205,9 @@ function CoursesContent() {
               type='text'
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder='Search courses by topic, skill, or title...'
+              placeholder={t('catalog.searchPlaceholder')}
               className='focus:border-primary focus:ring-primary h-11 w-full rounded-xl border border-gray-200 pl-10 pr-20 text-sm focus:ring-2 focus:outline-none'
+              aria-label={t('a11y.search')}
             />
             <Search className='absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-gray-400' />
             <Button
@@ -210,14 +215,14 @@ function CoursesContent() {
               size='sm'
               className='absolute top-1/2 right-1.5 -translate-y-1/2 rounded-lg text-xs h-8 px-3'
             >
-              Search
+              {t('actions.search')}
             </Button>
           </form>
 
           {/* Sort Dropdown */}
           <div className='flex items-center space-x-3'>
             <span className='text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:inline'>
-              Sort By:
+              {t('catalog.sortBy')}
             </span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -225,22 +230,25 @@ function CoursesContent() {
                   variant='outline'
                   className='flex h-11 items-center space-x-2 text-sm whitespace-nowrap rounded-xl border-gray-200'
                 >
-                  <span>{currentSortOption.label}</span>
+                  <span>{currentSortLabel}</span>
                   <ChevronDown className='h-4 w-4 text-gray-400' />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align='end' className='w-[240px] rounded-xl shadow-lg'>
-                {SORT_OPTIONS.map((opt) => (
-                  <DropdownMenuItem
-                    key={opt.label}
-                    onClick={() => handleSortSelect(opt)}
-                    className={`cursor-pointer text-xs py-2 ${
-                      opt.label === currentSortOption.label ? 'font-bold text-primary bg-primary/5' : ''
-                    }`}
-                  >
-                    {opt.label}
-                  </DropdownMenuItem>
-                ))}
+                {SORT_OPTIONS.map((opt) => {
+                  const label = t(`catalog.${opt.key}`);
+                  return (
+                    <DropdownMenuItem
+                      key={opt.key}
+                      onClick={() => handleSortSelect(opt)}
+                      className={`cursor-pointer text-xs py-2 ${
+                        opt.key === currentSortDef.key ? 'font-bold text-primary bg-primary/5' : ''
+                      }`}
+                    >
+                      {label}
+                    </DropdownMenuItem>
+                  );
+                })}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -253,15 +261,15 @@ function CoursesContent() {
             {/* Category Filter */}
             <div className='rounded-2xl p-5 bg-white border border-gray-100 shadow-xs'>
               <Title h={3} className='text-base font-bold text-gray-900 mb-1'>
-                Categories
+                {t('catalog.categories')}
               </Title>
               <span className='bg-primary block h-1 w-6 rounded-full mb-4' />
 
               <div className='space-y-2.5 max-h-[280px] overflow-y-auto pr-1'>
                 {isLoadingCategories ? (
-                  <p className='text-xs text-gray-400'>Loading categories...</p>
+                  <p className='text-xs text-gray-400'>{t('catalog.loadingCategories')}</p>
                 ) : categories.length === 0 ? (
-                  <p className='text-xs text-gray-400'>No categories found</p>
+                  <p className='text-xs text-gray-400'>{t('catalog.noCategories')}</p>
                 ) : (
                   categories.map((category) => {
                     const isChecked = categorySlugParam === category.slug;
@@ -289,7 +297,7 @@ function CoursesContent() {
                         </div>
                         {category.courseCount !== undefined && (
                           <span className='text-[11px] text-gray-400 font-mono'>
-                            {category.courseCount}
+                            {formatNumber(category.courseCount)}
                           </span>
                         )}
                       </div>
@@ -302,16 +310,16 @@ function CoursesContent() {
             {/* Level Filter */}
             <div className='rounded-2xl p-5 bg-white border border-gray-100 shadow-xs'>
               <Title h={3} className='text-base font-bold text-gray-900 mb-1'>
-                Difficulty Level
+                {t('catalog.level')}
               </Title>
               <span className='bg-primary block h-1 w-6 rounded-full mb-4' />
 
               <div className='space-y-2.5'>
                 {[
-                  { label: 'Beginner', val: 'BEGINNER' },
-                  { label: 'Intermediate', val: 'INTERMEDIATE' },
-                  { label: 'Advanced', val: 'ADVANCED' },
-                  { label: 'All Levels', val: 'ALL_LEVELS' },
+                  { label: t('catalog.beginner'), val: 'BEGINNER' },
+                  { label: t('catalog.intermediate'), val: 'INTERMEDIATE' },
+                  { label: t('catalog.advanced'), val: 'ADVANCED' },
+                  { label: t('catalog.allLevels'), val: 'ALL_LEVELS' },
                 ].map((lvl) => {
                   const isChecked = levelParam === lvl.val;
                   return (
@@ -343,7 +351,7 @@ function CoursesContent() {
             {/* Price Filter */}
             <div className='rounded-2xl p-5 bg-white border border-gray-100 shadow-xs'>
               <Title h={3} className='text-base font-bold text-gray-900 mb-1'>
-                Price
+                {t('catalog.price')}
               </Title>
               <span className='bg-primary block h-1 w-6 rounded-full mb-4' />
 
@@ -364,7 +372,7 @@ function CoursesContent() {
                       priceFilterParam === 'all' ? 'font-bold text-primary' : 'text-gray-600'
                     }`}
                   >
-                    All Courses
+                    {t('catalog.all')}
                   </Label>
                 </div>
 
@@ -384,7 +392,7 @@ function CoursesContent() {
                       priceFilterParam === 'free' ? 'font-bold text-primary' : 'text-gray-600'
                     }`}
                   >
-                    Free
+                    {t('catalog.free')}
                   </Label>
                 </div>
 
@@ -404,7 +412,7 @@ function CoursesContent() {
                       priceFilterParam === 'paid' ? 'font-bold text-primary' : 'text-gray-600'
                     }`}
                   >
-                    Paid
+                    {t('catalog.paid')}
                   </Label>
                 </div>
               </div>
@@ -419,7 +427,7 @@ function CoursesContent() {
                 className='w-full rounded-xl text-xs flex items-center justify-center space-x-1.5'
               >
                 <RotateCcw className='w-3.5 h-3.5' />
-                <span>Reset All Filters</span>
+                <span>{t('catalog.resetFilters')}</span>
               </Button>
             )}
           </aside>
@@ -444,12 +452,12 @@ function CoursesContent() {
             ) : isError ? (
               <div className='p-12 text-center bg-white rounded-2xl border border-gray-100 shadow-xs max-w-lg mx-auto'>
                 <AlertCircle className='w-12 h-12 text-red-500 mx-auto mb-3' />
-                <h3 className='text-lg font-bold text-gray-900 mb-1'>Unable to load courses</h3>
+                <h3 className='text-lg font-bold text-gray-900 mb-1'>{t('states.error')}</h3>
                 <p className='text-xs text-gray-500 mb-6'>
-                  {(error as any)?.response?.data?.message || 'An error occurred while contacting the catalog API.'}
+                  {(error as any)?.response?.data?.message || t('states.loadFailed')}
                 </p>
                 <Button onClick={() => refetch()} size='sm' className='rounded-xl'>
-                  Try Again
+                  {t('actions.retry')}
                 </Button>
               </div>
             ) : courses.length === 0 ? (
@@ -457,14 +465,14 @@ function CoursesContent() {
                 <div className='w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4'>
                   <BookOpen className='w-7 h-7' />
                 </div>
-                <h3 className='text-lg font-bold text-gray-900 mb-1'>No courses found</h3>
+                <h3 className='text-lg font-bold text-gray-900 mb-1'>{t('catalog.noCoursesFound')}</h3>
                 <p className='text-xs text-gray-500 mb-6'>
                   {searchParam || categorySlugParam || levelParam || priceFilterParam !== 'all'
-                    ? 'No public courses match your current search and filter selections.'
-                    : 'There are currently no published courses available in the catalog.'}
+                    ? t('catalog.noCoursesDescription')
+                    : t('catalog.noCoursesDescription')}
                 </p>
                 <Button onClick={handleResetFilters} variant='outline' size='sm' className='rounded-xl'>
-                  Clear Filters
+                  {t('catalog.resetFilters')}
                 </Button>
               </div>
             ) : (
@@ -484,6 +492,7 @@ function CoursesContent() {
                       disabled={!pagination.hasPreviousPage || isFetching}
                       onClick={() => updateUrlParams({ page: pagination.page - 1 })}
                       className='rounded-full h-10 w-10 disabled:opacity-40'
+                      aria-label={t('learning.previous')}
                     >
                       <ChevronLeft className='w-4 h-4' />
                     </Button>
@@ -502,7 +511,7 @@ function CoursesContent() {
                               isCurrent ? 'bg-primary text-white shadow-xs' : 'border-gray-200'
                             }`}
                           >
-                            {pageNum}
+                            {formatNumber(pageNum)}
                           </Button>
                         );
                       })}
@@ -514,6 +523,7 @@ function CoursesContent() {
                       disabled={!pagination.hasNextPage || isFetching}
                       onClick={() => updateUrlParams({ page: pagination.page + 1 })}
                       className='rounded-full h-10 w-10 disabled:opacity-40'
+                      aria-label={t('learning.next')}
                     >
                       <ChevronRight className='w-4 h-4' />
                     </Button>

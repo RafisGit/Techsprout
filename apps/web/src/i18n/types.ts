@@ -23,14 +23,15 @@ export const LOCALE_METADATA: Record<Locale, { name: string; nativeName: string;
 
 export type TranslationParams = Record<string, string | number>;
 
-export type TranslationFunction = (key: string, params?: TranslationParams) => string;
+export type TranslationFunction = ((key: string, params?: TranslationParams) => string) & Record<string, any>;
 
 export interface I18nContextValue {
   locale: Locale;
   setLocale: (locale: Locale) => void;
   t: TranslationFunction;
-  formatDate: (date: Date | string | number, options?: Intl.DateTimeFormatOptions) => string;
+  formatDate: (date: Date | string | number | null | undefined, options?: Intl.DateTimeFormatOptions) => string;
   formatNumber: (value: number | string, options?: Intl.NumberFormatOptions) => string;
   formatPercent: (value: number | string, options?: Intl.NumberFormatOptions) => string;
   formatCurrency: (amount: number | string | null | undefined, currency?: string) => string;
 }
+

@@ -30,6 +30,7 @@ import type {
   AssignmentSubmissionDto,
   AssignmentGradeDto,
 } from '@techsprout/contracts';
+import { useTranslation } from '@/i18n';
 
 interface LessonAssignmentsProps {
   courseId: string;
@@ -46,6 +47,7 @@ export function LessonAssignments({
   isInstructor,
   isAdmin,
 }: LessonAssignmentsProps) {
+  const { t, formatNumber, formatDate } = useTranslation();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -97,7 +99,7 @@ export function LessonAssignments({
       queryClient.invalidateQueries({ queryKey: ['assignmentSubmissions', courseId, activeAssignment?.id] });
     },
     onError: (err: any) => {
-      setFileError(err?.response?.data?.message || 'Submission upload failed. Please try again.');
+      setFileError(err?.response?.data?.message || t('assignments.failedToLoadAssignments'));
     },
   });
 
@@ -126,14 +128,14 @@ export function LessonAssignments({
     // Client-side extension validation
     const name = file.name.toLowerCase();
     if (!name.endsWith('.pdf') && !name.endsWith('.zip')) {
-      setFileError('Invalid file type. Only .pdf and .zip files are allowed.');
+      setFileError(t('assignments.invalidFileType'));
       setSelectedFile(null);
       return;
     }
 
     // Client-side 25MB size limit
     if (file.size > 25 * 1024 * 1024) {
-      setFileError('File size exceeds the 25 MB limit.');
+      setFileError(t('assignments.fileSizeExceeded'));
       setSelectedFile(null);
       return;
     }
@@ -148,10 +150,12 @@ export function LessonAssignments({
         <div>
           <div className='flex items-center gap-2'>
             <FileText className='w-5 h-5 text-primary' />
-            <h3 className='text-base sm:text-lg font-bold text-gray-900'>Project Assignments</h3>
+            <h3 className='text-base sm:text-lg font-bold text-gray-900'>
+              {t('assignments.projectAssignments')}
+            </h3>
           </div>
           <p className='text-xs text-gray-500 mt-1'>
-            Complete hands-on assignments, submit your code or design archive, and receive structured feedback.
+            {t('assignments.assignmentsSubtitle')}
           </p>
         </div>
 
@@ -173,16 +177,16 @@ export function LessonAssignments({
       {isLoading && (
         <div className='py-12 flex flex-col items-center justify-center space-y-3 text-gray-400'>
           <Loader2 className='w-6 h-6 animate-spin text-primary' />
-          <p className='text-xs font-medium'>Loading assignments...</p>
+          <p className='text-xs font-medium'>{t('assignments.loadingAssignments')}</p>
         </div>
       )}
 
       {isError && (
         <div className='p-6 text-center space-y-3 bg-red-50/50 rounded-2xl border border-red-100'>
           <AlertCircle className='w-6 h-6 text-red-500 mx-auto' />
-          <p className='text-xs font-semibold text-red-800'>Failed to load assignments.</p>
+          <p className='text-xs font-semibold text-red-800'>{t('assignments.failedToLoadAssignments')}</p>
           <Button onClick={() => refetch()} variant='outline' size='sm' className='rounded-xl text-xs'>
-            Retry
+            {t('assignments.retry')}
           </Button>
         </div>
       )}
@@ -191,9 +195,9 @@ export function LessonAssignments({
       {!isLoading && !isError && assignmentList.length === 0 && (
         <div className='py-12 text-center space-y-3 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200'>
           <BookOpen className='w-8 h-8 text-gray-300 mx-auto' />
-          <p className='text-sm font-semibold text-gray-700'>No assignments for this lesson</p>
+          <p className='text-sm font-semibold text-gray-700'>{t('assignments.noAssignmentsForLesson')}</p>
           <p className='text-xs text-gray-400 max-w-sm mx-auto'>
-            There are currently no hands-on project submissions required for this specific lesson.
+            {t('assignments.noAssignmentsDesc')}
           </p>
         </div>
       )}
@@ -206,13 +210,18 @@ export function LessonAssignments({
             <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-200/60 pb-3'>
               <h4 className='text-base font-bold text-gray-900'>{activeAssignment.title}</h4>
               <div className='flex items-center gap-3 text-xs text-gray-500'>
-                <span>Max Score: <strong className='text-gray-900'>{activeAssignment.maxScore} pts</strong></span>
+                <span>
+                  {t('assignments.maxScore')}{' '}
+                  <strong className='text-gray-900'>
+                    {formatNumber(activeAssignment.maxScore)} {t('quiz.pts')}
+                  </strong>
+                </span>
                 {activeAssignment.dueDate && (
                   <>
                     <span>•</span>
                     <span className='flex items-center gap-1'>
                       <Clock className='w-3.5 h-3.5' />
-                      Due: {new Date(activeAssignment.dueDate).toLocaleDateString()}
+                      {t('assignments.due', { date: formatDate(activeAssignment.dueDate) })}
                     </span>
                   </>
                 )}
@@ -224,7 +233,9 @@ export function LessonAssignments({
             {/* Detailed Instructions if available */}
             {activeAssignment.instructions && (
               <div className='mt-3 pt-3 border-t border-gray-200/60 space-y-1.5'>
-                <span className='text-xs font-bold text-gray-800 uppercase tracking-wider'>Instructions:</span>
+                <span className='text-xs font-bold text-gray-800 uppercase tracking-wider'>
+                  {t('assignments.instructions')}
+                </span>
                 <SafeMarkdown content={activeAssignment.instructions} className='text-xs text-gray-600' />
               </div>
             )}
@@ -234,14 +245,16 @@ export function LessonAssignments({
               <div className='pt-3 border-t border-gray-200/60 space-y-2'>
                 <span className='text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5'>
                   <Award className='w-3.5 h-3.5 text-primary' />
-                  <span>Grading Rubric</span>
+                  <span>{t('assignments.gradingRubric')}</span>
                 </span>
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-2.5'>
                   {activeAssignment.rubric.map((crit) => (
                     <div key={crit.id} className='bg-white rounded-xl border border-gray-200/80 p-3 text-xs space-y-1'>
                       <div className='flex items-center justify-between font-bold text-gray-900'>
                         <span>{crit.title}</span>
-                        <span className='text-primary'>{crit.maxScore} pts</span>
+                        <span className='text-primary'>
+                          {formatNumber(crit.maxScore)} {t('quiz.pts')}
+                        </span>
                       </div>
                       {crit.description && <p className='text-gray-500 text-[11px]'>{crit.description}</p>}
                     </div>
@@ -257,7 +270,7 @@ export function LessonAssignments({
               <div className='flex items-center justify-between pb-3 border-b border-gray-100'>
                 <div className='flex items-center gap-2'>
                   <FileCheck className='w-4 h-4 text-primary' />
-                  <h4 className='text-sm font-bold text-gray-900'>Your Submission</h4>
+                  <h4 className='text-sm font-bold text-gray-900'>{t('assignments.yourSubmission')}</h4>
                 </div>
                 {activeAssignment.userSubmission && (
                   <span
@@ -285,12 +298,11 @@ export function LessonAssignments({
                         )}
                         <span>{activeAssignment.userSubmission.originalFilename}</span>
                         <span className='text-gray-400 font-normal'>
-                          ({Math.round(activeAssignment.userSubmission.fileSizeBytes / 1024)} KB)
+                          ({formatNumber(Math.round(activeAssignment.userSubmission.fileSizeBytes / 1024))} KB)
                         </span>
                       </div>
                       <p className='text-gray-500'>
-                        Version {activeAssignment.userSubmission.version} • Submitted on{' '}
-                        {new Date(activeAssignment.userSubmission.submittedAt).toLocaleString()}
+                        Version {formatNumber(activeAssignment.userSubmission.version)} • {formatDate(activeAssignment.userSubmission.submittedAt)}
                       </p>
                     </div>
 
@@ -301,7 +313,7 @@ export function LessonAssignments({
                       className='inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-semibold text-xs transition-all'
                     >
                       <Download className='w-3.5 h-3.5' />
-                      <span>Download Archive</span>
+                      <span>{t('assignments.downloadArchive')}</span>
                     </a>
                   </div>
 
@@ -311,16 +323,16 @@ export function LessonAssignments({
                       <div className='flex items-center justify-between'>
                         <span className='text-xs font-bold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5'>
                           <CheckCircle2 className='w-4 h-4 text-emerald-600' />
-                          <span>Evaluation Result</span>
+                          <span>{t('assignments.evaluationResult')}</span>
                         </span>
                         <span className='text-base font-extrabold text-emerald-700'>
-                          {activeAssignment.userSubmission.grade.score} / {activeAssignment.maxScore} pts (
-                          {activeAssignment.userSubmission.grade.percentage}%)
+                          {formatNumber(activeAssignment.userSubmission.grade.score)} / {formatNumber(activeAssignment.maxScore)} {t('quiz.pts')} (
+                          {formatNumber(activeAssignment.userSubmission.grade.percentage)}%)
                         </span>
                       </div>
                       {activeAssignment.userSubmission.grade.feedback && (
                         <div className='text-xs text-emerald-950 pt-1'>
-                          <strong>Instructor Feedback:</strong>
+                          <strong>{t('assignments.instructorFeedback')}:</strong>
                           <p className='mt-1 leading-relaxed'>{activeAssignment.userSubmission.grade.feedback}</p>
                         </div>
                       )}
@@ -330,7 +342,7 @@ export function LessonAssignments({
                   {activeAssignment.allowResubmission && activeAssignment.status === 'PUBLISHED' && (
                     <div className='pt-2 border-t border-gray-100'>
                       <p className='text-xs text-gray-500 mb-3'>
-                        Need to update your submission? You can upload a new version below.
+                        {t('assignments.resubmissionPrompt')}
                       </p>
                     </div>
                   )}
@@ -347,10 +359,11 @@ export function LessonAssignments({
                   >
                     <Upload className='w-8 h-8 text-gray-400 mx-auto' />
                     <div className='text-xs text-gray-600'>
-                      <span className='font-bold text-primary'>Click to upload</span> or drag and drop
+                      <span className='font-bold text-primary'>{t('assignments.clickToUpload')}</span>{' '}
+                      {t('assignments.dragAndDrop')}
                     </div>
                     <p className='text-[11px] text-gray-400'>
-                      ZIP or PDF files only (Maximum file size: 25 MB)
+                      {t('assignments.fileRequirements')}
                     </p>
                     <input
                       ref={fileInputRef}
@@ -366,7 +379,7 @@ export function LessonAssignments({
                       <div className='flex items-center gap-2'>
                         <FileCheck className='w-4 h-4 text-primary' />
                         <span className='font-bold'>{selectedFile.name}</span>
-                        <span className='text-purple-600'>({Math.round(selectedFile.size / 1024)} KB)</span>
+                        <span className='text-purple-600'>({formatNumber(Math.round(selectedFile.size / 1024))} KB)</span>
                       </div>
                       <Button
                         size='sm'
@@ -374,18 +387,20 @@ export function LessonAssignments({
                         onClick={() => setSelectedFile(null)}
                         className='h-6 px-2 text-xs text-red-600 hover:bg-red-50'
                       >
-                        Remove
+                        {t('assignments.removeFile')}
                       </Button>
                     </div>
                   )}
 
                   <div className='space-y-1.5'>
-                    <label className='text-xs font-semibold text-gray-700'>Notes for Instructor (Optional)</label>
+                    <label className='text-xs font-semibold text-gray-700'>
+                      {t('assignments.notesForInstructor')}
+                    </label>
                     <input
                       type='text'
                       value={studentNotes}
                       onChange={(e) => setStudentNotes(e.target.value)}
-                      placeholder='e.g., Implemented the extra credit challenge in src/extra.ts'
+                      placeholder={t('assignments.notesPlaceholderInput')}
                       className='w-full rounded-xl border border-gray-200 px-3.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary'
                     />
                   </div>
@@ -405,7 +420,7 @@ export function LessonAssignments({
                     {submitMutation.isPending ? (
                       <Loader2 className='w-4 h-4 animate-spin' />
                     ) : (
-                      'Submit Assignment'
+                      t('assignments.submitAssignmentBtn')
                     )}
                   </Button>
                 </div>
@@ -420,16 +435,18 @@ export function LessonAssignments({
                 <div className='flex items-center gap-2'>
                   <Award className='w-4 h-4 text-primary' />
                   <h4 className='text-sm font-bold text-gray-900'>
-                    Student Submissions ({submissionsData?.total || 0})
+                    {t('assignments.studentSubmissions', { count: formatNumber(submissionsData?.total || 0) })}
                   </h4>
                 </div>
               </div>
 
               {isSubmissionsLoading ? (
-                <div className='py-6 text-center text-xs text-gray-400'>Loading student submissions...</div>
+                <div className='py-6 text-center text-xs text-gray-400'>
+                  {t('assignments.loadingStudentSubmissions')}
+                </div>
               ) : submissionsData?.data?.length === 0 ? (
                 <div className='py-6 text-center text-xs text-gray-400'>
-                  No student submissions received for this assignment yet.
+                  {t('assignments.noStudentSubmissions')}
                 </div>
               ) : (
                 <div className='space-y-3'>
@@ -453,18 +470,18 @@ export function LessonAssignments({
                           </span>
                         </div>
                         <div className='text-gray-500 flex items-center gap-2'>
-                          <span>Version {sub.version}</span>
+                          <span>Version {formatNumber(sub.version)}</span>
                           <span>•</span>
                           <span>{sub.originalFilename}</span>
                           <span>•</span>
-                          <span>{new Date(sub.submittedAt).toLocaleString()}</span>
+                          <span>{formatDate(sub.submittedAt)}</span>
                         </div>
                         {sub.studentNotes && (
                           <p className='text-gray-600 italic text-[11px]'>Note: "{sub.studentNotes}"</p>
                         )}
                         {sub.grade && (
                           <p className='text-emerald-700 font-bold'>
-                            Score: {sub.grade.score}/{activeAssignment.maxScore} pts ({sub.grade.percentage}%)
+                            Score: {formatNumber(sub.grade.score)}/{formatNumber(activeAssignment.maxScore)} {t('quiz.pts')} ({formatNumber(sub.grade.percentage)}%)
                           </p>
                         )}
                       </div>
@@ -476,7 +493,7 @@ export function LessonAssignments({
                           rel='noopener noreferrer'
                           className='px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-semibold text-xs'
                         >
-                          Download
+                          {t('assignments.downloadArchive')}
                         </a>
                         <Button
                           size='sm'
@@ -508,14 +525,14 @@ export function LessonAssignments({
                       onClick={() => setGradingSubmissionId(null)}
                       className='h-6 text-xs'
                     >
-                      Cancel
+                      {t('actions.cancel')}
                     </Button>
                   </div>
 
                   <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
                     <div className='space-y-1'>
                       <label className='text-xs font-semibold text-gray-700'>
-                        Numeric Score (Max: {activeAssignment.maxScore})
+                        Numeric Score (Max: {formatNumber(activeAssignment.maxScore)})
                       </label>
                       <input
                         type='number'

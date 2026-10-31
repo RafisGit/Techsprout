@@ -40,7 +40,7 @@ export function createTranslate(locale: Locale = DEFAULT_LOCALE): TranslationFun
   const targetDict = messages[locale] || messages[DEFAULT_LOCALE];
   const defaultDict = messages[DEFAULT_LOCALE];
 
-  return (key: string, params?: TranslationParams): string => {
+  const translateFn = (key: string, params?: TranslationParams): string => {
     // 1. Try target locale
     let text = getMessage(targetDict, key);
 
@@ -67,4 +67,6 @@ export function createTranslate(locale: Locale = DEFAULT_LOCALE): TranslationFun
 
     return text;
   };
+
+  return Object.assign(translateFn, targetDict) as unknown as TranslationFunction;
 }

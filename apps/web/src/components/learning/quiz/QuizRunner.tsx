@@ -23,6 +23,7 @@ import type {
 } from '@techsprout/contracts';
 import { QuizTimer } from './QuizTimer';
 import { saveAttemptAnswers } from '@/lib/api/quizzes';
+import { useTranslation } from '@/i18n';
 
 interface QuizRunnerProps {
   quiz: StudentQuizDto;
@@ -37,6 +38,7 @@ export function QuizRunner({
   onSubmitted,
   isSubmitting = false,
 }: QuizRunnerProps) {
+  const { t, formatNumber } = useTranslation();
   const questions = attempt.questions || [];
   const [currentIdx, setCurrentIdx] = useState(0);
 
@@ -158,7 +160,7 @@ export function QuizRunner({
   if (!currentQuestion) {
     return (
       <div className='p-8 text-center text-sm text-gray-500'>
-        No questions found for this assessment.
+        {t('quiz.noQuestionsFound')}
       </div>
     );
   }
@@ -173,11 +175,11 @@ export function QuizRunner({
         <div className='space-y-1'>
           <div className='flex items-center gap-2'>
             <span className='text-xs font-bold text-gray-900'>
-              Attempt #{attempt.attemptNumber}
+              {t('quiz.attemptNumber', { number: formatNumber(attempt.attemptNumber) })}
             </span>
             <span className='text-gray-300'>•</span>
             <span className='text-xs font-medium text-gray-500'>
-              Question {currentIdx + 1} of {questions.length}
+              {t('quiz.question', { current: formatNumber(currentIdx + 1), total: formatNumber(questions.length) })}
             </span>
           </div>
 
@@ -186,14 +188,14 @@ export function QuizRunner({
             {saveStatus === 'saving' ? (
               <>
                 <Loader2 className='w-3 h-3 animate-spin text-primary' />
-                <span>Saving answers...</span>
+                <span>{t('quiz.savingAnswers')}</span>
               </>
             ) : saveStatus === 'error' ? (
-              <span className='text-amber-600'>Changes not saved. Retrying soon...</span>
+              <span className='text-amber-600'>{t('quiz.changesNotSaved')}</span>
             ) : (
               <>
                 <Check className='w-3 h-3 text-emerald-500' />
-                <span>All answers saved</span>
+                <span>{t('quiz.allAnswersSaved')}</span>
               </>
             )}
           </div>
@@ -241,10 +243,11 @@ export function QuizRunner({
       <div className='space-y-4 pt-2' data-testid={`question-box-${currentQuestion.id}`}>
         <div className='flex items-center justify-between gap-3'>
           <span className='text-xs font-bold uppercase tracking-wider text-primary'>
-            Question {currentIdx + 1}
+            {t('quiz.question', { current: formatNumber(currentIdx + 1), total: formatNumber(questions.length) })}
           </span>
           <span className='text-xs font-semibold text-gray-500'>
-            {currentQuestion.points} {currentQuestion.points === 1 ? 'point' : 'points'}
+            {formatNumber(currentQuestion.points)}{' '}
+            {currentQuestion.points === 1 ? t('quiz.point') : t('quiz.points')}
           </span>
         </div>
 
@@ -256,10 +259,10 @@ export function QuizRunner({
         {/* Question Subtitle / Type Hint */}
         <p className='text-xs text-gray-400'>
           {currentQuestion.questionType === 'MULTIPLE_CHOICE'
-            ? 'Select all options that apply.'
+            ? t('quiz.selectAllApply')
             : currentQuestion.questionType === 'TRUE_FALSE'
-            ? 'Select True or False.'
-            : 'Select one option.'}
+            ? t('quiz.selectTrueFalse')
+            : t('quiz.selectOneOption')}
         </p>
 
         {/* Options List */}
@@ -330,12 +333,15 @@ export function QuizRunner({
           data-testid='btn-prev-question'
         >
           <ArrowLeft className='w-4 h-4 mr-1.5' />
-          Previous
+          {t('quiz.previous')}
         </Button>
 
         {/* Progress Summary in Center */}
         <span className='text-xs text-gray-500 hidden sm:inline-block'>
-          {answeredCount} of {questions.length} answered
+          {t('quiz.answeredSummary', {
+            answered: formatNumber(answeredCount),
+            total: formatNumber(questions.length),
+          })}
         </span>
 
         {/* Next Question or Submit Trigger */}
@@ -347,7 +353,7 @@ export function QuizRunner({
             className='rounded-xl text-xs font-bold px-5 py-2 bg-primary text-white hover:bg-primary/90'
             data-testid='btn-next-question'
           >
-            Next
+            {t('quiz.next')}
             <ArrowRight className='w-4 h-4 ml-1.5' />
           </Button>
         ) : (
@@ -359,7 +365,7 @@ export function QuizRunner({
             data-testid='btn-submit-quiz'
           >
             <Send className='w-4 h-4 mr-1.5' />
-            Finish & Submit
+            {t('quiz.finishAndSubmit')}
           </Button>
         )}
       </div>
@@ -376,9 +382,9 @@ export function QuizRunner({
                 <Send className='w-5 h-5' />
               </div>
               <div>
-                <h3 className='text-base font-bold text-gray-900'>Submit Assessment</h3>
+                <h3 className='text-base font-bold text-gray-900'>{t('quiz.submitAssessment')}</h3>
                 <p className='text-xs text-gray-500'>
-                  Are you ready to submit your attempt for grading?
+                  {t('quiz.readyToSubmit')}
                 </p>
               </div>
             </div>
@@ -387,15 +393,15 @@ export function QuizRunner({
               <div className='p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2.5'>
                 <AlertCircle className='w-4 h-4 text-amber-600 shrink-0 mt-0.5' />
                 <div>
-                  <span className='font-bold'>Incomplete Questions: </span>
-                  You have <span className='font-bold'>{unansweredCount}</span> unanswered{' '}
-                  {unansweredCount === 1 ? 'question' : 'questions'}. You may still submit, but unanswered questions
-                  receive 0 points.
+                  <span className='font-bold'>{t('quiz.incompleteQuestions')} </span>
+                  {t('quiz.incompleteQuestionsDesc', { count: formatNumber(unansweredCount) })}
+
+
                 </div>
               </div>
             ) : (
               <p className='text-xs text-gray-600'>
-                You have answered all {questions.length} questions. Your answers will be authoritatively graded by the server.
+                {t('quiz.allAnsweredDesc', { count: formatNumber(questions.length) })}
               </p>
             )}
 
@@ -407,7 +413,7 @@ export function QuizRunner({
                 onClick={() => setShowSubmitConfirm(false)}
                 className='rounded-xl text-xs font-semibold px-4 py-2 border-gray-200'
               >
-                Continue Answering
+                {t('quiz.continueAnswering')}
               </Button>
               <Button
                 type='button'
@@ -422,10 +428,10 @@ export function QuizRunner({
                 {isSubmitting ? (
                   <>
                     <Loader2 className='w-4 h-4 mr-1.5 animate-spin' />
-                    Submitting...
+                    {t('quiz.submitting')}
                   </>
                 ) : (
-                  'Confirm & Submit'
+                  t('quiz.confirmAndSubmit')
                 )}
               </Button>
             </div>
