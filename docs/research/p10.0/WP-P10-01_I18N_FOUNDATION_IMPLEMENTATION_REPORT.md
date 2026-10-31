@@ -10,6 +10,7 @@
 **Primary Locales:** English (`en`, default) and Bangla (`bn`)  
 **Feature Branch:** `feat/p10-i18n-foundation`  
 **Baseline Commit:** `6db61a7` (`feat(release): reconcile P6.3 candidate with main`)  
+**Implementation Commit SHA:** `7c8f9579b3ec3caa8b5a3e2dff2c1529b4461fa6`  
 
 ---
 
