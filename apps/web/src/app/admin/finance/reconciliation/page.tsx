@@ -8,10 +8,11 @@ import {
   reconcileRefund,
   initiateRefund,
   scanReconciliation,
-  formatBDT,
 } from '@/lib/api/finance';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { FinanceSubNav } from '@/components/admin/FinanceSubNav';
+import { useTranslation } from '@/i18n/client';
+import { formatCurrency, formatDate, formatNumber } from '@/i18n/format';
 import Link from 'next/link';
 import {
   RotateCcw,
@@ -21,12 +22,10 @@ import {
   AlertTriangle,
   AlertCircle,
   Link2,
-  Search,
   Loader2,
   ShieldAlert,
   X,
   Play,
-  Check,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
@@ -39,6 +38,7 @@ import type {
 } from '@techsprout/contracts';
 
 export default function AdminReconciliationPage() {
+  const { t, locale } = useTranslation();
   const queryClient = useQueryClient();
   const { data: currentUser, isLoading: isLoadingUser } = useCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
@@ -93,7 +93,7 @@ export default function AdminReconciliationPage() {
     mutationFn: (refundId: string) => queryRefundStatus(refundId),
     onSuccess: (data) => {
       setFeedbackSuccess(
-        `Settlement state queried for ${data.refundNumber}: current status is '${data.status}'.`
+        `${data.refundNumber}: ${data.status}`
       );
       invalidateData();
       setTimeout(() => setFeedbackSuccess(null), 5000);
@@ -115,7 +115,7 @@ export default function AdminReconciliationPage() {
     onSuccess: (data) => {
       setLinkRefTarget(null);
       setProviderRefInput('');
-      setFeedbackSuccess(`Provider reference linked to ${data.refundNumber} successfully.`);
+      setFeedbackSuccess(`${data.refundNumber}`);
       invalidateData();
       setTimeout(() => setFeedbackSuccess(null), 5000);
     },
@@ -135,7 +135,7 @@ export default function AdminReconciliationPage() {
     onSuccess: (data) => {
       setMarkFailedTarget(null);
       setFailReasonInput('');
-      setFeedbackSuccess(`Refund ${data.refundNumber} marked as FAILED for subsequent retry.`);
+      setFeedbackSuccess(`${data.refundNumber}`);
       invalidateData();
       setTimeout(() => setFeedbackSuccess(null), 5000);
     },
@@ -150,7 +150,7 @@ export default function AdminReconciliationPage() {
     mutationFn: ({ orderId, reason }: { orderId: string; reason: string }) =>
       initiateRefund(orderId, reason),
     onSuccess: (data) => {
-      setFeedbackSuccess(`Refund retry initiated: ${data.refundNumber} (Status: ${data.status}).`);
+      setFeedbackSuccess(`${data.refundNumber}: ${data.status}`);
       invalidateData();
       setTimeout(() => setFeedbackSuccess(null), 5000);
     },
@@ -167,7 +167,7 @@ export default function AdminReconciliationPage() {
     onSuccess: (data) => {
       setScanResult(data);
       setFeedbackSuccess(
-        `Reconciliation scan completed: ${data.totalOrdersScanned} orders scanned, ${data.discrepanciesFoundCount} discrepancies found, ${data.autoResolvedCount} auto-resolved.`
+        `${t.admin.reconciliation.scanResults}: ${data.totalOrdersScanned}`
       );
       if (!isDryRun) {
         invalidateData();
@@ -186,15 +186,15 @@ export default function AdminReconciliationPage() {
     return (
       <div className='max-w-2xl mx-auto p-8 bg-red-50 border border-red-200 text-red-800 rounded-2xl shadow-xs text-center'>
         <ShieldAlert className='w-12 h-12 text-red-600 mx-auto mb-3' />
-        <h2 className='text-xl font-bold mb-1'>Administrator Access Required</h2>
+        <h2 className='text-xl font-bold mb-1'>{t.admin.reconciliation.accessDeniedTitle}</h2>
         <p className='text-xs text-gray-600 mb-4'>
-          Reconciliation and refund administration operations are strictly restricted to system administrators.
+          {t.admin.reconciliation.accessDeniedDesc}
         </p>
         <Link
           href='/dashboard'
           className='px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition'
         >
-          Return to Dashboard
+          {t.admin.reconciliation.returnToDashboard}
         </Link>
       </div>
     );
@@ -209,10 +209,10 @@ export default function AdminReconciliationPage() {
       <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
         <div>
           <h1 className='text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight'>
-            Reconciliation & Refund Operations
+            {t.admin.reconciliation.title}
           </h1>
           <p className='text-sm text-gray-500 mt-1'>
-            Manage refund lifecycles, query provider settlements, resolve manual review cases, and scan order discrepancies.
+            {t.admin.reconciliation.subtitle}
           </p>
         </div>
       </div>
@@ -231,7 +231,7 @@ export default function AdminReconciliationPage() {
             onClick={() => setFeedbackSuccess(null)}
             className='text-xs font-semibold hover:underline'
           >
-            Dismiss
+            ×
           </button>
         </div>
       )}
@@ -246,7 +246,7 @@ export default function AdminReconciliationPage() {
             onClick={() => setFeedbackError(null)}
             className='text-xs font-semibold hover:underline'
           >
-            Dismiss
+            ×
           </button>
         </div>
       )}
@@ -261,7 +261,7 @@ export default function AdminReconciliationPage() {
               : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
-          Refund Operations
+          {t.admin.reconciliation.tabRefunds}
         </button>
         <button
           onClick={() => setActiveTab('scanner')}
@@ -271,7 +271,7 @@ export default function AdminReconciliationPage() {
               : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
-          Discrepancy Scanner
+          {t.admin.reconciliation.tabScanner}
         </button>
       </div>
 
@@ -281,7 +281,7 @@ export default function AdminReconciliationPage() {
           {/* Filter Bar */}
           <div className='bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
             <div className='flex items-center space-x-2'>
-              <span className='text-xs font-semibold text-gray-500'>Filter Status:</span>
+              <span className='text-xs font-semibold text-gray-500'>{t.admin.reconciliation.filterStatus}</span>
               <button
                 onClick={() => {
                   setRefundStatusFilter('');
@@ -293,7 +293,7 @@ export default function AdminReconciliationPage() {
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
-                All
+                {t.admin.reconciliation.filterAll}
               </button>
               <button
                 onClick={() => {
@@ -306,7 +306,7 @@ export default function AdminReconciliationPage() {
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
-                Pending
+                {t.admin.reconciliation.filterPending}
               </button>
               <button
                 onClick={() => {
@@ -319,7 +319,7 @@ export default function AdminReconciliationPage() {
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
-                Processed
+                {t.admin.reconciliation.filterProcessed}
               </button>
               <button
                 onClick={() => {
@@ -332,7 +332,7 @@ export default function AdminReconciliationPage() {
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
-                Failed
+                {t.admin.reconciliation.filterFailed}
               </button>
             </div>
           </div>
@@ -342,12 +342,12 @@ export default function AdminReconciliationPage() {
             {isLoadingRefunds ? (
               <div className='p-16 text-center'>
                 <Loader2 className='w-8 h-8 text-amber-600 animate-spin mx-auto mb-3' />
-                <p className='text-sm text-gray-500'>Loading refund records...</p>
+                <p className='text-sm text-gray-500'>{t.admin.reconciliation.loadingRefunds}</p>
               </div>
             ) : isRefundsError ? (
               <div className='p-12 text-center max-w-md mx-auto'>
                 <AlertCircle className='w-10 h-10 text-red-500 mx-auto mb-3' />
-                <h3 className='text-base font-semibold text-gray-900 mb-1'>Failed to load refunds</h3>
+                <h3 className='text-base font-semibold text-gray-900 mb-1'>{t.admin.reconciliation.errorTitle}</h3>
                 <p className='text-xs text-gray-500 mb-4'>
                   {(refundsError as any)?.response?.data?.message || 'Network error fetching refunds.'}
                 </p>
@@ -355,7 +355,7 @@ export default function AdminReconciliationPage() {
                   onClick={() => refetchRefunds()}
                   className='px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition'
                 >
-                  Retry
+                  {t.admin.reconciliation.retry}
                 </button>
               </div>
             ) : refundItems.length === 0 ? (
@@ -363,11 +363,11 @@ export default function AdminReconciliationPage() {
                 <div className='w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3 text-gray-400'>
                   <RotateCcw className='w-6 h-6' />
                 </div>
-                <h3 className='text-base font-semibold text-gray-900 mb-1'>No refund operations found</h3>
+                <h3 className='text-base font-semibold text-gray-900 mb-1'>{t.admin.reconciliation.noRefunds}</h3>
                 <p className='text-xs text-gray-500 mb-4'>
                   {refundStatusFilter
-                    ? `No refunds found with status '${refundStatusFilter}'.`
-                    : 'No refund requests have been recorded in the system.'}
+                    ? t.admin.reconciliation.noRefundsFiltered.replace('{status}', refundStatusFilter)
+                    : t.admin.reconciliation.noRefundsEmpty}
                 </p>
               </div>
             ) : (
@@ -375,13 +375,13 @@ export default function AdminReconciliationPage() {
                 <table className='w-full text-left text-sm text-gray-600'>
                   <thead className='bg-gray-50/80 text-xs font-semibold text-gray-700 uppercase border-b border-gray-200'>
                     <tr>
-                      <th scope='col' className='px-4 py-3.5'>Refund #</th>
-                      <th scope='col' className='px-4 py-3.5'>Amount</th>
-                      <th scope='col' className='px-4 py-3.5'>Status / Lifecycle</th>
-                      <th scope='col' className='px-4 py-3.5'>Provider Ref</th>
-                      <th scope='col' className='px-4 py-3.5'>Reason</th>
-                      <th scope='col' className='px-4 py-3.5'>Created</th>
-                      <th scope='col' className='px-4 py-3.5 text-right'>Action</th>
+                      <th scope='col' className='px-4 py-3.5'>{t.admin.reconciliation.thRefund}</th>
+                      <th scope='col' className='px-4 py-3.5'>{t.admin.reconciliation.thAmount}</th>
+                      <th scope='col' className='px-4 py-3.5'>{t.admin.reconciliation.thStatusLifecycle}</th>
+                      <th scope='col' className='px-4 py-3.5'>{t.admin.reconciliation.thGatewayRef}</th>
+                      <th scope='col' className='px-4 py-3.5'>{t.admin.reconciliation.thReason}</th>
+                      <th scope='col' className='px-4 py-3.5'>{t.admin.reconciliation.thCreatedAt}</th>
+                      <th scope='col' className='px-4 py-3.5 text-right'>{t.admin.reconciliation.thActions}</th>
                     </tr>
                   </thead>
                   <tbody className='divide-y divide-gray-100'>
@@ -398,32 +398,32 @@ export default function AdminReconciliationPage() {
                           </td>
 
                           <td className='px-4 py-3.5 whitespace-nowrap font-bold text-gray-900'>
-                            {formatBDT(ref.amountCents)}
+                            {formatCurrency((ref.amountCents || 0) / 100, locale)}
                           </td>
 
                           <td className='px-4 py-3.5 whitespace-nowrap'>
                             {isProcessed && (
                               <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200'>
                                 <CheckCircle2 className='w-3 h-3 mr-1 text-emerald-500' />
-                                Processed
+                                {t.admin.reconciliation.statusProcessed}
                               </span>
                             )}
                             {isFailed && (
                               <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200'>
                                 <XCircle className='w-3 h-3 mr-1 text-red-500' />
-                                Failed
+                                {t.admin.reconciliation.statusFailed}
                               </span>
                             )}
                             {isPendingWithRef && (
                               <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200'>
                                 <Clock className='w-3 h-3 mr-1 text-blue-500' />
-                                Awaiting Settlement
+                                {t.admin.reconciliation.statusAwaitingSettlement}
                               </span>
                             )}
                             {isPendingNoRef && (
                               <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-300'>
                                 <AlertTriangle className='w-3 h-3 mr-1 text-amber-600' />
-                                Manual Review Required
+                                {t.admin.reconciliation.statusManualReview}
                               </span>
                             )}
                           </td>
@@ -431,7 +431,7 @@ export default function AdminReconciliationPage() {
                           <td className='px-4 py-3.5 whitespace-nowrap font-mono text-xs text-gray-700'>
                             {ref.providerRefundRef || (
                               <span className='text-amber-600 italic font-sans font-medium text-[11px]'>
-                                Missing (Ambiguous)
+                                {t.admin.reconciliation.missingRef}
                               </span>
                             )}
                           </td>
@@ -441,7 +441,7 @@ export default function AdminReconciliationPage() {
                           </td>
 
                           <td className='px-4 py-3.5 whitespace-nowrap text-xs text-gray-500'>
-                            {new Date(ref.createdAt).toLocaleDateString()}
+                            {formatDate(ref.createdAt, locale)}
                           </td>
 
                           <td className='px-4 py-3.5 text-right whitespace-nowrap'>
@@ -452,14 +452,14 @@ export default function AdminReconciliationPage() {
                                   onClick={() => queryStatusMutation.mutate(ref.id)}
                                   disabled={queryStatusMutation.isPending}
                                   className='inline-flex items-center space-x-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50'
-                                  title='Check Gateway Clearing State'
+                                  title={t.admin.reconciliation.checkStatus}
                                 >
                                   {queryStatusMutation.isPending ? (
                                     <Loader2 className='w-3 h-3 animate-spin' />
                                   ) : (
                                     <RefreshCw className='w-3 h-3' />
                                   )}
-                                  <span>Check Status</span>
+                                  <span>{t.admin.reconciliation.checkStatus}</span>
                                 </button>
                               )}
 
@@ -472,10 +472,10 @@ export default function AdminReconciliationPage() {
                                       setProviderRefInput('');
                                     }}
                                     className='px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition'
-                                    title='Link Provider Reference'
+                                    title={t.admin.reconciliation.linkRef}
                                   >
                                     <Link2 className='w-3 h-3 mr-1 inline' />
-                                    Link Ref
+                                    {t.admin.reconciliation.linkRef}
                                   </button>
                                   <button
                                     onClick={() => {
@@ -483,9 +483,9 @@ export default function AdminReconciliationPage() {
                                       setFailReasonInput('');
                                     }}
                                     className='px-2.5 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition'
-                                    title='Mark Failed to enable retry'
+                                    title={t.admin.reconciliation.markFailed}
                                   >
-                                    Mark Failed
+                                    {t.admin.reconciliation.markFailed}
                                   </button>
                                 </div>
                               )}
@@ -501,17 +501,17 @@ export default function AdminReconciliationPage() {
                                   }
                                   disabled={retryRefundMutation.isPending}
                                   className='inline-flex items-center space-x-1 px-3 py-1.5 bg-gray-900 hover:bg-black text-white text-xs font-semibold rounded-lg transition disabled:opacity-50'
-                                  title='Retry Refund'
+                                  title={t.admin.reconciliation.retryRefund}
                                 >
                                   <RotateCcw className='w-3 h-3' />
-                                  <span>Retry</span>
+                                  <span>{t.admin.reconciliation.retryRefund}</span>
                                 </button>
                               )}
 
                               {/* PROCESSED -> Terminal */}
                               {isProcessed && (
                                 <span className='text-xs text-gray-400 italic px-2'>
-                                  Settled
+                                  {t.admin.reconciliation.settled}
                                 </span>
                               )}
                             </div>
@@ -528,8 +528,9 @@ export default function AdminReconciliationPage() {
             {pagination && pagination.totalPages > 1 && (
               <div className='p-4 border-t border-gray-200 flex items-center justify-between text-xs text-gray-600'>
                 <div>
-                  Page <span className='font-bold text-gray-900'>{pagination.page}</span> of{' '}
-                  <span className='font-bold text-gray-900'>{pagination.totalPages}</span>
+                  {t.admin.reconciliation.pagination
+                    .replace('{page}', formatNumber(pagination.page, locale))
+                    .replace('{totalPages}', formatNumber(pagination.totalPages, locale))}
                 </div>
                 <div className='flex items-center space-x-2'>
                   <button
@@ -537,14 +538,14 @@ export default function AdminReconciliationPage() {
                     disabled={!pagination.hasPreviousPage}
                     className='px-3 py-1.5 rounded-lg border border-gray-200 font-semibold hover:bg-gray-50 disabled:opacity-40 transition'
                   >
-                    Previous
+                    {t.admin.reconciliation.prev}
                   </button>
                   <button
                     onClick={() => setPage((p) => p + 1)}
                     disabled={!pagination.hasNextPage}
                     className='px-3 py-1.5 rounded-lg border border-gray-200 font-semibold hover:bg-gray-50 disabled:opacity-40 transition'
                   >
-                    Next
+                    {t.admin.reconciliation.next}
                   </button>
                 </div>
               </div>
@@ -559,9 +560,9 @@ export default function AdminReconciliationPage() {
           {/* Controls */}
           <div className='bg-white p-5 rounded-2xl border border-gray-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4'>
             <div className='space-y-1'>
-              <h3 className='text-sm font-bold text-gray-900'>Automated Gateway Reconciler</h3>
+              <h3 className='text-sm font-bold text-gray-900'>{t.admin.reconciliation.scanner.title}</h3>
               <p className='text-xs text-gray-500'>
-                Scans orders and gateway payments for delayed settlements, enrollment gaps, and ambiguous discrepancies.
+                {t.admin.reconciliation.scanner.desc}
               </p>
             </div>
 
@@ -573,7 +574,7 @@ export default function AdminReconciliationPage() {
                   onChange={(e) => setIsDryRun(e.target.checked)}
                   className='w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary'
                 />
-                <span>Dry Run (Preview Only, No DB Mutation)</span>
+                <span>{t.admin.reconciliation.scanner.dryRun}</span>
               </label>
 
               <button
@@ -584,12 +585,12 @@ export default function AdminReconciliationPage() {
                 {scanMutation.isPending ? (
                   <>
                     <Loader2 className='w-4 h-4 animate-spin' />
-                    <span>Scanning Orders...</span>
+                    <span>{t.admin.reconciliation.scanner.scanning}</span>
                   </>
                 ) : (
                   <>
                     <Play className='w-4 h-4' />
-                    <span>Run Discrepancy Scan</span>
+                    <span>{t.admin.reconciliation.scanner.runScan}</span>
                   </>
                 )}
               </button>
@@ -602,23 +603,23 @@ export default function AdminReconciliationPage() {
               {/* Summary Cards */}
               <div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
                 <div className='bg-white p-4 rounded-xl border border-gray-200 shadow-xs'>
-                  <span className='text-xs font-semibold text-gray-500 uppercase'>Orders Scanned</span>
+                  <span className='text-xs font-semibold text-gray-500 uppercase'>{t.admin.reconciliation.scanner.ordersScanned}</span>
                   <div className='text-2xl font-bold text-gray-900 mt-1'>
-                    {scanResult.totalOrdersScanned}
+                    {formatNumber(scanResult.totalOrdersScanned, locale)}
                   </div>
                 </div>
 
                 <div className='bg-white p-4 rounded-xl border border-gray-200 shadow-xs'>
-                  <span className='text-xs font-semibold text-gray-500 uppercase'>Discrepancies Detected</span>
+                  <span className='text-xs font-semibold text-gray-500 uppercase'>{t.admin.reconciliation.scanner.discrepanciesDetected}</span>
                   <div className='text-2xl font-bold text-amber-600 mt-1'>
-                    {scanResult.discrepanciesFoundCount}
+                    {formatNumber(scanResult.discrepanciesFoundCount, locale)}
                   </div>
                 </div>
 
                 <div className='bg-white p-4 rounded-xl border border-gray-200 shadow-xs'>
-                  <span className='text-xs font-semibold text-gray-500 uppercase'>Auto-Resolved</span>
+                  <span className='text-xs font-semibold text-gray-500 uppercase'>{t.admin.reconciliation.scanner.autoResolved}</span>
                   <div className='text-2xl font-bold text-emerald-600 mt-1'>
-                    {scanResult.autoResolvedCount}
+                    {formatNumber(scanResult.autoResolvedCount, locale)}
                   </div>
                 </div>
               </div>
@@ -626,26 +627,26 @@ export default function AdminReconciliationPage() {
               {/* Discrepancy List */}
               <div className='bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden'>
                 <div className='p-4 border-b border-gray-100 flex items-center justify-between'>
-                  <h4 className='text-sm font-bold text-gray-900'>Detected Order Discrepancies</h4>
+                  <h4 className='text-sm font-bold text-gray-900'>{t.admin.reconciliation.scanner.discrepanciesTitle}</h4>
                   <span className='text-xs text-gray-500'>
-                    Executed at {new Date(scanResult.executedAt).toLocaleTimeString()}
+                    {t.admin.reconciliation.scanner.executedAt.replace('{time}', formatDate(scanResult.executedAt, locale, { timeStyle: 'medium' }))}
                   </span>
                 </div>
 
                 {scanResult.discrepancies.length === 0 ? (
                   <div className='p-12 text-center text-xs text-gray-500'>
                     <CheckCircle2 className='w-8 h-8 text-emerald-500 mx-auto mb-2' />
-                    All scanned orders and gateway settlements are fully reconciled and aligned.
+                    {t.admin.reconciliation.scanner.zeroDiscrepancies}
                   </div>
                 ) : (
                   <div className='overflow-x-auto'>
                     <table className='w-full text-left text-sm text-gray-600'>
                       <thead className='bg-gray-50 text-xs font-semibold text-gray-700 uppercase border-b border-gray-200'>
                         <tr>
-                          <th scope='col' className='px-4 py-3'>Order #</th>
-                          <th scope='col' className='px-4 py-3'>Discrepancy Type</th>
-                          <th scope='col' className='px-4 py-3'>Description</th>
-                          <th scope='col' className='px-4 py-3'>Resolution Policy</th>
+                          <th scope='col' className='px-4 py-3'>{t.admin.reconciliation.scanner.thOrder}</th>
+                          <th scope='col' className='px-4 py-3'>{t.admin.reconciliation.scanner.thType}</th>
+                          <th scope='col' className='px-4 py-3'>{t.admin.reconciliation.scanner.thDescription}</th>
+                          <th scope='col' className='px-4 py-3'>{t.admin.reconciliation.scanner.thPolicy}</th>
                         </tr>
                       </thead>
                       <tbody className='divide-y divide-gray-100'>
@@ -665,11 +666,11 @@ export default function AdminReconciliationPage() {
                             <td className='px-4 py-3'>
                               {disc.autoResolvable ? (
                                 <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200'>
-                                  Safe Auto-Resolve
+                                  {t.admin.reconciliation.scanner.safeAutoResolve}
                                 </span>
                               ) : (
                                 <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200'>
-                                  Manual Review Required (Ambiguous)
+                                  {t.admin.reconciliation.scanner.manualReviewRequired}
                                 </span>
                               )}
                             </td>
@@ -690,17 +691,18 @@ export default function AdminReconciliationPage() {
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4'>
           <div className='bg-white w-full max-w-md rounded-2xl shadow-xl border border-gray-200 p-6 space-y-4 animate-in fade-in zoom-in-95'>
             <div className='flex items-center justify-between border-b border-gray-100 pb-3'>
-              <h3 className='text-base font-bold text-gray-900'>Link Provider Reference</h3>
+              <h3 className='text-base font-bold text-gray-900'>{t.admin.reconciliation.linkModalTitle}</h3>
               <button
                 onClick={() => setLinkRefTarget(null)}
                 className='text-gray-400 hover:text-gray-600 p-1 rounded-lg'
+                aria-label={t.admin.reconciliation.linkModal.cancel}
               >
                 <X className='w-5 h-5' />
               </button>
             </div>
 
             <p className='text-xs text-gray-600'>
-              Link the authoritative SSLCommerz refund reference ID obtained from the bank/gateway to enable automatic clearing queries.
+              {t.admin.reconciliation.linkModalDesc}
             </p>
 
             <form
@@ -716,7 +718,7 @@ export default function AdminReconciliationPage() {
             >
               <div>
                 <label className='block text-xs font-semibold text-gray-700 mb-1'>
-                  Provider Refund Reference <span className='text-red-500'>*</span>
+                  {t.admin.reconciliation.refInputLabel} <span className='text-red-500'>*</span>
                 </label>
                 <input
                   type='text'
@@ -734,14 +736,14 @@ export default function AdminReconciliationPage() {
                   onClick={() => setLinkRefTarget(null)}
                   className='px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition'
                 >
-                  Cancel
+                  {t.admin.reconciliation.linkModal.cancel}
                 </button>
                 <button
                   type='submit'
                   disabled={linkRefMutation.isPending || !providerRefInput.trim()}
                   className='px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-xl transition shadow-xs disabled:opacity-50'
                 >
-                  {linkRefMutation.isPending ? 'Linking...' : 'Save & Link Reference'}
+                  {linkRefMutation.isPending ? t.admin.reconciliation.linkModal.saving : t.admin.reconciliation.confirmLink}
                 </button>
               </div>
             </form>
@@ -754,17 +756,18 @@ export default function AdminReconciliationPage() {
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4'>
           <div className='bg-white w-full max-w-md rounded-2xl shadow-xl border border-gray-200 p-6 space-y-4 animate-in fade-in zoom-in-95'>
             <div className='flex items-center justify-between border-b border-gray-100 pb-3'>
-              <h3 className='text-base font-bold text-gray-900'>Mark Refund as Failed</h3>
+              <h3 className='text-base font-bold text-gray-900'>{t.admin.reconciliation.failModalTitle}</h3>
               <button
                 onClick={() => setMarkFailedTarget(null)}
                 className='text-gray-400 hover:text-gray-600 p-1 rounded-lg'
+                aria-label={t.admin.reconciliation.failModal.cancel}
               >
                 <X className='w-5 h-5' />
               </button>
             </div>
 
             <p className='text-xs text-gray-600'>
-              Transitioning this ambiguous refund to FAILED will keep the student order in PAID status and permit an administrative retry.
+              {t.admin.reconciliation.failModalDesc}
             </p>
 
             <form
@@ -780,7 +783,7 @@ export default function AdminReconciliationPage() {
             >
               <div>
                 <label className='block text-xs font-semibold text-gray-700 mb-1'>
-                  Failure Reason / Investigation Notes <span className='text-red-500'>*</span>
+                  {t.admin.reconciliation.failReasonLabel} <span className='text-red-500'>*</span>
                 </label>
                 <textarea
                   rows={3}
@@ -798,14 +801,14 @@ export default function AdminReconciliationPage() {
                   onClick={() => setMarkFailedTarget(null)}
                   className='px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition'
                 >
-                  Cancel
+                  {t.admin.reconciliation.failModal.cancel}
                 </button>
                 <button
                   type='submit'
                   disabled={markFailedMutation.isPending || failReasonInput.trim().length < 5}
                   className='px-5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-xl transition shadow-xs disabled:opacity-50'
                 >
-                  {markFailedMutation.isPending ? 'Marking Failed...' : 'Confirm Mark Failed'}
+                  {markFailedMutation.isPending ? t.admin.reconciliation.failModal.submitting : t.admin.reconciliation.confirmFail}
                 </button>
               </div>
             </form>

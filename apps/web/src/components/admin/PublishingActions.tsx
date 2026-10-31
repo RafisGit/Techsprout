@@ -13,6 +13,7 @@ import { CourseReviewModal } from '@/components/instructor/CourseReviewModal';
 import { ReviewWithdrawalModal } from '@/components/instructor/ReviewWithdrawalModal';
 import { ReviewApprovalModal } from '@/components/admin/ReviewApprovalModal';
 import { ReviewRejectionModal } from '@/components/admin/ReviewRejectionModal';
+import { useTranslation } from '@/i18n/client';
 import type { CourseDto } from '@techsprout/contracts';
 
 interface PublishingActionsProps {
@@ -23,6 +24,7 @@ interface PublishingActionsProps {
 
 export function PublishingActions({ course, isAdmin, onStatusChanged }: PublishingActionsProps) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -48,7 +50,7 @@ export function PublishingActions({ course, isAdmin, onStatusChanged }: Publishi
     mutationFn: () => publishCourse(course.id),
     onSuccess: (updated) => {
       clearMessages();
-      setSuccessMessage('Course published successfully! It is now live in the public catalog.');
+      setSuccessMessage(t('admin.publishing.publishSuccess'));
       queryClient.invalidateQueries({ queryKey: ['adminCourse', course.id] });
       queryClient.invalidateQueries({ queryKey: ['adminCourses'] });
       queryClient.invalidateQueries({ queryKey: ['courseReviewStatus', course.id] });
@@ -56,7 +58,7 @@ export function PublishingActions({ course, isAdmin, onStatusChanged }: Publishi
     },
     onError: (err: unknown) => {
       const errorObj = err as { response?: { data?: { message?: string; errorCode?: string } }; message?: string };
-      const msg = errorObj.response?.data?.message || errorObj.message || 'Failed to publish course';
+      const msg = errorObj.response?.data?.message || errorObj.message || t('admin.courses.deleteError');
       setErrorMessage(msg);
     },
   });
@@ -65,7 +67,7 @@ export function PublishingActions({ course, isAdmin, onStatusChanged }: Publishi
     mutationFn: () => unpublishCourse(course.id),
     onSuccess: (updated) => {
       clearMessages();
-      setSuccessMessage('Course unpublished. It is reverted to DRAFT and hidden from public catalog.');
+      setSuccessMessage(t('admin.publishing.unpublishSuccess'));
       queryClient.invalidateQueries({ queryKey: ['adminCourse', course.id] });
       queryClient.invalidateQueries({ queryKey: ['adminCourses'] });
       queryClient.invalidateQueries({ queryKey: ['courseReviewStatus', course.id] });
@@ -73,7 +75,7 @@ export function PublishingActions({ course, isAdmin, onStatusChanged }: Publishi
     },
     onError: (err: unknown) => {
       const errorObj = err as { response?: { data?: { message?: string } }; message?: string };
-      const msg = errorObj.response?.data?.message || errorObj.message || 'Failed to unpublish course';
+      const msg = errorObj.response?.data?.message || errorObj.message || t('admin.courses.deleteError');
       setErrorMessage(msg);
     },
   });
@@ -82,7 +84,7 @@ export function PublishingActions({ course, isAdmin, onStatusChanged }: Publishi
     mutationFn: () => archiveCourse(course.id),
     onSuccess: (updated) => {
       clearMessages();
-      setSuccessMessage('Course archived. It is retired from the public catalog.');
+      setSuccessMessage(t('admin.publishing.archiveSuccess'));
       queryClient.invalidateQueries({ queryKey: ['adminCourse', course.id] });
       queryClient.invalidateQueries({ queryKey: ['adminCourses'] });
       queryClient.invalidateQueries({ queryKey: ['courseReviewStatus', course.id] });
@@ -90,7 +92,7 @@ export function PublishingActions({ course, isAdmin, onStatusChanged }: Publishi
     },
     onError: (err: unknown) => {
       const errorObj = err as { response?: { data?: { message?: string } }; message?: string };
-      const msg = errorObj.response?.data?.message || errorObj.message || 'Failed to archive course';
+      const msg = errorObj.response?.data?.message || errorObj.message || t('admin.courses.deleteError');
       setErrorMessage(msg);
     },
   });
@@ -102,9 +104,9 @@ export function PublishingActions({ course, isAdmin, onStatusChanged }: Publishi
     <div className='p-6 bg-white rounded-xl shadow-xs border border-gray-200 space-y-5'>
       <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-gray-100'>
         <div>
-          <h3 className='text-lg font-bold text-gray-900'>Course Publishing & Governance</h3>
+          <h3 className='text-lg font-bold text-gray-900'>{t('admin.publishing.title')}</h3>
           <p className='text-xs text-gray-500 mt-0.5'>
-            Formal state machine governing public visibility and lifecycle status.
+            {t('admin.publishing.subtitle')}
           </p>
         </div>
         <div className='flex items-center space-x-3'>
@@ -116,11 +118,11 @@ export function PublishingActions({ course, isAdmin, onStatusChanged }: Publishi
               className='text-xs flex items-center gap-1.5 text-blue-700 border-blue-200 hover:bg-blue-50'
             >
               <Users className='w-3.5 h-3.5' />
-              <span>Learner Roster</span>
+              <span>{t('admin.publishing.viewLearners')}</span>
             </Button>
           </Link>
           <div className='flex items-center space-x-2'>
-            <span className='text-xs text-gray-500 font-medium'>Current Status:</span>
+            <span className='text-xs text-gray-500 font-medium'>{t('admin.publishing.currentStatus')}</span>
             <CourseStatusBadge status={course.status} />
           </div>
         </div>
@@ -149,7 +151,7 @@ export function PublishingActions({ course, isAdmin, onStatusChanged }: Publishi
         <div className='p-3.5 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs flex items-start space-x-2.5'>
           <AlertCircle className='w-4 h-4 flex-shrink-0 text-red-600 mt-0.5' />
           <div>
-            <p className='font-semibold'>Publishing Action Blocked</p>
+            <p className='font-semibold'>{t('admin.courses.deleteError')}</p>
             <p className='mt-0.5 text-red-700'>{errorMessage}</p>
           </div>
         </div>
@@ -167,7 +169,7 @@ export function PublishingActions({ course, isAdmin, onStatusChanged }: Publishi
                   className='bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm flex items-center gap-1.5'
                 >
                   <CheckCircle2 className='w-4 h-4' />
-                  <span>Approve & Publish</span>
+                  <span>{t('admin.reviewModals.approveConfirm')}</span>
                 </Button>
 
                 <Button
@@ -177,7 +179,7 @@ export function PublishingActions({ course, isAdmin, onStatusChanged }: Publishi
                   className='border-amber-300 text-amber-800 hover:bg-amber-50 text-sm font-medium flex items-center gap-1.5'
                 >
                   <XCircle className='w-4 h-4' />
-                  <span>Request Revisions</span>
+                  <span>{t('admin.reviewModals.rejectConfirm')}</span>
                 </Button>
               </>
             )}
@@ -195,7 +197,7 @@ export function PublishingActions({ course, isAdmin, onStatusChanged }: Publishi
                   ) : (
                     <CheckCircle2 className='w-4 h-4 mr-2' />
                   )}
-                  Publish Course (Direct)
+                  {t('admin.publishing.publishNow')}
                 </Button>
 
                 <Button
@@ -206,7 +208,7 @@ export function PublishingActions({ course, isAdmin, onStatusChanged }: Publishi
                   className='text-primary border-primary/30 hover:bg-primary/5 text-sm font-medium flex items-center gap-1.5'
                 >
                   <Send className='w-4 h-4' />
-                  <span>Submit for Review</span>
+                  <span>{t('admin.publishing.submitReview')}</span>
                 </Button>
               </>
             )}
@@ -225,7 +227,7 @@ export function PublishingActions({ course, isAdmin, onStatusChanged }: Publishi
                   ) : (
                     <RotateCcw className='w-4 h-4 mr-2' />
                   )}
-                  Unpublish to Draft
+                  {t('admin.publishing.unpublish')}
                 </Button>
 
                 <Button
@@ -240,14 +242,14 @@ export function PublishingActions({ course, isAdmin, onStatusChanged }: Publishi
                   ) : (
                     <Archive className='w-4 h-4 mr-2' />
                   )}
-                  Archive Course
+                  {t('admin.publishing.archive')}
                 </Button>
               </>
             )}
 
             {course.status === 'ARCHIVED' && (
               <p className='text-xs text-slate-500 italic'>
-                This course is archived. Deletion and edits are restricted to preserve academic records.
+                {t('admin.courses.deleteConfirm')}
               </p>
             )}
           </div>
@@ -262,14 +264,10 @@ export function PublishingActions({ course, isAdmin, onStatusChanged }: Publishi
                   className='bg-primary text-white font-medium text-sm hover:bg-primary/90 flex items-center gap-1.5'
                 >
                   <Send className='w-4 h-4' />
-                  <span>Submit for Institutional Review</span>
+                  <span>{t('admin.publishing.submitReview')}</span>
                 </Button>
               </div>
             )}
-
-            <div className='p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600'>
-              <strong>Instructor Notice:</strong> Publishing, unpublishing, and archiving are restricted to institutional administrators. When your curriculum is finalized, submit your course for review.
-            </div>
           </div>
         )}
       </div>

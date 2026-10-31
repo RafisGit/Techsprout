@@ -5,51 +5,59 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BookOpen, FolderTree, LayoutDashboard, UserCheck, Banknote, Ticket, ClipboardCheck } from 'lucide-react';
 import { useCurrentUser } from '@/lib/useCurrentUser';
+import { useTranslation } from '@/i18n/client';
 
 export function AdminNav() {
   const pathname = usePathname();
   const { data: user } = useCurrentUser();
+  const { t } = useTranslation();
 
   const isAdmin = user?.role === 'admin';
 
   const navLinks = [
     {
-      title: 'Overview',
+      title: t('admin.nav.overview'),
       href: '/dashboard/admin/overview',
       icon: LayoutDashboard,
       show: isAdmin,
     },
     {
-      title: 'Courses',
+      title: t('admin.nav.courses'),
       href: '/admin/courses',
       icon: BookOpen,
       show: true,
     },
     {
-      title: 'Review Queue',
+      title: t('admin.nav.reviewQueue'),
       href: '/admin/courses/review-queue',
       icon: ClipboardCheck,
       show: isAdmin,
     },
     {
-      title: 'Categories',
+      title: t('admin.nav.categories'),
       href: '/admin/categories',
       icon: FolderTree,
       show: isAdmin,
     },
     {
-      title: 'Finance',
+      title: t('admin.nav.finance'),
       href: '/admin/finance',
       icon: Banknote,
       show: isAdmin,
     },
     {
-      title: 'Coupons',
+      title: t('admin.nav.coupons'),
       href: '/admin/coupons',
       icon: Ticket,
       show: isAdmin,
     },
   ];
+
+  const getRoleLabel = (role?: string) => {
+    if (role === 'admin') return t('admin.nav.roleAdmin');
+    if (role === 'instructor') return t('admin.nav.roleInstructor');
+    return t('admin.nav.roleStudent');
+  };
 
   return (
     <div className='bg-white border-b border-gray-200 shadow-xs mb-8 rounded-xl px-4 py-3 sm:px-6'>
@@ -91,7 +99,7 @@ export function AdminNav() {
               <span className='font-medium text-gray-700'>{user.name}</span>
             </div>
             <span className='px-2 py-0.5 rounded-full font-semibold capitalize bg-gray-100 text-gray-700 border border-gray-200'>
-              {user.role}
+              {getRoleLabel(user.role)}
             </span>
           </div>
         )}

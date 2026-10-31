@@ -4,31 +4,33 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, ShoppingCart, RefreshCw, ClipboardCheck } from 'lucide-react';
+import { useTranslation } from '@/i18n/client';
 
 export function FinanceSubNav() {
   const pathname = usePathname();
+  const { t } = useTranslation();
 
   const links = [
     {
-      title: 'Finance Overview',
+      title: t('admin.finance.subNav.overview'),
       href: '/admin/finance',
       icon: LayoutDashboard,
       exact: true,
     },
     {
-      title: 'Orders Explorer',
+      title: t('admin.finance.subNav.orders'),
       href: '/admin/finance/orders',
       icon: ShoppingCart,
       exact: false,
     },
     {
-      title: 'Refund Requests',
+      title: t('admin.finance.subNav.refundRequests'),
       href: '/admin/finance/refund-requests',
       icon: ClipboardCheck,
       exact: false,
     },
     {
-      title: 'Reconciliation & Refunds',
+      title: t('admin.finance.subNav.reconciliation'),
       href: '/admin/finance/reconciliation',
       icon: RefreshCw,
       exact: false,

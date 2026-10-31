@@ -29,6 +29,7 @@ import {
   updateLesson,
   deleteLesson,
 } from '@/lib/api/catalog';
+import { useTranslation } from '@/i18n/client';
 import type { ModuleDto, LessonDto, LessonType } from '@techsprout/contracts';
 
 interface CurriculumManagerProps {
@@ -38,6 +39,7 @@ interface CurriculumManagerProps {
 
 export function CurriculumManager({ courseId, modules }: CurriculumManagerProps) {
   const queryClient = useQueryClient();
+  const { t, formatNumber } = useTranslation();
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -158,6 +160,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
       }),
     onSuccess: () => {
       setErrorMessage(null);
+      setActiveModuleForLesson(null);
       setEditingLessonId(null);
       resetLessonForm();
       invalidateCourse();
@@ -192,10 +195,9 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
 
   const handleStartAddLesson = (mod: ModuleDto) => {
     resetLessonForm();
-    const nextPos = (mod.lessons?.length || 0) + 1;
-    setLessonPosition(nextPos);
-    setActiveModuleForLesson(mod.id);
     setEditingLessonId(null);
+    setLessonPosition((mod.lessons?.length || 0) + 1);
+    setActiveModuleForLesson(mod.id);
     setErrorMessage(null);
   };
 
@@ -220,9 +222,9 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
     <div className='p-6 bg-white rounded-xl shadow-xs border border-gray-200'>
       <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-gray-100 gap-4'>
         <div>
-          <h3 className='text-lg font-bold text-gray-900'>Curriculum: Modules & Lessons</h3>
+          <h3 className='text-lg font-bold text-gray-900'>{t('admin.curriculum.title')}</h3>
           <p className='text-xs text-gray-500 mt-0.5'>
-            Structure course curriculum into ordered learning modules and sequenced lessons.
+            {t('admin.curriculum.subtitle')}
           </p>
         </div>
         <Button
@@ -237,7 +239,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
           className='bg-primary text-white text-xs h-9'
         >
           <Plus className='w-4 h-4 mr-1.5' />
-          Add Module
+          {t('admin.curriculum.addModule')}
         </Button>
       </div>
 
@@ -251,11 +253,11 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
       {/* Add Module Inline Form */}
       {isAddingModule && (
         <div className='mt-4 p-4 rounded-xl border border-primary/30 bg-primary/5 space-y-3'>
-          <h4 className='text-sm font-semibold text-primary'>New Curriculum Module</h4>
+          <h4 className='text-sm font-semibold text-primary'>{t('admin.curriculum.addModule')}</h4>
           <div className='grid grid-cols-1 sm:grid-cols-4 gap-3'>
             <div className='sm:col-span-3'>
               <Input
-                placeholder='Module Title (e.g. Module 1: Foundations)'
+                placeholder={t('admin.curriculum.moduleTitleLabel')}
                 value={moduleTitle}
                 onChange={(e) => setModuleTitle(e.target.value)}
                 className='h-9 bg-white text-sm'
@@ -265,7 +267,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
               <Input
                 type='number'
                 min={1}
-                placeholder='Position'
+                placeholder={t('admin.curriculum.modulePositionLabel')}
                 value={modulePosition}
                 onChange={(e) => setModulePosition(parseInt(e.target.value, 10) || 1)}
                 className='h-9 bg-white text-sm'
@@ -273,7 +275,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
             </div>
           </div>
           <Textarea
-            placeholder='Module overview or description (optional)'
+            placeholder={t('admin.curriculum.moduleDescLabel')}
             value={moduleDescription}
             onChange={(e) => setModuleDescription(e.target.value)}
             className='bg-white text-sm resize-none h-16'
@@ -286,7 +288,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
               onClick={() => setIsAddingModule(false)}
               className='text-xs h-8'
             >
-              Cancel
+              {t('admin.curriculum.cancelModule')}
             </Button>
             <Button
               type='button'
@@ -296,7 +298,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
               className='bg-primary text-white text-xs h-8'
             >
               {createModMutation.isPending && <Loader2 className='w-3 h-3 mr-1 animate-spin' />}
-              Save Module
+              {t('admin.curriculum.saveModule')}
             </Button>
           </div>
         </div>
@@ -308,10 +310,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
           <div className='p-3 bg-gray-50 rounded-full w-12 h-12 flex items-center justify-center mx-auto text-gray-400 mb-3'>
             <Plus className='w-6 h-6' />
           </div>
-          <h4 className='text-sm font-semibold text-gray-700'>No curriculum modules yet</h4>
-          <p className='text-xs text-gray-400 mt-1 max-w-sm mx-auto'>
-            Publishing requires at least 1 module with lessons. Click Add Module to begin structuring this course.
-          </p>
+          <h4 className='text-sm font-semibold text-gray-700'>{t('admin.curriculum.noModules')}</h4>
         </div>
       )}
 
@@ -347,7 +346,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
                       className='bg-emerald-600 text-white h-8 text-xs'
                     >
                       <Check className='w-3.5 h-3.5 mr-1' />
-                      Save
+                      {t('admin.curriculum.saveModule')}
                     </Button>
                     <Button
                       size='sm'
@@ -361,7 +360,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
                   <Textarea
                     value={moduleDescription}
                     onChange={(e) => setModuleDescription(e.target.value)}
-                    placeholder='Module description'
+                    placeholder={t('admin.curriculum.moduleDescLabel')}
                     className='bg-white text-xs h-14 resize-none'
                   />
                 </div>
@@ -374,7 +373,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
                     <div>
                       <div className='flex items-center space-x-2'>
                         <span className='px-2 py-0.5 rounded text-xs font-semibold bg-gray-200 text-gray-700'>
-                          #{mod.position}
+                          #{formatNumber(mod.position)}
                         </span>
                         <h4 className='text-sm font-semibold text-gray-800'>{mod.title}</h4>
                       </div>
@@ -391,7 +390,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
                       className='text-xs text-primary hover:text-primary hover:bg-primary/10 h-7'
                     >
                       <Plus className='w-3.5 h-3.5 mr-1' />
-                      Add Lesson
+                      {t('admin.curriculum.addLesson')}
                     </Button>
                     <Button
                       type='button'
@@ -412,7 +411,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
                       variant='ghost'
                       size='sm'
                       onClick={() => {
-                        if (confirm(`Are you sure you want to delete module "${mod.title}" and all its lessons?`)) {
+                        if (confirm(t('admin.curriculum.deleteModuleConfirm'))) {
                           deleteModMutation.mutate(mod.id);
                         }
                       }}
@@ -433,7 +432,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
                     <div className='p-4 rounded-xl border border-primary/30 bg-primary/5 space-y-3'>
                       <div className='flex items-center justify-between'>
                         <h5 className='text-xs font-bold text-primary uppercase tracking-wider'>
-                          {editingLessonId ? 'Edit Lesson' : 'New Lesson'}
+                          {editingLessonId ? t('admin.curriculum.editLesson') : t('admin.curriculum.addLesson')}
                         </h5>
                         <button
                           type='button'
@@ -449,28 +448,28 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
 
                       <div className='grid grid-cols-1 sm:grid-cols-4 gap-3'>
                         <div className='sm:col-span-2'>
-                          <label className='block text-xs font-medium text-gray-700 mb-1'>Title</label>
+                          <label className='block text-xs font-medium text-gray-700 mb-1'>{t('admin.curriculum.lessonTitleLabel')}</label>
                           <Input
-                            placeholder='e.g. Lesson 1.1: Setup Environment'
+                            placeholder={t('admin.curriculum.lessonTitleLabel')}
                             value={lessonTitle}
                             onChange={(e) => setLessonTitle(e.target.value)}
                             className='h-8 bg-white text-xs'
                           />
                         </div>
                         <div>
-                          <label className='block text-xs font-medium text-gray-700 mb-1'>Lesson Type</label>
+                          <label className='block text-xs font-medium text-gray-700 mb-1'>{t('admin.curriculum.lessonTypeLabel')}</label>
                           <select
                             value={lessonType}
                             onChange={(e) => setLessonType(e.target.value as LessonType)}
                             className='w-full h-8 px-2 text-xs rounded-md border border-gray-300 bg-white'
                           >
-                            <option value='VIDEO'>VIDEO</option>
-                            <option value='TEXT'>TEXT</option>
+                            <option value='VIDEO'>{t('admin.curriculum.typeVideo')}</option>
+                            <option value='TEXT'>{t('admin.curriculum.typeText')}</option>
                             <option value='PDF'>PDF</option>
                           </select>
                         </div>
                         <div>
-                          <label className='block text-xs font-medium text-gray-700 mb-1'>Position</label>
+                          <label className='block text-xs font-medium text-gray-700 mb-1'>{t('admin.curriculum.modulePositionLabel')}</label>
                           <Input
                             type='number'
                             min={1}
@@ -484,12 +483,12 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
                       <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
                         <div>
                           <label className='block text-xs font-medium text-gray-700 mb-1'>
-                            Duration (Seconds)
+                            {t('admin.curriculum.durationLabel')}
                           </label>
                           <Input
                             type='number'
                             min={0}
-                            placeholder='e.g. 480'
+                            placeholder='480'
                             value={lessonDuration}
                             onChange={(e) => setLessonDuration(parseInt(e.target.value, 10) || 0)}
                             className='h-8 bg-white text-xs'
@@ -504,7 +503,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
                             className='rounded border-gray-300 text-primary focus:ring-primary w-4 h-4'
                           />
                           <label htmlFor={`preview-${mod.id}`} className='text-xs font-medium text-gray-700'>
-                            Free Public Preview Lesson
+                            {t('admin.curriculum.previewLabel')}
                           </label>
                         </div>
                       </div>
@@ -521,7 +520,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
                               setLessonMediaId(m?.id || null);
                               setLessonMediaUrl(m?.url || null);
                             }}
-                            label='Attach Video Asset (Required for Course Publishing)'
+                            label={t('admin.curriculum.typeVideo')}
                           />
                         </div>
                       )}
@@ -529,10 +528,10 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
                       {lessonType === 'TEXT' && (
                         <div>
                           <label className='block text-xs font-medium text-gray-700 mb-1'>
-                            Reading Lesson Content (Markdown supported)
+                            {t('admin.curriculum.lessonContentLabel')}
                           </label>
                           <Textarea
-                            placeholder='Write your lesson notes, guidelines, or transcript here...'
+                            placeholder={t('admin.curriculum.lessonContentLabel')}
                             value={lessonContent}
                             onChange={(e) => setLessonContent(e.target.value)}
                             className='bg-white text-xs h-24 resize-none'
@@ -551,7 +550,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
                           }}
                           className='text-xs h-8'
                         >
-                          Cancel
+                          {t('admin.curriculum.cancelModule')}
                         </Button>
                         <Button
                           type='button'
@@ -569,7 +568,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
                           {(createLesMutation.isPending || updateLesMutation.isPending) && (
                             <Loader2 className='w-3 h-3 mr-1 animate-spin' />
                           )}
-                          {editingLessonId ? 'Save Changes' : 'Create Lesson'}
+                          {editingLessonId ? t('admin.curriculum.saveLesson') : t('admin.curriculum.addLesson')}
                         </Button>
                       </div>
                     </div>
@@ -578,7 +577,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
                   {/* Lessons Listing */}
                   {sortedLessons.length === 0 ? (
                     <p className='text-xs text-gray-400 italic py-2 pl-2'>
-                      No lessons in this module. Click Add Lesson above.
+                      {t('admin.curriculum.noModules')}
                     </p>
                   ) : (
                     <div className='divide-y divide-gray-100 rounded-lg border border-gray-100 overflow-hidden'>
@@ -588,7 +587,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
                           className='p-3 flex items-center justify-between hover:bg-gray-50 transition-colors'
                         >
                           <div className='flex items-center space-x-3 truncate'>
-                            <span className='text-xs font-bold text-gray-400 w-5'>#{les.position}</span>
+                            <span className='text-xs font-bold text-gray-400 w-5'>#{formatNumber(les.position)}</span>
                             <div className='p-1.5 rounded-md bg-gray-100 text-gray-600'>
                               {les.lessonType === 'VIDEO' ? (
                                 <Video className='w-3.5 h-3.5 text-blue-600' />
@@ -604,19 +603,12 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
                                 {les.isPreview && (
                                   <span className='inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-emerald-100 text-emerald-800'>
                                     <Eye className='w-2.5 h-2.5 mr-0.5' />
-                                    Preview
+                                    {t('admin.curriculum.previewLabel')}
                                   </span>
                                 )}
                               </div>
                               <p className='text-[10px] text-gray-400'>
-                                {les.lessonType} • {Math.round(les.durationSeconds / 60)} min •{' '}
-                                {les.mediaId ? (
-                                  <span className='text-emerald-600'>Media attached</span>
-                                ) : les.lessonType === 'VIDEO' ? (
-                                  <span className='text-amber-600 font-semibold'>Missing media</span>
-                                ) : (
-                                  'Text content'
-                                )}
+                                {les.lessonType} • {formatNumber(Math.round(les.durationSeconds / 60))} min
                               </p>
                             </div>
                           </div>
@@ -636,7 +628,7 @@ export function CurriculumManager({ courseId, modules }: CurriculumManagerProps)
                               variant='ghost'
                               size='sm'
                               onClick={() => {
-                                if (confirm(`Delete lesson "${les.title}"?`)) {
+                                if (confirm(t('admin.curriculum.deleteLessonConfirm'))) {
                                   deleteLesMutation.mutate(les.id);
                                 }
                               }}

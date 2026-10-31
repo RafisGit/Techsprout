@@ -11,6 +11,7 @@ import {
 } from '@/lib/api/catalog';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { MediaUploader } from '@/components/admin/MediaUploader';
+import { useTranslation } from '@/i18n/client';
 import { ArrowLeft, Save, AlertCircle, Sparkles } from 'lucide-react';
 import type {
   CourseLevel,
@@ -32,6 +33,7 @@ export default function NewCoursePage() {
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
+  const { t } = useTranslation();
 
   // Form states
   const [title, setTitle] = useState('');
@@ -42,7 +44,7 @@ export default function NewCoursePage() {
   const [categoryId, setCategoryId] = useState('');
   const [instructorId, setInstructorId] = useState('');
   const [price, setPrice] = useState('0.00');
-  const [currency, setCurrency] = useState('USD');
+  const [currency, setCurrency] = useState('BDT');
   const [level, setLevel] = useState<CourseLevel>('BEGINNER');
   const [language, setLanguage] = useState('English');
   const [durationMinutes, setDurationMinutes] = useState(0);
@@ -71,7 +73,7 @@ export default function NewCoursePage() {
     (u) => u.role === 'instructor' || u.role === 'admin'
   );
 
-  // Auto-slug generator on title change
+  // Auto-slugify title
   const handleTitleChange = (val: string) => {
     setTitle(val);
     if (!isSlugCustomized) {
@@ -79,6 +81,7 @@ export default function NewCoursePage() {
     }
   };
 
+  // Create Mutation
   const createMutation = useMutation({
     mutationFn: (payload: CreateCourseRequest) => createCourse(payload),
     onSuccess: (newCourse) => {
@@ -86,11 +89,11 @@ export default function NewCoursePage() {
       router.push(`/admin/courses/${newCourse.id}`);
     },
     onError: (err: any) => {
-      const respData = err?.response?.data;
-      setFormError(respData?.message || err?.message || 'Failed to create course');
-      if (respData?.errors && typeof respData.errors === 'object') {
-        setFieldErrors(respData.errors);
+      const resp = err?.response?.data;
+      if (resp?.errors) {
+        setFieldErrors(resp.errors);
       }
+      setFormError(resp?.message || err?.message || t('admin.courseForm.saveError'));
     },
   });
 
@@ -100,12 +103,11 @@ export default function NewCoursePage() {
     setFieldErrors({});
 
     if (!title.trim() || title.length < 3) {
-      setFormError('Course title must be at least 3 characters.');
+      setFormError(t('admin.courseForm.titleLabel'));
       return;
     }
-
     if (!categoryId) {
-      setFormError('Please select a course category.');
+      setFormError(t('admin.courseForm.selectCategory'));
       return;
     }
 
@@ -116,34 +118,36 @@ export default function NewCoursePage() {
       description: description.trim() || undefined,
       categoryId,
       instructorId: isAdmin && instructorId ? instructorId : undefined,
-      price: price || '0.00',
+      price: parseFloat(price) || 0,
       currency,
       level,
-      language,
-      durationMinutes: Number(durationMinutes) || 0,
+      language: language.trim() || 'English',
+      durationMinutes: durationMinutes || undefined,
       visibility,
-      thumbnailMediaId: thumbnailMediaId || null,
+      thumbnailMediaId: thumbnailMediaId || undefined,
     };
 
     createMutation.mutate(payload);
   };
 
   return (
-    <div className='max-w-4xl mx-auto space-y-6'>
-      {/* Header and Back Link */}
+    <div className='max-w-4xl mx-auto space-y-6 pb-12'>
+      {/* Header */}
       <div className='flex items-center justify-between'>
         <div className='flex items-center space-x-3'>
           <Link
             href='/admin/courses'
-            className='p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition'
+            className='p-2 rounded-xl border border-gray-200 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition'
+            title={t('admin.courseForm.backToCourses')}
           >
-            <ArrowLeft className='w-5 h-5' />
+            <ArrowLeft className='w-4 h-4' />
           </Link>
           <div>
-            <h1 className='text-2xl font-bold text-gray-900'>Create New Course</h1>
+            <h1 className='text-2xl font-bold text-gray-900 tracking-tight'>
+              {t('admin.courseForm.createTitle')}
+            </h1>
             <p className='text-xs text-gray-500 mt-0.5'>
-              Add a new course to the institutional catalog. Initial state will be{' '}
-              <strong className='text-amber-600'>DRAFT</strong>.
+              {t('admin.courseForm.createSubtitle')}
             </p>
           </div>
         </div>
@@ -152,33 +156,29 @@ export default function NewCoursePage() {
       {formError && (
         <div className='p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-center space-x-3 text-sm'>
           <AlertCircle className='w-5 h-5 shrink-0 text-red-500' />
-          <div>
-            <p className='font-semibold'>Error creating course</p>
-            <p className='text-xs mt-0.5'>{formError}</p>
-          </div>
+          <span>{formError}</span>
         </div>
       )}
 
-      {/* Main Creation Form */}
       <form onSubmit={handleSubmit} className='space-y-6'>
-        {/* Basic Course Information */}
+        {/* Core Metadata */}
         <div className='bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-5'>
           <h2 className='text-lg font-semibold text-gray-900 border-b border-gray-100 pb-3'>
-            Basic Information
+            {t('admin.courseForm.tabs.settings')}
           </h2>
 
           <div className='space-y-4'>
             {/* Title */}
             <div>
               <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                Course Title <span className='text-red-500'>*</span>
+                {t('admin.courseForm.titleLabel')} <span className='text-red-500'>*</span>
               </label>
               <input
                 type='text'
                 required
                 value={title}
                 onChange={(e) => handleTitleChange(e.target.value)}
-                placeholder='e.g. Modern Full-Stack Development with Next.js'
+                placeholder={t('admin.courseForm.titlePlaceholder')}
                 className='w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary'
               />
               {fieldErrors.title && (
@@ -188,48 +188,38 @@ export default function NewCoursePage() {
 
             {/* Slug */}
             <div>
-              <div className='flex items-center justify-between mb-1.5'>
-                <label className='block text-xs font-semibold text-gray-700'>
-                  URL Slug <span className='text-red-500'>*</span>
-                </label>
-                {!isSlugCustomized && (
-                  <span className='text-[11px] text-primary flex items-center space-x-1'>
-                    <Sparkles className='w-3 h-3' />
-                    <span>Auto-generated from title</span>
-                  </span>
-                )}
-              </div>
+              <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
+                {t('admin.courseForm.slugLabel')} <span className='text-red-500'>*</span>
+              </label>
               <div className='flex rounded-xl shadow-xs'>
                 <span className='inline-flex items-center px-3 rounded-l-xl border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-xs font-mono'>
                   /courses/
                 </span>
                 <input
                   type='text'
+                  required
                   value={slug}
                   onChange={(e) => {
                     setSlug(e.target.value);
                     setIsSlugCustomized(true);
                   }}
-                  placeholder='modern-full-stack-development'
-                  className='flex-1 min-w-0 block w-full px-3.5 py-2 rounded-none rounded-r-xl border border-gray-300 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary'
+                  placeholder={t('admin.courseForm.slugPlaceholder')}
+                  className='flex-1 block w-full px-3.5 py-2 rounded-none rounded-r-xl border border-gray-300 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary'
                 />
               </div>
-              {fieldErrors.slug && (
-                <p className='text-xs text-red-500 mt-1'>{fieldErrors.slug.join(', ')}</p>
-              )}
             </div>
 
             {/* Short Description */}
             <div>
               <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                Short Summary
+                {t('admin.courseForm.shortDescLabel')}
               </label>
               <textarea
                 rows={2}
                 maxLength={500}
                 value={shortDescription}
                 onChange={(e) => setShortDescription(e.target.value)}
-                placeholder='A concise 1-2 sentence overview of what students will achieve...'
+                placeholder={t('admin.courseForm.shortDescPlaceholder')}
                 className='w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary'
               />
               <p className='text-[11px] text-gray-400 text-right mt-0.5'>
@@ -240,13 +230,13 @@ export default function NewCoursePage() {
             {/* Detailed Description */}
             <div>
               <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                Full Description / Syllabus Overview
+                {t('admin.courseForm.descLabel')}
               </label>
               <textarea
                 rows={5}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder='Detailed description, prerequisites, and learning outcomes...'
+                placeholder={t('admin.courseForm.descPlaceholder')}
                 className='w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary'
               />
             </div>
@@ -256,14 +246,14 @@ export default function NewCoursePage() {
         {/* Classification & Ownership */}
         <div className='bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-5'>
           <h2 className='text-lg font-semibold text-gray-900 border-b border-gray-100 pb-3'>
-            Classification & Instructor
+            {t('admin.courses.thCategory')} & {t('admin.courses.thInstructor')}
           </h2>
 
           <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
             {/* Category */}
             <div>
               <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                Category <span className='text-red-500'>*</span>
+                {t('admin.courseForm.categoryLabel')} <span className='text-red-500'>*</span>
               </label>
               <select
                 required
@@ -272,10 +262,10 @@ export default function NewCoursePage() {
                 disabled={isLoadingCategories}
                 className='w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50'
               >
-                <option value=''>Select a Category</option>
+                <option value=''>{t('admin.courseForm.selectCategory')}</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name} {!c.isActive ? '(Inactive)' : ''}
+                    {c.name} {!c.isActive ? `(${t('admin.status.inactive')})` : ''}
                   </option>
                 ))}
               </select>
@@ -287,7 +277,7 @@ export default function NewCoursePage() {
             {/* Instructor */}
             <div>
               <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                Assigned Instructor
+                {t('admin.courseForm.instructorLabel')}
               </label>
               {isAdmin ? (
                 <select
@@ -295,7 +285,7 @@ export default function NewCoursePage() {
                   onChange={(e) => setInstructorId(e.target.value)}
                   className='w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary'
                 >
-                  <option value=''>Assign to Self ({currentUser?.name})</option>
+                  <option value=''>{t('admin.courseForm.selectInstructor')} ({currentUser?.name})</option>
                   {instructors.map((ins) => (
                     <option key={ins.id} value={ins.id}>
                       {ins.name} ({ins.email})
@@ -304,8 +294,8 @@ export default function NewCoursePage() {
                 </select>
               ) : (
                 <div className='px-3.5 py-2 text-sm rounded-xl border border-gray-200 bg-gray-50 text-gray-700 flex items-center justify-between'>
-                  <span className='font-medium'>{currentUser?.name} (You)</span>
-                  <span className='text-xs text-gray-400 font-mono'>Instructor</span>
+                  <span className='font-medium'>{currentUser?.name}</span>
+                  <span className='text-xs text-gray-400 font-mono'>{t('admin.nav.roleInstructor')}</span>
                 </div>
               )}
             </div>
@@ -315,14 +305,14 @@ export default function NewCoursePage() {
         {/* Pricing, Level & Media */}
         <div className='bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-5'>
           <h2 className='text-lg font-semibold text-gray-900 border-b border-gray-100 pb-3'>
-            Pricing, Metadata & Thumbnail
+            {t('admin.courses.thPrice')} & {t('admin.courseForm.thumbnailLabel')}
           </h2>
 
           <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4'>
             {/* Price */}
             <div>
               <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                Price (0 for Free)
+                {t('admin.courseForm.priceLabel')}
               </label>
               <input
                 type='number'
@@ -337,41 +327,38 @@ export default function NewCoursePage() {
             {/* Currency */}
             <div>
               <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                Currency
+                {t('admin.courseForm.currencyLabel')}
               </label>
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
                 className='w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary'
               >
-                <option value='USD'>USD ($)</option>
-                <option value='EUR'>EUR (€)</option>
-                <option value='GBP'>GBP (£)</option>
                 <option value='BDT'>BDT (৳)</option>
+                <option value='USD'>USD ($)</option>
               </select>
             </div>
 
             {/* Level */}
             <div>
               <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                Level
+                {t('admin.courseForm.levelLabel')}
               </label>
               <select
                 value={level}
                 onChange={(e) => setLevel(e.target.value as CourseLevel)}
                 className='w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary'
               >
-                <option value='BEGINNER'>Beginner</option>
-                <option value='INTERMEDIATE'>Intermediate</option>
-                <option value='ADVANCED'>Advanced</option>
-                <option value='ALL_LEVELS'>All Levels</option>
+                <option value='BEGINNER'>{t('admin.courseForm.levelBeginner')}</option>
+                <option value='INTERMEDIATE'>{t('admin.courseForm.levelIntermediate')}</option>
+                <option value='ADVANCED'>{t('admin.courseForm.levelAdvanced')}</option>
               </select>
             </div>
 
             {/* Language */}
             <div>
               <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                Language
+                {t('admin.courseForm.languageLabel')}
               </label>
               <input
                 type='text'
@@ -386,7 +373,7 @@ export default function NewCoursePage() {
             {/* Duration */}
             <div>
               <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                Estimated Duration (Minutes)
+                {t('admin.courseForm.durationLabel')}
               </label>
               <input
                 type='number'
@@ -400,15 +387,15 @@ export default function NewCoursePage() {
             {/* Visibility */}
             <div>
               <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                Visibility
+                {t('admin.courseForm.visibilityLabel')}
               </label>
               <select
                 value={visibility}
                 onChange={(e) => setVisibility(e.target.value as CourseVisibility)}
                 className='w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary'
               >
-                <option value='PUBLIC'>Public (Listed in catalog when published)</option>
-                <option value='PRIVATE'>Private (Unlisted)</option>
+                <option value='PUBLIC'>{t('admin.courseForm.visibilityPublic')}</option>
+                <option value='PRIVATE'>{t('admin.courseForm.visibilityPrivate')}</option>
               </select>
             </div>
           </div>
@@ -416,7 +403,7 @@ export default function NewCoursePage() {
           {/* Thumbnail Uploader */}
           <div className='pt-2'>
             <label className='block text-xs font-semibold text-gray-700 mb-2'>
-              Course Cover Thumbnail
+              {t('admin.courseForm.thumbnailLabel')}
             </label>
             <MediaUploader
               mediaType='IMAGE'
@@ -440,7 +427,7 @@ export default function NewCoursePage() {
             href='/admin/courses'
             className='px-5 py-2.5 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition'
           >
-            Cancel
+            {t('admin.courseForm.cancel')}
           </Link>
           <button
             type='submit'
@@ -448,7 +435,7 @@ export default function NewCoursePage() {
             className='inline-flex items-center space-x-2 px-6 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary/90 transition shadow-xs disabled:opacity-50'
           >
             <Save className='w-4 h-4' />
-            <span>{createMutation.isPending ? 'Creating Draft...' : 'Create Course'}</span>
+            <span>{createMutation.isPending ? t('admin.courseForm.saving') : t('admin.courseForm.createCourse')}</span>
           </button>
         </div>
       </form>

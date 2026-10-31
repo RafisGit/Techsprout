@@ -655,4 +655,184 @@ describe('Phase 10.1 / WP-P10-01: Internationalization Foundation & Localization
       expect(missingInEn).toEqual([]);
     });
   });
+
+  // =========================================================================
+  // 13. ADMIN PORTAL LOCALIZATION (WP-P10-04)
+  // =========================================================================
+  describe('13. Admin Portal Localization (WP-P10-04)', () => {
+    it('13.1 provides complete admin navigation and dashboard overview strings in English and Bangla', () => {
+      expect(en.admin.nav.overview).toBe('Overview');
+      expect(bn.admin.nav.overview).toBe('সারসংক্ষেপ');
+      expect(en.admin.nav.courses).toBe('Courses');
+      expect(bn.admin.nav.courses).toBe('কোর্সসমূহ');
+      expect(en.admin.nav.finance).toBe('Finance');
+      expect(bn.admin.nav.finance).toBe('অর্থ ও হিসাব');
+      expect(en.admin.nav.roleAdmin).toBe('Administrator');
+      expect(bn.admin.nav.roleAdmin).toBe('প্রশাসক');
+
+      expect(en.admin.overview.title).toBe('Platform Analytics Overview');
+      expect(bn.admin.overview.title).toBe('প্ল্যাটফর্ম অ্যানালিটিক্স সারসংক্ষেপ');
+      expect(en.admin.overview.activeCourses).toBe('Active Courses');
+      expect(bn.admin.overview.activeCourses).toBe('সক্রিয় কোর্সসমূহ');
+      expect(en.admin.overview.queueSlaTarget).toBe('Review Queue SLA');
+      expect(bn.admin.overview.queueSlaTarget).toBe('পর্যালোচনা SLA লক্ষ্য');
+    });
+
+    it('13.2 provides complete course review queue and adjudication modal strings in English and Bangla', () => {
+      expect(en.admin.reviewQueue.title).toBe('Course Review Queue');
+      expect(bn.admin.reviewQueue.title).toBe('কোর্স পর্যালোচনা সারি');
+      expect(en.admin.reviewQueue.approve).toBe('Approve');
+      expect(bn.admin.reviewQueue.approve).toBe('অনুমোদন করুন');
+      expect(en.admin.reviewQueue.reject).toBe('Request Revisions');
+      expect(bn.admin.reviewQueue.reject).toBe('সংশোধন অনুরোধ');
+
+      expect(en.admin.reviewModals.approveTitle).toBe('Approve Course Publication');
+      expect(bn.admin.reviewModals.approveTitle).toBe('কোর্স প্রকাশনার অনুমোদন দিন');
+      expect(en.admin.reviewModals.rejectTitle).toBe('Request Revisions & Reject Submission');
+      expect(bn.admin.reviewModals.rejectTitle).toBe('সংশোধনের অনুরোধ ও প্রত্যাখান');
+      expect(en.admin.reviewModals.feedbackMin).toBe('Feedback must be at least 5 characters.');
+      expect(bn.admin.reviewModals.feedbackMin).toBe('মতামত কমপক্ষে ৫ অক্ষরের হতে হবে।');
+    });
+
+    it('13.3 provides complete course management, curriculum, and publishing actions in English and Bangla', () => {
+      expect(en.admin.courses.title).toBe('Course Catalog Administration');
+      expect(bn.admin.courses.title).toBe('কোর্স ক্যাটালগ প্রশাসন');
+      expect(en.admin.curriculum.title).toBe('Curriculum Structure');
+      expect(bn.admin.curriculum.title).toBe('পাঠ্যক্রম রূপরেখা');
+      expect(en.admin.curriculum.typeVideo).toBe('Video Lecture');
+      expect(bn.admin.curriculum.typeVideo).toBe('ভিডিও লেকচার');
+      expect(en.admin.curriculum.typeQuiz).toBe('Quiz');
+      expect(bn.admin.curriculum.typeQuiz).toBe('কুইজ');
+
+      expect(en.admin.publishing.publishNow).toBe('Publish Directly');
+      expect(bn.admin.publishing.publishNow).toBe('সরাসরি প্রকাশ করুন');
+      expect(en.admin.publishing.unpublish).toBe('Unpublish to Draft');
+      expect(bn.admin.publishing.unpublish).toBe('খসড়ায় ফিরিয়ে নিন');
+      expect(en.admin.publishing.archive).toBe('Archive Course');
+      expect(bn.admin.publishing.archive).toBe('কোর্স আর্কাইভ করুন');
+    });
+
+    it('13.4 provides complete category and coupon management strings in English and Bangla', () => {
+      expect(en.admin.categories.title).toBe('Category Management');
+      expect(bn.admin.categories.title).toBe('ক্যাটাগরি ব্যবস্থাপনা');
+      expect(en.admin.categories.newCategory).toBe('New Category');
+      expect(bn.admin.categories.newCategory).toBe('নতুন ক্যাটাগরি');
+
+      expect(en.admin.coupons.title).toBe('Coupon & Promotional Code Management');
+      expect(bn.admin.coupons.title).toBe('কুপন ও প্রচারমূলক কোড ব্যবস্থাপনা');
+      expect(en.admin.coupons.createCoupon).toBe('Create Coupon');
+      expect(bn.admin.coupons.createCoupon).toBe('কুপন তৈরি করুন');
+      expect(en.admin.coupons.typePercentage).toBe('Percentage (%)');
+      expect(bn.admin.coupons.typePercentage).toBe('শতাংশ (%)');
+      expect(en.admin.coupons.typeFixed).toBe('Fixed Amount (BDT)');
+      expect(bn.admin.coupons.typeFixed).toBe('নির্দিষ্ট পরিমাণ (BDT)');
+    });
+
+    it('13.5 provides complete institutional finance dashboard and CSV export strings in English and Bangla', () => {
+      expect(en.admin.finance.title).toBe('Institutional Finance Dashboard');
+      expect(bn.admin.finance.title).toBe('প্রাতিষ্ঠানিক আর্থিক ড্যাশবোর্ড');
+      expect(en.admin.finance.kpis.grossCollections).toBe('Gross Collections');
+      expect(bn.admin.finance.kpis.grossCollections).toBe('মোট সংগৃহীত পেমেন্ট');
+      expect(en.admin.finance.kpis.discountsApplied).toBe('Promotional Discounts');
+      expect(bn.admin.finance.kpis.discountsApplied).toBe('প্রচারমূলক মোট ছাড়');
+      expect(en.admin.finance.kpis.netCollections).toBe('Net Platform Collections');
+      expect(bn.admin.finance.kpis.netCollections).toBe('প্ল্যাটফর্মের নিট প্রাপ্তি');
+      expect(en.admin.finance.kpis.processedRefunds).toBe('Disbursed Refunds');
+      expect(bn.admin.finance.kpis.processedRefunds).toBe('বিতরণকৃত রিফান্ড');
+      expect(en.admin.finance.exportModal.title).toBe('Export Financial Audit CSV');
+      expect(bn.admin.finance.exportModal.title).toBe('আর্থিক অডিট CSV এক্সপোর্ট');
+      expect(en.admin.finance.exportModal.preset30d).toBe('Last 30 Days');
+      expect(bn.admin.finance.exportModal.preset30d).toBe('বিগত ৩০ দিন');
+    });
+
+    it('13.6 provides complete orders explorer and payment audit strings in English and Bangla', () => {
+      expect(en.admin.orders.title).toBe('Orders & Transactions Explorer');
+      expect(bn.admin.orders.title).toBe('অর্ডার ও ট্রানজ্যাকশন এক্সপ্লোরার');
+      expect(en.admin.orders.allStatuses).toBe('All Order Statuses');
+      expect(bn.admin.orders.allStatuses).toBe('সকল অর্ডার স্ট্যাটাস');
+      expect(en.admin.orders.statuses.paid).toBe('Paid');
+      expect(bn.admin.orders.statuses.paid).toBe('পরিশোধিত');
+      expect(en.admin.orders.statuses.failed).toBe('Failed');
+      expect(bn.admin.orders.statuses.failed).toBe('ব্যর্থ');
+      expect(en.admin.orders.refundModalTitle).toBe('Adjudicate & Initiate Refund');
+      expect(bn.admin.orders.refundModalTitle).toBe('রিফান্ড বিবেচনা ও প্রয়োগ');
+      expect(en.admin.orders.refundNotice.title).toBe('Financial & Academic Policy Notice:');
+      expect(bn.admin.orders.refundNotice.title).toBe('আর্থিক ও প্রাতিষ্ঠানিক নীতিমালা নোটিশ:');
+    });
+
+    it('13.7 provides complete student refund requests queue strings in English and Bangla', () => {
+      expect(en.admin.refundRequests.title).toBe('Student Refund Requests');
+      expect(bn.admin.refundRequests.title).toBe('শিক্ষার্থীদের রিফান্ডের আবেদন');
+      expect(en.admin.refundRequests.reasons.COURSE_CONTENT_MISMATCH).toBe('Course Content Mismatch');
+      expect(bn.admin.refundRequests.reasons.COURSE_CONTENT_MISMATCH).toBe('কোর্স কন্টেন্ট প্রত্যাশা অনুযায়ী নয়');
+      expect(en.admin.refundRequests.reasons.TECHNICAL_ISSUES).toBe('Technical Issues');
+      expect(bn.admin.refundRequests.reasons.TECHNICAL_ISSUES).toBe('কারিগরি জটিলতা');
+      expect(en.admin.refundRequests.modal.bannerApproved).toBe('Status: Refund Request Approved');
+      expect(bn.admin.refundRequests.modal.bannerApproved).toBe('স্ট্যাটাস: রিফান্ডের আবেদন অনুমোদিত');
+      expect(en.admin.refundRequests.modal.progressEvaluation).toBe('Course Progress Evaluation');
+      expect(bn.admin.refundRequests.modal.progressEvaluation).toBe('কোর্সের অগ্রগতি মূল্যায়ন');
+    });
+
+    it('13.8 provides complete payment gateway reconciliation & discrepancy scanner strings in English and Bangla', () => {
+      expect(en.admin.reconciliation.title).toBe('Payment Gateway Reconciliation & Settlement');
+      expect(bn.admin.reconciliation.title).toBe('পেমেন্ট গেটওয়ে সমন্বয় ও নিষ্পত্তি');
+      expect(en.admin.reconciliation.tabRefunds).toBe('Refund Operations');
+      expect(bn.admin.reconciliation.tabRefunds).toBe('রিফান্ড কার্যক্রম');
+      expect(en.admin.reconciliation.tabScanner).toBe('Discrepancy Scanner');
+      expect(bn.admin.reconciliation.tabScanner).toBe('অসঙ্গতি স্ক্যানার');
+      expect(en.admin.reconciliation.statusManualReview).toBe('Manual Review Required');
+      expect(bn.admin.reconciliation.statusManualReview).toBe('ম্যানুয়াল পর্যালোচনা প্রয়োজন');
+      expect(en.admin.reconciliation.scanner.ordersScanned).toBe('Orders Scanned');
+      expect(bn.admin.reconciliation.scanner.ordersScanned).toBe('স্ক্যানকৃত অর্ডার');
+      expect(en.admin.reconciliation.scanner.safeAutoResolve).toBe('Safe Auto-Resolve');
+      expect(bn.admin.reconciliation.scanner.safeAutoResolve).toBe('নিরাপদ স্বয়ংক্রিয় সমাধান');
+    });
+
+    it('13.9 strictly formats BDT currency without dollar signs across administrator modules', () => {
+      expect(formatCurrency(250000, 'en', 'BDT')).toBe('BDT 250,000.00');
+      expect(formatCurrency(250000, 'bn', 'BDT')).toBe('BDT ২,৫০,০০০.০০');
+      expect(formatCurrency(1200.5, 'en', 'BDT')).toBe('BDT 1,200.50');
+      expect(formatCurrency(1200.5, 'bn', 'BDT')).toBe('BDT ১,২০০.৫০');
+      expect(formatCurrency(0, 'en', 'BDT')).toBe('BDT 0.00');
+      expect(formatCurrency(0, 'bn', 'BDT')).toBe('BDT ০.০০');
+
+      expect(formatCurrency(5000, 'en', 'BDT')).not.toContain('$');
+      expect(formatCurrency(5000, 'bn', 'BDT')).not.toContain('$');
+    });
+
+    it('13.10 handles parameter substitution across administrator domains', () => {
+      const tEn = createTranslate('en');
+      const tBn = createTranslate('bn');
+
+      expect(tEn('admin.coupons.editModalTitle', { code: 'EID2026' })).toBe('Edit Coupon: EID2026');
+      expect(tBn('admin.coupons.editModalTitle', { code: 'EID2026' })).toBe('কুপন সম্পাদনা: EID2026');
+
+      expect(tEn('admin.coupons.deleteConfirm', { code: 'RAMADAN' })).toBe('Are you sure you want to delete coupon "RAMADAN"?');
+      expect(tBn('admin.coupons.deleteConfirm', { code: 'RAMADAN' })).toBe('আপনি কি নিশ্চিত যে "RAMADAN" কুপনটি মুছে ফেলতে চান?');
+
+      expect(tEn('admin.reconciliation.discrepanciesFound', { count: '3' })).toBe('3 Discrepancies Detected');
+      expect(tBn('admin.reconciliation.discrepanciesFound', { count: '৩' })).toBe('৩টি অসঙ্গতি শনাক্ত হয়েছে');
+    });
+
+    it('13.11 verifies bidirectional 100% dictionary key parity including the admin namespace', () => {
+      function compareKeys(objA: any, objB: any, path: string = '', missingPrefix: string): string[] {
+        const missing: string[] = [];
+        for (const key of Object.keys(objA)) {
+          const currentPath = path ? `${path}.${key}` : key;
+          if (objB[key] === undefined) {
+            missing.push(`${missingPrefix}: ${currentPath}`);
+          } else if (typeof objA[key] === 'object' && objA[key] !== null) {
+            missing.push(...compareKeys(objA[key], objB[key], currentPath, missingPrefix));
+          }
+        }
+        return missing;
+      }
+
+      const missingInBn = compareKeys(en.admin, bn.admin, 'admin', 'Missing in Bangla');
+      const missingInEn = compareKeys(bn.admin, en.admin, 'admin', 'Missing in English');
+
+      expect(missingInBn).toEqual([]);
+      expect(missingInEn).toEqual([]);
+    });
+  });
 });

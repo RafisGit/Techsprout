@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { uploadImageMedia, uploadVideoMedia, type MediaUploadResult } from '@/lib/api/catalog';
+import { useTranslation } from '@/i18n/client';
 
 export interface MediaUploaderProps {
   type?: 'image' | 'video';
@@ -44,6 +45,7 @@ export function MediaUploader({
   label,
   helperText,
 }: MediaUploaderProps) {
+  const { t } = useTranslation();
   const resolvedType = (mediaType || type || 'image').toLowerCase() as 'image' | 'video';
   const effectiveInitialUrl = initialPublicUrl !== undefined ? initialPublicUrl : currentUrl || null;
 
@@ -67,12 +69,12 @@ export function MediaUploader({
       let result: MediaUploadResult;
       if (resolvedType === 'image') {
         if (!file.type.startsWith('image/')) {
-          throw new Error('Please select a valid image file (JPEG, PNG, WebP)');
+          throw new Error(t('admin.media.errorInvalidImage'));
         }
         result = await uploadImageMedia(file, folder || 'techsprout/images/courses');
       } else {
         if (!file.type.startsWith('video/')) {
-          throw new Error('Please select a valid video file (MP4, WebM)');
+          throw new Error(t('admin.media.errorInvalidVideo'));
         }
         result = await uploadVideoMedia(file, folder || 'techsprout/videos/lessons');
       }
@@ -156,7 +158,7 @@ export function MediaUploader({
                   <FileVideo className='w-6 h-6' />
                 </div>
                 <div className='truncate'>
-                  <p className='text-sm font-medium text-gray-900 truncate'>Video Media Attached</p>
+                  <p className='text-sm font-medium text-gray-900 truncate'>{t('admin.curriculum.typeVideo')}</p>
                   <a
                     href={previewUrl}
                     target='_blank'
@@ -169,7 +171,7 @@ export function MediaUploader({
               </div>
               <span className='px-2.5 py-0.5 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center space-x-1 shrink-0'>
                 <CheckCircle2 className='w-3 h-3' />
-                <span>Ready</span>
+                <span>{t('admin.media.uploadSuccess')}</span>
               </span>
             </div>
           )}
@@ -177,7 +179,7 @@ export function MediaUploader({
           <div className='mt-2 flex items-center justify-between px-1'>
             <div className='flex items-center space-x-2 text-xs text-emerald-600 font-medium'>
               <CheckCircle2 className='w-3.5 h-3.5' />
-              <span>Media secured in Cloudinary</span>
+              <span>{t('admin.media.uploadSuccess')}</span>
             </div>
             <div className='flex items-center space-x-2'>
               <Button
@@ -189,7 +191,7 @@ export function MediaUploader({
                 className='h-8 text-xs'
               >
                 <RotateCcw className='w-3.5 h-3.5 mr-1' />
-                Replace
+                {t('admin.media.replaceMedia')}
               </Button>
               <Button
                 type='button'
@@ -200,7 +202,7 @@ export function MediaUploader({
                 className='h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50'
               >
                 <X className='w-3.5 h-3.5 mr-1' />
-                Remove
+                {t('admin.media.removeMedia')}
               </Button>
             </div>
           </div>
@@ -218,9 +220,8 @@ export function MediaUploader({
             <div className='flex flex-col items-center space-y-2 py-4'>
               <Loader2 className='w-8 h-8 text-primary animate-spin' />
               <p className='text-xs font-medium text-gray-600'>
-                Uploading to Cloudinary & persisting to database...
+                {t('admin.media.uploading')}
               </p>
-              <p className='text-[11px] text-gray-400'>Please wait</p>
             </div>
           ) : (
             <div className='flex flex-col items-center space-y-2 text-center py-2'>
@@ -233,12 +234,12 @@ export function MediaUploader({
               </div>
               <div className='space-y-1'>
                 <p className='text-xs font-semibold text-gray-700'>
-                  Click or drag file to upload {resolvedType}
+                  {t('admin.media.dragDrop')}
                 </p>
                 <p className='text-[11px] text-gray-400'>
                   {resolvedType === 'image'
-                    ? 'PNG, JPG, WebP up to 10MB'
-                    : 'MP4, WebM up to 100MB'}
+                    ? t('admin.media.supportedImageFormats')
+                    : t('admin.media.supportedVideoFormats')}
                 </p>
               </div>
             </div>

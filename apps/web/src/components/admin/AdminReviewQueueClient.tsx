@@ -11,6 +11,7 @@ import { ReviewApprovalModal } from '@/components/admin/ReviewApprovalModal';
 import { ReviewRejectionModal } from '@/components/admin/ReviewRejectionModal';
 import { Button } from '@/components/ui/button';
 import { useCurrentUser } from '@/lib/useCurrentUser';
+import { useTranslation } from '@/i18n/client';
 import {
   Clock,
   CheckCircle2,
@@ -29,6 +30,7 @@ import {
 export function AdminReviewQueueClient() {
   const { data: currentUser, isLoading: isLoadingUser } = useCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
+  const { t, formatNumber, formatDate, formatCurrency } = useTranslation();
 
   const [page, setPage] = useState(1);
   const limit = 10;
@@ -51,9 +53,9 @@ export function AdminReviewQueueClient() {
     return (
       <div className='max-w-2xl mx-auto p-8 bg-red-50 border border-red-200 text-red-800 rounded-2xl shadow-xs text-center my-8'>
         <ShieldAlert className='w-12 h-12 text-red-600 mx-auto mb-3' />
-        <h2 className='text-xl font-bold mb-1'>Administrator Access Required</h2>
+        <h2 className='text-xl font-bold mb-1'>{t('admin.nav.accessDeniedTitle')}</h2>
         <p className='text-xs text-gray-600 mb-4'>
-          The course review queue is restricted to institutional administrators.
+          {t('admin.nav.accessDeniedDesc')}
         </p>
       </div>
     );
@@ -68,19 +70,19 @@ export function AdminReviewQueueClient() {
       <div className='bg-white p-6 rounded-2xl border border-gray-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4'>
         <div>
           <div className='flex items-center gap-3'>
-            <h1 className='text-2xl font-bold text-gray-900'>Course Review Queue</h1>
+            <h1 className='text-2xl font-bold text-gray-900'>{t('admin.reviewQueue.title')}</h1>
             <span className='px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200'>
-              {pagination.total} Pending
+              {t('admin.reviewQueue.pendingCount', { count: formatNumber(pagination.total) })}
             </span>
           </div>
           <p className='text-sm text-gray-600 mt-1'>
-            Inspect and evaluate courses submitted by instructors before approving publication to the public catalog.
+            {t('admin.reviewQueue.subtitle')}
           </p>
         </div>
 
         <div className='flex items-center gap-2'>
           <Button variant='outline' size='sm' onClick={() => refetch()} className='text-xs'>
-            Refresh Queue
+            {t('admin.reviewQueue.refresh')}
           </Button>
         </div>
       </div>
@@ -98,10 +100,9 @@ export function AdminReviewQueueClient() {
             <div className='w-12 h-12 rounded-2xl bg-red-50 text-red-600 mx-auto flex items-center justify-center mb-3'>
               <AlertCircle className='w-6 h-6' />
             </div>
-            <p className='text-red-700 font-semibold'>Failed to load review queue.</p>
-            <p className='text-gray-500 text-xs mt-1'>Please check your permissions and connection.</p>
+            <p className='text-red-700 font-semibold'>{t('admin.reviewQueue.errorLoading')}</p>
             <Button variant='outline' size='sm' onClick={() => refetch()} className='mt-4'>
-              Retry
+              {t('admin.overview.retry')}
             </Button>
           </div>
         ) : items.length === 0 ? (
@@ -109,9 +110,9 @@ export function AdminReviewQueueClient() {
             <div className='w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 mx-auto flex items-center justify-center mb-4'>
               <CheckCircle2 className='w-8 h-8' />
             </div>
-            <h3 className='text-lg font-bold text-gray-900'>Review Queue is Clear</h3>
+            <h3 className='text-lg font-bold text-gray-900'>{t('admin.reviewQueue.emptyTitle')}</h3>
             <p className='text-sm text-gray-500 max-w-md mx-auto mt-1'>
-              All course submissions have been reviewed and decided. New submissions will appear here when submitted by instructors.
+              {t('admin.reviewQueue.emptyDesc')}
             </p>
           </div>
         ) : (
@@ -129,28 +130,27 @@ export function AdminReviewQueueClient() {
                     </h3>
                     <span className='px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1'>
                       <Clock className='w-3 h-3' />
-                      <span>Pending Review</span>
+                      <span>{t('admin.status.pending')}</span>
                     </span>
                   </div>
 
                   <div className='flex flex-wrap items-center gap-4 text-xs text-gray-500'>
                     <span className='flex items-center gap-1.5'>
                       <User className='w-3.5 h-3.5 text-gray-400' />
-                      Instructor: <strong className='text-gray-700'>{item.instructor.name}</strong> ({item.instructor.email})
+                      {t('admin.courses.thInstructor')}: <strong className='text-gray-700'>{item.instructor.name}</strong> ({item.instructor.email})
                     </span>
                     <span className='flex items-center gap-1.5'>
                       <Calendar className='w-3.5 h-3.5 text-gray-400' />
-                      Submitted: {new Date(item.submittedAt).toLocaleDateString()} at{' '}
-                      {new Date(item.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {t('admin.reviewQueue.thSubmitted')}: {formatDate(new Date(item.submittedAt))}
                     </span>
                     <span>
-                      Price: <strong>{item.course.price} {item.course.currency}</strong>
+                      {t('admin.courses.thPrice')}: <strong>{formatCurrency(item.course.price, item.course.currency)}</strong>
                     </span>
                   </div>
 
                   {item.submissionNotes && (
                     <div className='p-2.5 bg-gray-50 rounded-lg border border-gray-200 text-xs text-gray-700 max-w-2xl'>
-                      <span className='font-semibold text-gray-900'>Instructor Notes: </span>
+                      <span className='font-semibold text-gray-900'>{t('admin.courses.thInstructor')}: </span>
                       {item.submissionNotes}
                     </div>
                   )}
@@ -161,7 +161,7 @@ export function AdminReviewQueueClient() {
                   <Link href={`/admin/courses/${item.courseId}`}>
                     <Button variant='outline' size='sm' className='flex items-center gap-1.5'>
                       <FileText className='w-4 h-4' />
-                      <span>Inspect Curriculum</span>
+                      <span>{t('admin.reviewQueue.inspectCourse')}</span>
                     </Button>
                   </Link>
 
@@ -171,7 +171,7 @@ export function AdminReviewQueueClient() {
                     className='bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5'
                   >
                     <CheckCircle2 className='w-4 h-4' />
-                    <span>Approve & Publish</span>
+                    <span>{t('admin.reviewQueue.approve')}</span>
                   </Button>
 
                   <Button
@@ -181,7 +181,7 @@ export function AdminReviewQueueClient() {
                     className='border-amber-300 text-amber-800 hover:bg-amber-50 flex items-center gap-1.5'
                   >
                     <XCircle className='w-4 h-4' />
-                    <span>Request Revisions</span>
+                    <span>{t('admin.reviewQueue.reject')}</span>
                   </Button>
                 </div>
               </div>
@@ -193,7 +193,7 @@ export function AdminReviewQueueClient() {
         {pagination.totalPages > 1 && (
           <div className='p-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-600 bg-gray-50/50'>
             <span>
-              Showing Page <strong>{pagination.page}</strong> of <strong>{pagination.totalPages}</strong> ({pagination.total} items)
+              {t('admin.overview.pageOf', { page: formatNumber(pagination.page), totalPages: formatNumber(pagination.totalPages) })} ({formatNumber(pagination.total)} {t('admin.nav.courses')})
             </span>
             <div className='flex items-center gap-2'>
               <Button
@@ -203,7 +203,7 @@ export function AdminReviewQueueClient() {
                 disabled={pagination.page <= 1}
               >
                 <ChevronLeft className='w-4 h-4 mr-1' />
-                Previous
+                {t('admin.overview.prev')}
               </Button>
               <Button
                 variant='outline'
@@ -211,7 +211,7 @@ export function AdminReviewQueueClient() {
                 onClick={() => setPage((p) => Math.min(p + 1, pagination.totalPages))}
                 disabled={pagination.page >= pagination.totalPages}
               >
-                Next
+                {t('admin.overview.next')}
                 <ChevronRight className='w-4 h-4 ml-1' />
               </Button>
             </div>

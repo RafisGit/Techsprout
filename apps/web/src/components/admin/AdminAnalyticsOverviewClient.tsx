@@ -10,6 +10,7 @@ import {
 } from '@/lib/api/admin-analytics';
 import { AdminNav } from '@/components/admin/AdminNav';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from '@/i18n/client';
 import {
   BookOpen,
   Users,
@@ -36,6 +37,8 @@ type CourseStatusFilter = 'ALL' | 'PUBLISHED' | 'IN_REVIEW' | 'DRAFT' | 'ARCHIVE
 type SortField = 'enrollments' | 'completionRate' | 'title' | 'createdAt';
 
 export function AdminAnalyticsOverviewClient() {
+  const { t, formatNumber } = useTranslation();
+
   // Query 1: Platform Overview Metrics
   const {
     data: overview,
@@ -124,6 +127,21 @@ export function AdminAnalyticsOverviewClient() {
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'PUBLISHED':
+        return t('admin.status.published');
+      case 'IN_REVIEW':
+        return t('admin.status.inReview');
+      case 'DRAFT':
+        return t('admin.status.draft');
+      case 'ARCHIVED':
+        return t('admin.status.archived');
+      default:
+        return status;
+    }
+  };
+
   return (
     <div className='space-y-8'>
       {/* Top Admin Navigation Bar */}
@@ -134,17 +152,17 @@ export function AdminAnalyticsOverviewClient() {
         <div>
           <div className='flex items-center gap-2'>
             <h1 className='text-2xl font-bold text-gray-900 tracking-tight'>
-              Institutional Platform Analytics
+              {t('admin.overview.title')}
             </h1>
             {isFetchingOverview && !isLoadingOverview && (
               <span className='inline-flex items-center gap-1 text-[11px] text-gray-400 font-medium'>
                 <Loader2 className='w-3 h-3 animate-spin text-primary' />
-                <span>Refreshing...</span>
+                <span>{t('admin.overview.refresh')}</span>
               </span>
             )}
           </div>
           <p className='text-xs text-gray-600 mt-1 max-w-3xl'>
-            High-level overview of institutional learner growth, catalog completion rates, review queue turnaround times, and course performance metrics.
+            {t('admin.overview.subtitle')}
           </p>
         </div>
 
@@ -152,13 +170,13 @@ export function AdminAnalyticsOverviewClient() {
           <Link href='/admin/courses/review-queue'>
             <Button variant='outline' size='sm' className='flex items-center gap-1.5 text-blue-700 border-blue-200 hover:bg-blue-50'>
               <ClipboardCheck className='w-4 h-4' />
-              <span>Review Queue</span>
+              <span>{t('admin.nav.reviewQueue')}</span>
             </Button>
           </Link>
           <Link href='/admin/courses/new'>
             <Button size='sm' className='bg-primary text-white hover:bg-primary/90 flex items-center gap-1.5 shadow-xs'>
               <BookOpen className='w-4 h-4' />
-              <span>Create Course</span>
+              <span>{t('admin.courses.newCourse')}</span>
             </Button>
           </Link>
         </div>
@@ -170,26 +188,26 @@ export function AdminAnalyticsOverviewClient() {
           <div className='flex items-center gap-3'>
             <AlertCircle className='w-5 h-5 text-rose-600 flex-shrink-0' />
             <div>
-              <h4 className='text-sm font-bold'>Unable to load platform analytics</h4>
+              <h4 className='text-sm font-bold'>{t('admin.overview.errorLoading')}</h4>
               <p className='text-xs text-rose-700 mt-0.5'>
                 {(overviewError as any)?.response?.data?.message || 'Failed to fetch platform metrics.'}
               </p>
             </div>
           </div>
           <Button variant='outline' size='sm' onClick={() => refetchOverview()} className='text-xs text-rose-800 border-rose-300'>
-            Retry
+            {t('admin.overview.retry')}
           </Button>
         </div>
       )}
 
       {/* Section 1: Executive KPI Metrics Grid */}
       <div className='space-y-3'>
-        <h2 className='text-base font-bold text-gray-900'>Platform Learning Totals</h2>
+        <h2 className='text-base font-bold text-gray-900'>{t('admin.overview.title')}</h2>
         <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4'>
           {/* Metric 1: Registered Students */}
           <div className='p-5 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
             <div className='flex items-center justify-between'>
-              <span className='text-xs font-semibold text-gray-500'>Registered Students</span>
+              <span className='text-xs font-semibold text-gray-500'>{t('admin.nav.roleStudent')}</span>
               <div className='w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center'>
                 <Users className='w-4 h-4' />
               </div>
@@ -198,16 +216,18 @@ export function AdminAnalyticsOverviewClient() {
               {isLoadingOverview ? (
                 <div className='h-8 w-16 bg-gray-200 rounded animate-pulse' />
               ) : (
-                <div className='text-2xl font-extrabold text-gray-900'>{overview?.totalRegisteredStudents ?? 0}</div>
+                <div className='text-2xl font-extrabold text-gray-900'>
+                  {formatNumber(overview?.totalRegisteredStudents ?? 0)}
+                </div>
               )}
-              <p className='text-[11px] text-gray-400 mt-0.5'>Active student accounts</p>
+              <p className='text-[11px] text-gray-400 mt-0.5'>{t('admin.overview.totalEnrollmentsSubtitle')}</p>
             </div>
           </div>
 
           {/* Metric 2: Active Instructors */}
           <div className='p-5 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
             <div className='flex items-center justify-between'>
-              <span className='text-xs font-semibold text-gray-500'>Active Instructors</span>
+              <span className='text-xs font-semibold text-gray-500'>{t('admin.nav.roleInstructor')}</span>
               <div className='w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center'>
                 <BookOpen className='w-4 h-4' />
               </div>
@@ -216,16 +236,18 @@ export function AdminAnalyticsOverviewClient() {
               {isLoadingOverview ? (
                 <div className='h-8 w-16 bg-gray-200 rounded animate-pulse' />
               ) : (
-                <div className='text-2xl font-extrabold text-gray-900'>{overview?.totalActiveInstructors ?? 0}</div>
+                <div className='text-2xl font-extrabold text-gray-900'>
+                  {formatNumber(overview?.totalActiveInstructors ?? 0)}
+                </div>
               )}
-              <p className='text-[11px] text-gray-400 mt-0.5'>Verified educators</p>
+              <p className='text-[11px] text-gray-400 mt-0.5'>{t('admin.courses.thInstructor')}</p>
             </div>
           </div>
 
           {/* Metric 3: Platform Enrollments */}
           <div className='p-5 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
             <div className='flex items-center justify-between'>
-              <span className='text-xs font-semibold text-gray-500'>Total Enrollments</span>
+              <span className='text-xs font-semibold text-gray-500'>{t('admin.overview.totalEnrollments')}</span>
               <div className='w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center'>
                 <Layers className='w-4 h-4' />
               </div>
@@ -234,16 +256,18 @@ export function AdminAnalyticsOverviewClient() {
               {isLoadingOverview ? (
                 <div className='h-8 w-16 bg-gray-200 rounded animate-pulse' />
               ) : (
-                <div className='text-2xl font-extrabold text-gray-900'>{overview?.platformWideEnrollments ?? 0}</div>
+                <div className='text-2xl font-extrabold text-gray-900'>
+                  {formatNumber(overview?.platformWideEnrollments ?? 0)}
+                </div>
               )}
-              <p className='text-[11px] text-gray-400 mt-0.5'>Cumulative enrollments</p>
+              <p className='text-[11px] text-gray-400 mt-0.5'>{t('admin.overview.totalEnrollmentsSubtitle')}</p>
             </div>
           </div>
 
           {/* Metric 4: Platform Certificates */}
           <div className='p-5 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
             <div className='flex items-center justify-between'>
-              <span className='text-xs font-semibold text-gray-500'>Certificates Issued</span>
+              <span className='text-xs font-semibold text-gray-500'>{t('admin.overview.completedLearners')}</span>
               <div className='w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center'>
                 <Award className='w-4 h-4' />
               </div>
@@ -252,16 +276,18 @@ export function AdminAnalyticsOverviewClient() {
               {isLoadingOverview ? (
                 <div className='h-8 w-16 bg-gray-200 rounded animate-pulse' />
               ) : (
-                <div className='text-2xl font-extrabold text-gray-900'>{overview?.platformWideCertificates ?? 0}</div>
+                <div className='text-2xl font-extrabold text-gray-900'>
+                  {formatNumber(overview?.platformWideCertificates ?? 0)}
+                </div>
               )}
-              <p className='text-[11px] text-gray-400 mt-0.5'>Completed courses</p>
+              <p className='text-[11px] text-gray-400 mt-0.5'>{t('admin.overview.completedLearnersSubtitle')}</p>
             </div>
           </div>
 
           {/* Metric 5: Platform Completion Rate */}
           <div className='p-5 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
             <div className='flex items-center justify-between'>
-              <span className='text-xs font-semibold text-gray-500'>Completion Rate</span>
+              <span className='text-xs font-semibold text-gray-500'>{t('admin.overview.avgCompletionRate')}</span>
               <div className='w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center'>
                 <TrendingUp className='w-4 h-4' />
               </div>
@@ -270,9 +296,11 @@ export function AdminAnalyticsOverviewClient() {
               {isLoadingOverview ? (
                 <div className='h-8 w-16 bg-gray-200 rounded animate-pulse' />
               ) : (
-                <div className='text-2xl font-extrabold text-gray-900'>{overview?.platformCompletionRate ?? 0}%</div>
+                <div className='text-2xl font-extrabold text-gray-900'>
+                  {formatNumber(overview?.platformCompletionRate ?? 0)}%
+                </div>
               )}
-              <p className='text-[11px] text-gray-400 mt-0.5'>Across all courses</p>
+              <p className='text-[11px] text-gray-400 mt-0.5'>{t('admin.overview.avgCompletionRateSubtitle')}</p>
             </div>
           </div>
         </div>
@@ -283,14 +311,15 @@ export function AdminAnalyticsOverviewClient() {
         {/* Card: Course Lifecycle Status Breakdown */}
         <div className='lg:col-span-2 p-6 bg-white rounded-2xl border border-gray-200 shadow-xs space-y-4'>
           <div className='flex items-center justify-between'>
-            <h3 className='text-base font-bold text-gray-900'>Catalog Course Lifecycle</h3>
+            <h3 className='text-base font-bold text-gray-900'>{t('admin.courses.title')}</h3>
             <span className='text-xs text-gray-400 font-mono'>
-              Total{' '}
-              {(overview?.totalPublishedCourses ?? 0) +
-                (overview?.totalInReviewCourses ?? 0) +
-                (overview?.totalDraftCourses ?? 0) +
-                (overview?.totalArchivedCourses ?? 0)}{' '}
-              Courses
+              {formatNumber(
+                (overview?.totalPublishedCourses ?? 0) +
+                  (overview?.totalInReviewCourses ?? 0) +
+                  (overview?.totalDraftCourses ?? 0) +
+                  (overview?.totalArchivedCourses ?? 0)
+              )}{' '}
+              {t('admin.nav.courses')}
             </span>
           </div>
 
@@ -298,56 +327,56 @@ export function AdminAnalyticsOverviewClient() {
             {/* Published */}
             <div className='p-4 rounded-xl border border-emerald-100 bg-emerald-50/40 flex flex-col justify-between'>
               <div className='flex items-center justify-between'>
-                <span className='text-xs font-bold text-emerald-800'>Published</span>
+                <span className='text-xs font-bold text-emerald-800'>{t('admin.status.published')}</span>
                 <span className='w-2 h-2 rounded-full bg-emerald-500' />
               </div>
               <div className='mt-3'>
                 <div className='text-2xl font-extrabold text-emerald-900'>
-                  {overview?.totalPublishedCourses ?? 0}
+                  {formatNumber(overview?.totalPublishedCourses ?? 0)}
                 </div>
-                <p className='text-[10px] text-emerald-700 mt-0.5'>Live in catalog</p>
+                <p className='text-[10px] text-emerald-700 mt-0.5'>{t('admin.overview.activeCoursesSubtitle')}</p>
               </div>
             </div>
 
             {/* In Review */}
             <div className='p-4 rounded-xl border border-blue-100 bg-blue-50/40 flex flex-col justify-between'>
               <div className='flex items-center justify-between'>
-                <span className='text-xs font-bold text-blue-800'>In Review</span>
+                <span className='text-xs font-bold text-blue-800'>{t('admin.status.inReview')}</span>
                 <span className='w-2 h-2 rounded-full bg-blue-500' />
               </div>
               <div className='mt-3'>
                 <div className='text-2xl font-extrabold text-blue-900'>
-                  {overview?.totalInReviewCourses ?? 0}
+                  {formatNumber(overview?.totalInReviewCourses ?? 0)}
                 </div>
-                <p className='text-[10px] text-blue-700 mt-0.5'>Pending approval</p>
+                <p className='text-[10px] text-blue-700 mt-0.5'>{t('admin.overview.inReviewCoursesSubtitle')}</p>
               </div>
             </div>
 
             {/* Draft */}
             <div className='p-4 rounded-xl border border-amber-100 bg-amber-50/40 flex flex-col justify-between'>
               <div className='flex items-center justify-between'>
-                <span className='text-xs font-bold text-amber-800'>Draft</span>
+                <span className='text-xs font-bold text-amber-800'>{t('admin.status.draft')}</span>
                 <span className='w-2 h-2 rounded-full bg-amber-500' />
               </div>
               <div className='mt-3'>
                 <div className='text-2xl font-extrabold text-amber-900'>
-                  {overview?.totalDraftCourses ?? 0}
+                  {formatNumber(overview?.totalDraftCourses ?? 0)}
                 </div>
-                <p className='text-[10px] text-amber-700 mt-0.5'>In authoring</p>
+                <p className='text-[10px] text-amber-700 mt-0.5'>{t('admin.status.draft')}</p>
               </div>
             </div>
 
             {/* Archived */}
             <div className='p-4 rounded-xl border border-slate-100 bg-slate-50 flex flex-col justify-between'>
               <div className='flex items-center justify-between'>
-                <span className='text-xs font-bold text-slate-700'>Archived</span>
+                <span className='text-xs font-bold text-slate-700'>{t('admin.status.archived')}</span>
                 <span className='w-2 h-2 rounded-full bg-slate-400' />
               </div>
               <div className='mt-3'>
                 <div className='text-2xl font-extrabold text-slate-800'>
-                  {overview?.totalArchivedCourses ?? 0}
+                  {formatNumber(overview?.totalArchivedCourses ?? 0)}
                 </div>
-                <p className='text-[10px] text-slate-500 mt-0.5'>Retired offerings</p>
+                <p className='text-[10px] text-slate-500 mt-0.5'>{t('admin.status.archived')}</p>
               </div>
             </div>
           </div>
@@ -357,35 +386,35 @@ export function AdminAnalyticsOverviewClient() {
         <div className='p-6 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between space-y-4'>
           <div>
             <div className='flex items-center justify-between'>
-              <h3 className='text-base font-bold text-gray-900'>Review Queue SLA</h3>
+              <h3 className='text-base font-bold text-gray-900'>{t('admin.overview.queueSlaTarget')}</h3>
               <div className='w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center'>
                 <Clock className='w-4 h-4' />
               </div>
             </div>
             <p className='text-xs text-gray-500 mt-1'>
-              Turnaround duration for instructor curriculum review submissions.
+              {t('admin.overview.queueSlaTargetSubtitle')}
             </p>
 
             <div className='mt-5 space-y-4'>
               <div className='flex items-center justify-between p-3.5 bg-gray-50 rounded-xl border border-gray-100'>
                 <div>
-                  <span className='text-xs font-semibold text-gray-700'>Pending Reviews</span>
-                  <p className='text-[11px] text-gray-400'>Courses awaiting moderation</p>
+                  <span className='text-xs font-semibold text-gray-700'>{t('admin.overview.inReviewCourses')}</span>
+                  <p className='text-[11px] text-gray-400'>{t('admin.overview.inReviewCoursesSubtitle')}</p>
                 </div>
                 <span className='text-xl font-extrabold text-primary'>
-                  {overview?.reviewQueue.pendingReviewsCount ?? 0}
+                  {formatNumber(overview?.reviewQueue.pendingReviewsCount ?? 0)}
                 </span>
               </div>
 
               <div className='flex items-center justify-between p-3.5 bg-gray-50 rounded-xl border border-gray-100'>
                 <div>
-                  <span className='text-xs font-semibold text-gray-700'>Avg Turnaround</span>
-                  <p className='text-[11px] text-gray-400'>Submission to review decision</p>
+                  <span className='text-xs font-semibold text-gray-700'>{t('admin.overview.queueSlaTarget')}</span>
+                  <p className='text-[11px] text-gray-400'>{t('admin.overview.queueSlaTargetSubtitle')}</p>
                 </div>
                 <span className='text-xl font-extrabold text-gray-900'>
                   {overview?.reviewQueue.averageTurnaroundHours != null
-                    ? `${overview.reviewQueue.averageTurnaroundHours}h`
-                    : 'N/A'}
+                    ? `${formatNumber(overview.reviewQueue.averageTurnaroundHours)}h`
+                    : '—'}
                 </span>
               </div>
             </div>
@@ -394,7 +423,7 @@ export function AdminAnalyticsOverviewClient() {
           <div className='pt-2'>
             <Link href='/admin/courses/review-queue'>
               <Button variant='outline' size='sm' className='w-full text-xs font-semibold flex items-center justify-center gap-1.5'>
-                <span>Open Review Queue</span>
+                <span>{t('admin.nav.reviewQueue')}</span>
                 <ArrowRight className='w-3.5 h-3.5' />
               </Button>
             </Link>
@@ -408,14 +437,14 @@ export function AdminAnalyticsOverviewClient() {
         <div className='p-6 border-b border-gray-100 space-y-4'>
           <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
             <div>
-              <h2 className='text-lg font-bold text-gray-900'>Catalog Course Analytics</h2>
+              <h2 className='text-lg font-bold text-gray-900'>{t('admin.overview.coursePerformanceTitle')}</h2>
               <p className='text-xs text-gray-500 mt-0.5'>
-                Search and analyze student enrollments and completion rates across the entire institutional catalog.
+                {t('admin.overview.coursePerformanceSubtitle')}
               </p>
             </div>
             <div className='flex items-center gap-2'>
               <span className='text-xs text-gray-500 font-medium'>
-                {pagination.total} {pagination.total === 1 ? 'course' : 'courses'} total
+                {formatNumber(pagination.total)} {t('admin.nav.courses')}
               </span>
             </div>
           </div>
@@ -429,7 +458,7 @@ export function AdminAnalyticsOverviewClient() {
                 type='text'
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder='Search courses by title...'
+                placeholder={t('admin.overview.searchPlaceholder')}
                 className='w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary'
               />
               {searchQuery && (
@@ -438,7 +467,7 @@ export function AdminAnalyticsOverviewClient() {
                   onClick={() => setSearchQuery('')}
                   className='text-[11px] text-gray-400 hover:text-gray-700 absolute right-3 top-1/2 -translate-y-1/2'
                 >
-                  Clear
+                  ✕
                 </button>
               )}
             </div>
@@ -447,11 +476,11 @@ export function AdminAnalyticsOverviewClient() {
             <div className='flex flex-wrap items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs font-semibold'>
               {(
                 [
-                  { key: 'ALL', label: 'All Statuses' },
-                  { key: 'PUBLISHED', label: 'Published' },
-                  { key: 'IN_REVIEW', label: 'In Review' },
-                  { key: 'DRAFT', label: 'Draft' },
-                  { key: 'ARCHIVED', label: 'Archived' },
+                  { key: 'ALL', label: t('admin.overview.allStatuses') },
+                  { key: 'PUBLISHED', label: t('admin.status.published') },
+                  { key: 'IN_REVIEW', label: t('admin.status.inReview') },
+                  { key: 'DRAFT', label: t('admin.status.draft') },
+                  { key: 'ARCHIVED', label: t('admin.status.archived') },
                 ] as const
               ).map((tab) => (
                 <button
@@ -471,16 +500,16 @@ export function AdminAnalyticsOverviewClient() {
 
             {/* Sort Dropdown */}
             <div className='flex items-center gap-2 text-xs'>
-              <span className='text-gray-500 font-medium'>Sort by:</span>
+              <span className='text-gray-500 font-medium'>{t('admin.overview.sortBy')}:</span>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortField)}
                 className='bg-gray-50 border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 font-medium focus:ring-2 focus:ring-primary focus:outline-none'
               >
-                <option value='enrollments'>Enrollments</option>
-                <option value='completionRate'>Completion Rate</option>
-                <option value='title'>Title</option>
-                <option value='createdAt'>Creation Date</option>
+                <option value='enrollments'>{t('admin.overview.sortEnrollments')}</option>
+                <option value='completionRate'>{t('admin.overview.sortCompletion')}</option>
+                <option value='title'>{t('admin.overview.sortTitle')}</option>
+                <option value='createdAt'>{t('admin.overview.sortDate')}</option>
               </select>
               <Button
                 variant='outline'
@@ -506,22 +535,22 @@ export function AdminAnalyticsOverviewClient() {
         ) : isCoursesError ? (
           <div className='p-8 text-center space-y-3'>
             <AlertCircle className='w-8 h-8 text-rose-500 mx-auto' />
-            <h4 className='text-sm font-bold text-gray-900'>Unable to load course analytics</h4>
+            <h4 className='text-sm font-bold text-gray-900'>{t('admin.overview.errorLoading')}</h4>
             <p className='text-xs text-gray-500 max-w-md mx-auto'>
               {(coursesError as any)?.response?.data?.message || 'Failed to retrieve course rollup data.'}
             </p>
             <Button variant='outline' size='sm' onClick={() => refetchCourses()} className='text-xs'>
-              Retry
+              {t('admin.overview.retry')}
             </Button>
           </div>
         ) : courseItems.length === 0 ? (
           <div className='p-12 text-center space-y-3'>
             <BookOpen className='w-10 h-10 text-gray-300 mx-auto' />
-            <h4 className='text-sm font-bold text-gray-800'>No courses found</h4>
+            <h4 className='text-sm font-bold text-gray-800'>{t('admin.overview.noCoursesFound')}</h4>
             <p className='text-xs text-gray-500 max-w-sm mx-auto'>
               {debouncedSearch
-                ? `No courses matched your query "${debouncedSearch}". Try broadening your search or clearing filters.`
-                : 'No course analytics available under the selected status filter.'}
+                ? `No courses matched your query "${debouncedSearch}".`
+                : t('admin.courses.noCoursesDesc')}
             </p>
             {(debouncedSearch || statusFilter !== 'ALL') && (
               <Button
@@ -534,7 +563,7 @@ export function AdminAnalyticsOverviewClient() {
                 }}
                 className='text-xs mt-2'
               >
-                Reset Filters
+                {t('admin.overview.allStatuses')}
               </Button>
             )}
           </div>
@@ -544,13 +573,13 @@ export function AdminAnalyticsOverviewClient() {
               <thead className='bg-gray-50/75 text-gray-700 font-semibold'>
                 <tr>
                   <th scope='col' className='px-4 py-3'>
-                    Course Title
+                    {t('admin.overview.thCourse')}
                   </th>
                   <th scope='col' className='px-4 py-3'>
-                    Instructor
+                    {t('admin.courses.thInstructor')}
                   </th>
                   <th scope='col' className='px-4 py-3 text-center'>
-                    Status
+                    {t('admin.overview.thStatus')}
                   </th>
                   <th
                     scope='col'
@@ -558,14 +587,14 @@ export function AdminAnalyticsOverviewClient() {
                     className='px-4 py-3 text-center cursor-pointer hover:bg-gray-100 transition-colors'
                   >
                     <div className='flex items-center justify-center gap-1'>
-                      <span>Enrolled</span>
+                      <span>{t('admin.overview.thEnrollments')}</span>
                       {sortBy === 'enrollments' && (
                         <span className='font-mono text-[10px]'>{sortOrder === 'asc' ? '↑' : '↓'}</span>
                       )}
                     </div>
                   </th>
                   <th scope='col' className='px-4 py-3 text-center'>
-                    Completions
+                    {t('admin.overview.completedLearners')}
                   </th>
                   <th
                     scope='col'
@@ -573,14 +602,14 @@ export function AdminAnalyticsOverviewClient() {
                     className='px-4 py-3 min-w-[150px] cursor-pointer hover:bg-gray-100 transition-colors'
                   >
                     <div className='flex items-center gap-1'>
-                      <span>Completion Rate</span>
+                      <span>{t('admin.overview.thCompletionRate')}</span>
                       {sortBy === 'completionRate' && (
                         <span className='font-mono text-[10px]'>{sortOrder === 'asc' ? '↑' : '↓'}</span>
                       )}
                     </div>
                   </th>
                   <th scope='col' className='px-4 py-3 text-right'>
-                    Actions
+                    {t('admin.overview.thActions')}
                   </th>
                 </tr>
               </thead>
@@ -616,25 +645,25 @@ export function AdminAnalyticsOverviewClient() {
                       {/* Status */}
                       <td className='px-4 py-3 text-center'>
                         <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border ${statusBadgeStyles}`}>
-                          {course.status}
+                          {getStatusLabel(course.status)}
                         </span>
                       </td>
 
                       {/* Enrolled Count */}
                       <td className='px-4 py-3 text-center font-bold text-gray-900'>
-                        {course.totalEnrolled}
+                        {formatNumber(course.totalEnrolled)}
                       </td>
 
                       {/* Completed Count */}
                       <td className='px-4 py-3 text-center font-semibold text-gray-700'>
-                        {course.completedCount}
+                        {formatNumber(course.completedCount)}
                       </td>
 
                       {/* Completion Rate */}
                       <td className='px-4 py-3'>
                         <div className='space-y-1'>
                           <div className='flex items-center justify-between text-xs font-bold text-gray-800'>
-                            <span>{course.completionRate}%</span>
+                            <span>{formatNumber(course.completionRate)}%</span>
                           </div>
                           <div className='w-full bg-gray-100 h-2 rounded-full overflow-hidden'>
                             <div
@@ -659,10 +688,10 @@ export function AdminAnalyticsOverviewClient() {
                               variant='outline'
                               size='sm'
                               className='h-7 text-xs px-2.5 text-gray-700 hover:text-gray-900'
-                              title='Edit Curriculum'
+                              title={t('admin.courseForm.tabs.curriculum')}
                             >
                               <FileEdit className='w-3 h-3 mr-1' />
-                              <span>Curriculum</span>
+                              <span>{t('admin.courseForm.tabs.curriculum')}</span>
                             </Button>
                           </Link>
 
@@ -671,10 +700,10 @@ export function AdminAnalyticsOverviewClient() {
                               variant='outline'
                               size='sm'
                               className='h-7 text-xs px-2.5 text-blue-700 border-blue-200 hover:bg-blue-50'
-                              title='View Enrolled Learners'
+                              title={t('admin.publishing.viewLearners')}
                             >
                               <Users className='w-3 h-3 mr-1' />
-                              <span>Learners</span>
+                              <span>{t('admin.publishing.viewLearners')}</span>
                             </Button>
                           </Link>
 
@@ -704,7 +733,7 @@ export function AdminAnalyticsOverviewClient() {
         {pagination.totalPages > 1 && (
           <div className='p-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-600 bg-gray-50/50'>
             <span>
-              Page <strong>{pagination.page}</strong> of <strong>{pagination.totalPages}</strong> ({pagination.total} matching courses)
+              {t('admin.overview.pageOf', { page: formatNumber(pagination.page), totalPages: formatNumber(pagination.totalPages) })} ({formatNumber(pagination.total)} {t('admin.nav.courses')})
             </span>
             <div className='flex items-center gap-2'>
               <Button
@@ -715,7 +744,7 @@ export function AdminAnalyticsOverviewClient() {
                 className='text-xs h-8'
               >
                 <ChevronLeft className='w-3.5 h-3.5 mr-1' />
-                Previous
+                {t('admin.overview.prev')}
               </Button>
               <Button
                 variant='outline'
@@ -724,7 +753,7 @@ export function AdminAnalyticsOverviewClient() {
                 disabled={!pagination.hasNextPage}
                 className='text-xs h-8'
               >
-                Next
+                {t('admin.overview.next')}
                 <ChevronRight className='w-3.5 h-3.5 ml-1' />
               </Button>
             </div>

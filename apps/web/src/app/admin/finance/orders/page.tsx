@@ -7,15 +7,15 @@ import {
   fetchAdminOrderById,
   fetchOrderPayments,
   initiateRefund,
-  formatBDT,
 } from '@/lib/api/finance';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { FinanceSubNav } from '@/components/admin/FinanceSubNav';
+import { useTranslation } from '@/i18n/client';
+import { formatCurrency, formatDate, formatNumber } from '@/i18n/format';
 import Link from 'next/link';
 import {
   ShoppingCart,
   Search,
-  Filter,
   Eye,
   RotateCcw,
   AlertCircle,
@@ -40,6 +40,7 @@ import type {
 } from '@techsprout/contracts';
 
 export default function AdminOrdersExplorerPage() {
+  const { t, locale } = useTranslation();
   const queryClient = useQueryClient();
   const { data: currentUser, isLoading: isLoadingUser } = useCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
@@ -122,7 +123,7 @@ export default function AdminOrdersExplorerPage() {
       setRefundReason('');
       setRefundFormError(null);
       setActionSuccessMessage(
-        `Refund operation ${data.refundNumber} initiated successfully with status '${data.status}'.`
+        t.admin.orders.refundSuccess
       );
       queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'finance'] });
@@ -130,7 +131,7 @@ export default function AdminOrdersExplorerPage() {
     },
     onError: (err: any) => {
       const resp = err?.response?.data;
-      setRefundFormError(resp?.message || err?.message || 'Failed to initiate refund operation.');
+      setRefundFormError(resp?.message || err?.message || t.admin.orders.refundError);
     },
   });
 
@@ -145,7 +146,7 @@ export default function AdminOrdersExplorerPage() {
     setRefundFormError(null);
 
     if (!refundReason.trim() || refundReason.trim().length < 5) {
-      setRefundFormError('Refund reason is required and must be at least 5 characters.');
+      setRefundFormError(t.admin.orders.refundReasonPlaceholder);
       return;
     }
 
@@ -164,42 +165,42 @@ export default function AdminOrdersExplorerPage() {
         return (
           <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200'>
             <CheckCircle2 className='w-3 h-3 mr-1 text-emerald-500' />
-            Paid
+            {t.admin.orders.statuses.paid}
           </span>
         );
       case 'PAYMENT_PROCESSING':
         return (
           <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200'>
             <Clock className='w-3 h-3 mr-1 text-blue-500' />
-            Processing
+            {t.admin.orders.statuses.processing}
           </span>
         );
       case 'PENDING':
         return (
           <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200'>
             <Clock className='w-3 h-3 mr-1 text-amber-500' />
-            Pending
+            {t.admin.orders.statuses.pending}
           </span>
         );
       case 'REFUNDED':
         return (
           <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200'>
             <RotateCcw className='w-3 h-3 mr-1 text-purple-500' />
-            Refunded
+            {t.admin.orders.statuses.refunded}
           </span>
         );
       case 'CANCELLED':
         return (
           <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200'>
             <XCircle className='w-3 h-3 mr-1 text-gray-400' />
-            Cancelled
+            {t.admin.orders.statuses.cancelled}
           </span>
         );
       case 'FAILED':
         return (
           <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200'>
             <AlertCircle className='w-3 h-3 mr-1 text-red-500' />
-            Failed
+            {t.admin.orders.statuses.failed}
           </span>
         );
       default:
@@ -216,15 +217,15 @@ export default function AdminOrdersExplorerPage() {
     return (
       <div className='max-w-2xl mx-auto p-8 bg-red-50 border border-red-200 text-red-800 rounded-2xl shadow-xs text-center'>
         <ShieldAlert className='w-12 h-12 text-red-600 mx-auto mb-3' />
-        <h2 className='text-xl font-bold mb-1'>Administrator Access Required</h2>
+        <h2 className='text-xl font-bold mb-1'>{t.admin.orders.accessDeniedTitle}</h2>
         <p className='text-xs text-gray-600 mb-4'>
-          The Orders & Payment Explorer is strictly restricted to system administrators.
+          {t.admin.orders.accessDeniedDesc}
         </p>
         <Link
           href='/dashboard'
           className='px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition'
         >
-          Return to Dashboard
+          {t.admin.orders.returnToDashboard}
         </Link>
       </div>
     );
@@ -239,10 +240,10 @@ export default function AdminOrdersExplorerPage() {
       <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
         <div>
           <h1 className='text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight'>
-            Orders & Payment Explorer
+            {t.admin.orders.title}
           </h1>
           <p className='text-sm text-gray-500 mt-1'>
-            Inspect student orders, verify gateway payment attempts, and initiate authorized full refunds.
+            {t.admin.orders.subtitle}
           </p>
         </div>
       </div>
@@ -261,7 +262,7 @@ export default function AdminOrdersExplorerPage() {
             onClick={() => setActionSuccessMessage(null)}
             className='text-xs font-semibold hover:underline'
           >
-            Dismiss
+            ×
           </button>
         </div>
       )}
@@ -279,7 +280,7 @@ export default function AdminOrdersExplorerPage() {
                 setSearchTerm(e.target.value);
                 setPage(1);
               }}
-              placeholder='Search order #, email, name...'
+              placeholder={t.admin.orders.searchPlaceholder}
               className='w-full pl-10 pr-4 py-2 text-xs sm:text-sm rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary'
             />
           </div>
@@ -294,13 +295,13 @@ export default function AdminOrdersExplorerPage() {
               }}
               className='w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary bg-white'
             >
-              <option value=''>All Order Statuses</option>
-              <option value='PAID'>PAID</option>
-              <option value='PAYMENT_PROCESSING'>PAYMENT_PROCESSING</option>
-              <option value='PENDING'>PENDING</option>
-              <option value='REFUNDED'>REFUNDED</option>
-              <option value='CANCELLED'>CANCELLED</option>
-              <option value='FAILED'>FAILED</option>
+              <option value=''>{t.admin.orders.allStatuses}</option>
+              <option value='PAID'>{t.admin.orders.statuses.paid}</option>
+              <option value='PAYMENT_PROCESSING'>{t.admin.orders.statuses.processing}</option>
+              <option value='PENDING'>{t.admin.orders.statuses.pending}</option>
+              <option value='REFUNDED'>{t.admin.orders.statuses.refunded}</option>
+              <option value='CANCELLED'>{t.admin.orders.statuses.cancelled}</option>
+              <option value='FAILED'>{t.admin.orders.statuses.failed}</option>
             </select>
           </div>
 
@@ -313,7 +314,7 @@ export default function AdminOrdersExplorerPage() {
                 setStartDate(e.target.value);
                 setPage(1);
               }}
-              placeholder='Start Date'
+              placeholder={t.admin.orders.dateFrom}
               className='w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary text-gray-600'
             />
           </div>
@@ -327,7 +328,7 @@ export default function AdminOrdersExplorerPage() {
                 setEndDate(e.target.value);
                 setPage(1);
               }}
-              placeholder='End Date'
+              placeholder={t.admin.orders.dateTo}
               className='w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary text-gray-600'
             />
           </div>
@@ -346,7 +347,7 @@ export default function AdminOrdersExplorerPage() {
               }}
               className='text-xs font-semibold text-primary hover:underline'
             >
-              Clear All Filters
+              {t.admin.orders.clearFilters}
             </button>
           </div>
         )}
@@ -357,12 +358,12 @@ export default function AdminOrdersExplorerPage() {
         {isLoadingOrders ? (
           <div className='p-16 text-center'>
             <Loader2 className='w-8 h-8 text-primary animate-spin mx-auto mb-3' />
-            <p className='text-sm text-gray-500'>Loading orders from database...</p>
+            <p className='text-sm text-gray-500'>{t.admin.orders.loading}</p>
           </div>
         ) : isOrdersError ? (
           <div className='p-12 text-center max-w-md mx-auto'>
             <AlertCircle className='w-10 h-10 text-red-500 mx-auto mb-3' />
-            <h3 className='text-base font-semibold text-gray-900 mb-1'>Failed to load orders</h3>
+            <h3 className='text-base font-semibold text-gray-900 mb-1'>{t.admin.orders.errorTitle}</h3>
             <p className='text-xs text-gray-500 mb-4'>
               {(ordersError as any)?.response?.data?.message || 'Network error fetching orders list.'}
             </p>
@@ -370,7 +371,7 @@ export default function AdminOrdersExplorerPage() {
               onClick={() => refetchOrders()}
               className='px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition'
             >
-              Retry
+              {t.admin.orders.retry}
             </button>
           </div>
         ) : items.length === 0 ? (
@@ -378,11 +379,11 @@ export default function AdminOrdersExplorerPage() {
             <div className='w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3 text-gray-400'>
               <ShoppingCart className='w-6 h-6' />
             </div>
-            <h3 className='text-base font-semibold text-gray-900 mb-1'>No orders found</h3>
+            <h3 className='text-base font-semibold text-gray-900 mb-1'>{t.admin.orders.noOrders}</h3>
             <p className='text-xs text-gray-500 mb-4'>
               {searchTerm || statusFilter || startDate || endDate
-                ? 'No orders matched your selected filters.'
-                : 'No customer orders have been recorded in the system yet.'}
+                ? t.admin.orders.noOrdersFiltered
+                : t.admin.orders.noOrdersEmpty}
             </p>
           </div>
         ) : (
@@ -390,13 +391,13 @@ export default function AdminOrdersExplorerPage() {
             <table className='w-full text-left text-sm text-gray-600'>
               <thead className='bg-gray-50/80 text-xs font-semibold text-gray-700 uppercase border-b border-gray-200'>
                 <tr>
-                  <th scope='col' className='px-4 py-3.5'>Order #</th>
-                  <th scope='col' className='px-4 py-3.5'>Student</th>
-                  <th scope='col' className='px-4 py-3.5'>Course</th>
-                  <th scope='col' className='px-4 py-3.5 text-right'>Payable</th>
-                  <th scope='col' className='px-4 py-3.5 text-center'>Status</th>
-                  <th scope='col' className='px-4 py-3.5'>Date</th>
-                  <th scope='col' className='px-4 py-3.5 text-right'>Actions</th>
+                  <th scope='col' className='px-4 py-3.5'>{t.admin.orders.thOrder}</th>
+                  <th scope='col' className='px-4 py-3.5'>{t.admin.orders.thCustomer}</th>
+                  <th scope='col' className='px-4 py-3.5'>{t.admin.orders.thCourse}</th>
+                  <th scope='col' className='px-4 py-3.5 text-right'>{t.admin.orders.thPayable}</th>
+                  <th scope='col' className='px-4 py-3.5 text-center'>{t.admin.orders.thStatus}</th>
+                  <th scope='col' className='px-4 py-3.5'>{t.admin.orders.thDate}</th>
+                  <th scope='col' className='px-4 py-3.5 text-right'>{t.admin.orders.thActions}</th>
                 </tr>
               </thead>
               <tbody className='divide-y divide-gray-100'>
@@ -407,7 +408,7 @@ export default function AdminOrdersExplorerPage() {
                     </td>
 
                     <td className='px-4 py-3.5 whitespace-nowrap'>
-                      <div className='font-medium text-gray-900'>{ord.studentName || 'Student'}</div>
+                      <div className='font-medium text-gray-900'>{ord.studentName || t.admin.orders.orderDetail.studentDefault}</div>
                       <div className='text-xs text-gray-500'>{ord.studentEmail || '—'}</div>
                     </td>
 
@@ -416,7 +417,7 @@ export default function AdminOrdersExplorerPage() {
                     </td>
 
                     <td className='px-4 py-3.5 text-right whitespace-nowrap font-bold text-gray-900'>
-                      {formatBDT(ord.payableCents)}
+                      {formatCurrency((ord.payableCents || 0) / 100, locale)}
                     </td>
 
                     <td className='px-4 py-3.5 text-center whitespace-nowrap'>
@@ -424,7 +425,7 @@ export default function AdminOrdersExplorerPage() {
                     </td>
 
                     <td className='px-4 py-3.5 whitespace-nowrap text-xs text-gray-500'>
-                      {new Date(ord.createdAt).toLocaleDateString('en-US', {
+                      {formatDate(ord.createdAt, locale, {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric',
@@ -436,7 +437,8 @@ export default function AdminOrdersExplorerPage() {
                         <button
                           onClick={() => setSelectedOrderId(ord.id)}
                           className='p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 rounded-lg transition'
-                          title='View Order Details'
+                          title={t.admin.orders.viewDetails}
+                          aria-label={t.admin.orders.viewDetails}
                         >
                           <Eye className='w-4 h-4' />
                         </button>
@@ -449,7 +451,8 @@ export default function AdminOrdersExplorerPage() {
                               });
                             }}
                             className='p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition'
-                            title='Initiate Full Refund'
+                            title={t.admin.orders.initiateFullRefund}
+                            aria-label={t.admin.orders.initiateFullRefund}
                           >
                             <RotateCcw className='w-4 h-4' />
                           </button>
@@ -467,8 +470,10 @@ export default function AdminOrdersExplorerPage() {
         {pagination && pagination.totalPages > 1 && (
           <div className='p-4 border-t border-gray-200 flex items-center justify-between text-xs text-gray-600'>
             <div>
-              Showing page <span className='font-bold text-gray-900'>{pagination.page}</span> of{' '}
-              <span className='font-bold text-gray-900'>{pagination.totalPages}</span> ({pagination.total} total orders)
+              {t.admin.orders.pagination
+                .replace('{page}', formatNumber(pagination.page, locale))
+                .replace('{totalPages}', formatNumber(pagination.totalPages, locale))
+                .replace('{total}', formatNumber(pagination.total, locale))}
             </div>
 
             <div className='flex items-center space-x-2'>
@@ -478,14 +483,14 @@ export default function AdminOrdersExplorerPage() {
                 className='inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 font-semibold hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition'
               >
                 <ChevronLeft className='w-3.5 h-3.5 mr-1' />
-                Previous
+                {t.admin.orders.prev}
               </button>
               <button
                 onClick={() => setPage((p) => p + 1)}
                 disabled={!pagination.hasNextPage}
                 className='inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 font-semibold hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition'
               >
-                Next
+                {t.admin.orders.next}
                 <ChevronRight className='w-3.5 h-3.5 ml-1' />
               </button>
             </div>
@@ -501,7 +506,7 @@ export default function AdminOrdersExplorerPage() {
             <div className='flex items-center justify-between border-b border-gray-100 pb-3'>
               <div>
                 <h3 className='text-lg font-bold text-gray-900 flex items-center space-x-2'>
-                  <span>Order Inspection</span>
+                  <span>{t.admin.orders.orderDetailTitle}</span>
                   {orderDetail && (
                     <span className='font-mono text-sm font-semibold text-primary'>
                       {orderDetail.orderNumber}
@@ -509,12 +514,13 @@ export default function AdminOrdersExplorerPage() {
                   )}
                 </h3>
                 <p className='text-xs text-gray-500'>
-                  Authoritative record and payment gateway transaction trace
+                  {t.admin.orders.orderDetail.subtitle}
                 </p>
               </div>
               <button
                 onClick={() => setSelectedOrderId(null)}
                 className='text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100'
+                aria-label={t.admin.orders.orderDetail.close}
               >
                 <X className='w-5 h-5' />
               </button>
@@ -523,30 +529,30 @@ export default function AdminOrdersExplorerPage() {
             {isLoadingDetail || !orderDetail ? (
               <div className='p-12 text-center'>
                 <Loader2 className='w-8 h-8 text-primary animate-spin mx-auto mb-2' />
-                <p className='text-xs text-gray-500'>Loading order snapshot...</p>
+                <p className='text-xs text-gray-500'>{t.admin.orders.orderDetail.loading}</p>
               </div>
             ) : (
               <div className='space-y-6'>
                 {/* Status & Timing Overview */}
                 <div className='grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs'>
                   <div>
-                    <span className='text-gray-500 block font-medium'>Status</span>
+                    <span className='text-gray-500 block font-medium'>{t.admin.orders.orderDetail.status}</span>
                     <div className='mt-1'>{renderStatusBadge(orderDetail.status)}</div>
                   </div>
                   <div>
-                    <span className='text-gray-500 block font-medium'>Created At</span>
+                    <span className='text-gray-500 block font-medium'>{t.admin.orders.orderDetail.createdAt}</span>
                     <span className='font-semibold text-gray-900 mt-1 block'>
-                      {new Date(orderDetail.createdAt).toLocaleString()}
+                      {formatDate(orderDetail.createdAt, locale, { dateStyle: 'medium', timeStyle: 'short' })}
                     </span>
                   </div>
                   <div>
-                    <span className='text-gray-500 block font-medium'>Paid At</span>
+                    <span className='text-gray-500 block font-medium'>{t.admin.orders.orderDetail.paidAt}</span>
                     <span className='font-semibold text-gray-900 mt-1 block'>
-                      {orderDetail.paidAt ? new Date(orderDetail.paidAt).toLocaleString() : '—'}
+                      {orderDetail.paidAt ? formatDate(orderDetail.paidAt, locale, { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
                     </span>
                   </div>
                   <div>
-                    <span className='text-gray-500 block font-medium'>Currency</span>
+                    <span className='text-gray-500 block font-medium'>{t.admin.orders.orderDetail.currency}</span>
                     <span className='font-bold text-gray-900 mt-1 block'>{orderDetail.currency}</span>
                   </div>
                 </div>
@@ -554,23 +560,23 @@ export default function AdminOrdersExplorerPage() {
                 {/* Student Info */}
                 <div className='border border-gray-200 rounded-xl p-4 space-y-1.5'>
                   <div className='text-xs font-semibold text-gray-500 uppercase tracking-wider'>
-                    Student Information
+                    {t.admin.orders.customerInfo}
                   </div>
-                  <div className='font-semibold text-gray-900'>{orderDetail.studentName || 'Student'}</div>
+                  <div className='font-semibold text-gray-900'>{orderDetail.studentName || t.admin.orders.orderDetail.studentDefault}</div>
                   <div className='text-xs text-gray-600'>{orderDetail.studentEmail}</div>
                 </div>
 
                 {/* Items & Financial Breakdown */}
                 <div className='border border-gray-200 rounded-xl p-4 space-y-3'>
                   <div className='text-xs font-semibold text-gray-500 uppercase tracking-wider'>
-                    Course Items
+                    {t.admin.orders.orderItems}
                   </div>
                   <div className='divide-y divide-gray-100'>
                     {orderDetail.items.map((item) => (
                       <div key={item.id} className='py-2 flex items-center justify-between text-xs'>
                         <span className='font-semibold text-gray-900'>{item.courseTitle}</span>
                         <span className='font-mono font-bold text-gray-800'>
-                          {formatBDT(item.unitPriceCents)}
+                          {formatCurrency((item.unitPriceCents || 0) / 100, locale)}
                         </span>
                       </div>
                     ))}
@@ -578,18 +584,18 @@ export default function AdminOrdersExplorerPage() {
 
                   <div className='border-t border-gray-200 pt-3 space-y-1 text-xs'>
                     <div className='flex justify-between text-gray-600'>
-                      <span>Subtotal:</span>
-                      <span className='font-mono'>{formatBDT(orderDetail.subtotalCents)}</span>
+                      <span>{t.admin.orders.orderDetail.subtotal}</span>
+                      <span className='font-mono'>{formatCurrency((orderDetail.subtotalCents || 0) / 100, locale)}</span>
                     </div>
                     {orderDetail.discountCents > 0 && (
                       <div className='flex justify-between text-purple-700 font-medium'>
-                        <span>Discount {orderDetail.couponCode ? `(${orderDetail.couponCode})` : ''}:</span>
-                        <span className='font-mono'>- {formatBDT(orderDetail.discountCents)}</span>
+                        <span>{t.admin.orders.orderDetail.discount.replace('{coupon}', orderDetail.couponCode ? `(${orderDetail.couponCode})` : '')}</span>
+                        <span className='font-mono'>- {formatCurrency((orderDetail.discountCents || 0) / 100, locale)}</span>
                       </div>
                     )}
                     <div className='flex justify-between text-sm font-bold text-gray-900 pt-1 border-t border-gray-100'>
-                      <span>Total Payable:</span>
-                      <span className='text-primary'>{formatBDT(orderDetail.payableCents)}</span>
+                      <span>{t.admin.orders.orderDetail.totalPayable}</span>
+                      <span className='text-primary'>{formatCurrency((orderDetail.payableCents || 0) / 100, locale)}</span>
                     </div>
                   </div>
                 </div>
@@ -599,21 +605,21 @@ export default function AdminOrdersExplorerPage() {
                   <div className='flex items-center justify-between'>
                     <div className='text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center space-x-1.5'>
                       <CreditCard className='w-4 h-4 text-gray-400' />
-                      <span>Payment Gateway Attempts (SSLCommerz)</span>
+                      <span>{t.admin.orders.paymentTransactions}</span>
                     </div>
                     <span className='text-xs text-gray-400'>
-                      {orderPayments.length} attempt{orderPayments.length === 1 ? '' : 's'}
+                      {t.admin.orders.orderDetail.attemptsCount.replace('{count}', formatNumber(orderPayments.length, locale))}
                     </span>
                   </div>
 
                   {isLoadingPayments ? (
                     <div className='p-4 text-center text-xs text-gray-500'>
                       <Loader2 className='w-4 h-4 text-primary animate-spin mx-auto mb-1' />
-                      Loading payment attempts...
+                      {t.admin.orders.orderDetail.loadingPayments}
                     </div>
                   ) : orderPayments.length === 0 ? (
                     <div className='p-4 bg-gray-50 rounded-lg text-center text-xs text-gray-500'>
-                      No gateway payment sessions initiated yet.
+                      {t.admin.orders.orderDetail.noPayments}
                     </div>
                   ) : (
                     <div className='divide-y divide-gray-100'>
@@ -637,27 +643,27 @@ export default function AdminOrdersExplorerPage() {
                           </div>
                           <div className='grid grid-cols-2 gap-2 text-gray-500 text-[11px]'>
                             <div>
-                              Val ID:{' '}
+                              {t.admin.orders.valId}{' '}
                               <span className='font-mono font-medium text-gray-800'>
                                 {pay.valId || '—'}
                               </span>
                             </div>
                             <div>
-                              Bank Tran ID:{' '}
+                              {t.admin.orders.bankTranId}{' '}
                               <span className='font-mono font-medium text-gray-800'>
                                 {pay.bankTranId || '—'}
                               </span>
                             </div>
                             <div>
-                              Method:{' '}
+                              {t.admin.orders.thGateway}:{' '}
                               <span className='font-medium text-gray-800'>
                                 {pay.cardType || 'SSLCommerz Gateway'}
                               </span>
                             </div>
                             <div>
-                              Amount:{' '}
+                              {t.admin.orders.thAmount}:{' '}
                               <span className='font-bold text-gray-900'>
-                                {formatBDT(pay.amountCents)}
+                                {formatCurrency((pay.amountCents || 0) / 100, locale)}
                               </span>
                             </div>
                           </div>
@@ -677,11 +683,11 @@ export default function AdminOrdersExplorerPage() {
                         className='inline-flex items-center space-x-1.5 text-xs font-semibold text-primary hover:underline'
                       >
                         <FileText className='w-4 h-4' />
-                        <span>View Official Invoice</span>
+                        <span>{t.admin.orders.orderDetail.viewInvoice}</span>
                         <ExternalLink className='w-3 h-3' />
                       </Link>
                     ) : (
-                      <span className='text-xs text-gray-400'>No invoice generated</span>
+                      <span className='text-xs text-gray-400'>{t.admin.orders.orderDetail.noInvoice}</span>
                     )}
                   </div>
 
@@ -692,14 +698,14 @@ export default function AdminOrdersExplorerPage() {
                         className='inline-flex items-center space-x-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-xl transition shadow-xs'
                       >
                         <RotateCcw className='w-4 h-4' />
-                        <span>Initiate Refund</span>
+                        <span>{t.admin.orders.initiateRefund}</span>
                       </button>
                     )}
                     <button
                       onClick={() => setSelectedOrderId(null)}
                       className='px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition'
                     >
-                      Close
+                      {t.admin.orders.orderDetail.close}
                     </button>
                   </div>
                 </div>
@@ -717,11 +723,12 @@ export default function AdminOrdersExplorerPage() {
             <div className='flex items-center justify-between border-b border-gray-100 pb-3'>
               <div className='flex items-center space-x-2 text-amber-600 font-bold'>
                 <AlertTriangle className='w-5 h-5 shrink-0' />
-                <h3 className='text-lg text-gray-900'>Initiate Full Order Refund</h3>
+                <h3 className='text-lg text-gray-900'>{t.admin.orders.refundModalTitle}</h3>
               </div>
               <button
                 onClick={() => setRefundOrderTarget(null)}
                 className='text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100'
+                aria-label={t.admin.orders.refundNotice.cancel}
               >
                 <X className='w-5 h-5' />
               </button>
@@ -730,33 +737,33 @@ export default function AdminOrdersExplorerPage() {
             {/* Warning Callout */}
             <div className='p-3.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs space-y-1.5'>
               <div className='font-bold flex items-center space-x-1'>
-                <span>Financial & Academic Policy Notice:</span>
+                <span>{t.admin.orders.refundNotice.title}</span>
               </div>
               <ul className='list-disc pl-4 space-y-1 text-amber-800'>
-                <li>Refund amount is server-derived for the full payable total; partial refunds are prohibited.</li>
-                <li>Refund execution is asynchronous via SSLCommerz gateway settlement.</li>
-                <li>Upon gateway clearing confirmation, student course enrollment will be cancelled and any issued certificate permanently revoked.</li>
-                <li>A processed refund is an irreversible terminal domain state.</li>
+                <li>{t.admin.orders.refundNotice.item1}</li>
+                <li>{t.admin.orders.refundNotice.item2}</li>
+                <li>{t.admin.orders.refundNotice.item3}</li>
+                <li>{t.admin.orders.refundNotice.item4}</li>
               </ul>
             </div>
 
             {/* Order Summary Snapshot */}
             <div className='bg-gray-50 p-3.5 rounded-xl border border-gray-200 text-xs space-y-1'>
               <div className='flex justify-between'>
-                <span className='text-gray-500'>Order Number:</span>
+                <span className='text-gray-500'>{t.admin.orders.thOrder}:</span>
                 <span className='font-mono font-bold text-gray-900'>{refundOrderTarget.orderNumber}</span>
               </div>
               <div className='flex justify-between'>
-                <span className='text-gray-500'>Student:</span>
+                <span className='text-gray-500'>{t.admin.orders.thCustomer}:</span>
                 <span className='font-medium text-gray-900'>{refundOrderTarget.studentEmail}</span>
               </div>
               <div className='flex justify-between'>
-                <span className='text-gray-500'>Course:</span>
+                <span className='text-gray-500'>{t.admin.orders.thCourse}:</span>
                 <span className='font-medium text-gray-900'>{refundOrderTarget.items[0]?.courseTitle}</span>
               </div>
               <div className='flex justify-between pt-1 border-t border-gray-200 text-sm font-bold'>
-                <span className='text-gray-700'>Refund Amount (Locked):</span>
-                <span className='text-amber-700'>{formatBDT(refundOrderTarget.payableCents)}</span>
+                <span className='text-gray-700'>{t.admin.orders.refundNotice.amountLocked}</span>
+                <span className='text-amber-700'>{formatCurrency((refundOrderTarget.payableCents || 0) / 100, locale)}</span>
               </div>
             </div>
 
@@ -772,14 +779,14 @@ export default function AdminOrdersExplorerPage() {
             <form onSubmit={handleRefundSubmit} className='space-y-4'>
               <div>
                 <label className='block text-xs font-semibold text-gray-700 mb-1'>
-                  Refund Justification / Reason <span className='text-red-500'>*</span>
+                  {t.admin.orders.refundReasonLabel} <span className='text-red-500'>*</span>
                 </label>
                 <textarea
                   rows={3}
                   required
                   value={refundReason}
                   onChange={(e) => setRefundReason(e.target.value)}
-                  placeholder='Specify the administrative justification for this refund (minimum 5 characters)...'
+                  placeholder={t.admin.orders.refundReasonPlaceholder}
                   className='w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-amber-500'
                 />
               </div>
@@ -790,7 +797,7 @@ export default function AdminOrdersExplorerPage() {
                   onClick={() => setRefundOrderTarget(null)}
                   className='px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition'
                 >
-                  Cancel
+                  {t.admin.orders.refundNotice.cancel}
                 </button>
                 <button
                   type='submit'
@@ -800,10 +807,10 @@ export default function AdminOrdersExplorerPage() {
                   {refundMutation.isPending ? (
                     <>
                       <Loader2 className='w-3.5 h-3.5 animate-spin' />
-                      <span>Submitting...</span>
+                      <span>{t.admin.orders.refundNotice.submitting}</span>
                     </>
                   ) : (
-                    <span>Confirm & Authorize Refund</span>
+                    <span>{t.admin.orders.refundNotice.confirm}</span>
                   )}
                 </button>
               </div>

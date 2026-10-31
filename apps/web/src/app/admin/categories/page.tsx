@@ -9,6 +9,7 @@ import {
   deleteCategory,
 } from '@/lib/api/catalog';
 import { useCurrentUser } from '@/lib/useCurrentUser';
+import { useTranslation } from '@/i18n/client';
 import {
   FolderTree,
   Plus,
@@ -37,6 +38,7 @@ export default function AdminCategoriesPage() {
   const queryClient = useQueryClient();
   const { data: currentUser, isLoading: isLoadingUser } = useCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
+  const { t, formatNumber } = useTranslation();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
@@ -76,7 +78,7 @@ export default function AdminCategoriesPage() {
   const createMutation = useMutation({
     mutationFn: (data: CreateCategoryRequest) => createCategory(data),
     onSuccess: () => {
-      setSuccessBanner('Category created successfully.');
+      setSuccessBanner(t('admin.categories.createSuccess'));
       setIsModalOpen(false);
       resetModalForm();
       invalidateCategories();
@@ -93,7 +95,7 @@ export default function AdminCategoriesPage() {
     mutationFn: ({ id, data }: { id: string; data: UpdateCategoryRequest }) =>
       updateCategory(id, data),
     onSuccess: () => {
-      setSuccessBanner('Category updated successfully.');
+      setSuccessBanner(t('admin.categories.updateSuccess'));
       setIsModalOpen(false);
       resetModalForm();
       invalidateCategories();
@@ -110,18 +112,16 @@ export default function AdminCategoriesPage() {
     mutationFn: (id: string) => deleteCategory(id),
     onSuccess: () => {
       setDeleteError(null);
-      setSuccessBanner('Category deleted successfully.');
+      setSuccessBanner(t('admin.categories.deleteSuccess'));
       invalidateCategories();
       setTimeout(() => setSuccessBanner(null), 4000);
     },
     onError: (err: any) => {
       const resp = err?.response?.data;
       if (resp?.errorCode === 'CATEGORY_HAS_COURSES') {
-        setDeleteError(
-          'Cannot delete category: It contains associated courses. Please reassign or delete the courses first.'
-        );
+        setDeleteError(t('admin.categories.errorHasCourses'));
       } else {
-        setDeleteError(resp?.message || err?.message || 'Failed to delete category');
+        setDeleteError(resp?.message || err?.message || t('admin.categories.deleteSuccess'));
       }
     },
   });
@@ -201,7 +201,7 @@ export default function AdminCategoriesPage() {
   };
 
   const handleDeleteCategory = (cat: CategoryDto) => {
-    if (confirm(`Are you sure you want to delete category "${cat.name}"?`)) {
+    if (confirm(t('admin.categories.deleteConfirm', { name: cat.name }))) {
       setDeleteError(null);
       deleteMutation.mutate(cat.id);
     }
@@ -212,9 +212,9 @@ export default function AdminCategoriesPage() {
     return (
       <div className='max-w-2xl mx-auto p-8 bg-red-50 border border-red-200 text-red-800 rounded-2xl shadow-xs text-center'>
         <ShieldAlert className='w-12 h-12 text-red-600 mx-auto mb-3' />
-        <h2 className='text-xl font-bold mb-1'>Administrator Access Required</h2>
+        <h2 className='text-xl font-bold mb-1'>{t('admin.nav.accessDeniedTitle')}</h2>
         <p className='text-xs text-gray-600 mb-4'>
-          Category taxonomy management is restricted to system administrators.
+          {t('admin.nav.accessDeniedDesc')}
         </p>
       </div>
     );
@@ -238,10 +238,10 @@ export default function AdminCategoriesPage() {
       <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
         <div>
           <h1 className='text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight'>
-            Category Management
+            {t('admin.categories.title')}
           </h1>
           <p className='text-sm text-gray-500 mt-1'>
-            Define, organize, and activate course categories across the institutional catalog.
+            {t('admin.categories.subtitle')}
           </p>
         </div>
 
@@ -250,7 +250,7 @@ export default function AdminCategoriesPage() {
           className='inline-flex items-center justify-center space-x-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary/90 transition shadow-xs'
         >
           <Plus className='w-4 h-4' />
-          <span>New Category</span>
+          <span>{t('admin.categories.newCategory')}</span>
         </button>
       </div>
 
@@ -264,7 +264,7 @@ export default function AdminCategoriesPage() {
             onClick={() => setSuccessBanner(null)}
             className='text-xs font-semibold hover:underline'
           >
-            Dismiss
+            {t('admin.categories.dismiss')}
           </button>
         </div>
       )}
@@ -279,7 +279,7 @@ export default function AdminCategoriesPage() {
             onClick={() => setDeleteError(null)}
             className='text-xs font-semibold hover:underline'
           >
-            Dismiss
+            {t('admin.categories.dismiss')}
           </button>
         </div>
       )}
@@ -292,7 +292,7 @@ export default function AdminCategoriesPage() {
             type='text'
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder='Search categories by name or slug...'
+            placeholder={t('admin.categories.searchPlaceholder')}
             className='w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary'
           />
         </div>
@@ -306,7 +306,7 @@ export default function AdminCategoriesPage() {
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
-            All ({categories.length})
+            {t('admin.categories.all', { count: formatNumber(categories.length) })}
           </button>
           <button
             onClick={() => setFilterActive('active')}
@@ -316,7 +316,7 @@ export default function AdminCategoriesPage() {
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
-            Active ({categories.filter((c) => c.isActive).length})
+            {t('admin.categories.active', { count: formatNumber(categories.filter((c) => c.isActive).length) })}
           </button>
           <button
             onClick={() => setFilterActive('inactive')}
@@ -326,7 +326,7 @@ export default function AdminCategoriesPage() {
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
-            Inactive ({categories.filter((c) => !c.isActive).length})
+            {t('admin.categories.inactive', { count: formatNumber(categories.filter((c) => !c.isActive).length) })}
           </button>
         </div>
       </div>
@@ -336,12 +336,12 @@ export default function AdminCategoriesPage() {
         {isLoading ? (
           <div className='p-12 text-center'>
             <Loader2 className='w-8 h-8 text-primary animate-spin mx-auto mb-3' />
-            <p className='text-sm text-gray-500'>Loading categories from API...</p>
+            <p className='text-sm text-gray-500'>Loading...</p>
           </div>
         ) : isError ? (
           <div className='p-12 text-center max-w-md mx-auto'>
             <AlertCircle className='w-10 h-10 text-red-500 mx-auto mb-3' />
-            <h3 className='text-base font-semibold text-gray-900 mb-1'>Failed to load categories</h3>
+            <h3 className='text-base font-semibold text-gray-900 mb-1'>{t('admin.overview.errorLoading')}</h3>
             <p className='text-xs text-gray-500 mb-4'>
               {(error as any)?.response?.data?.message || 'Network error'}
             </p>
@@ -349,7 +349,7 @@ export default function AdminCategoriesPage() {
               onClick={() => refetch()}
               className='px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition'
             >
-              Retry
+              {t('admin.overview.retry')}
             </button>
           </div>
         ) : filteredCategories.length === 0 ? (
@@ -357,18 +357,18 @@ export default function AdminCategoriesPage() {
             <div className='w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3 text-gray-400'>
               <FolderTree className='w-6 h-6' />
             </div>
-            <h3 className='text-base font-semibold text-gray-900 mb-1'>No categories found</h3>
+            <h3 className='text-base font-semibold text-gray-900 mb-1'>{t('admin.categories.noCategories')}</h3>
             <p className='text-xs text-gray-500 mb-4'>
               {searchTerm
-                ? 'No categories matched your search term.'
-                : 'Create your first category to start organizing courses.'}
+                ? t('admin.overview.noCoursesFound')
+                : t('admin.categories.noCategoriesDesc')}
             </p>
             <button
               onClick={openCreateModal}
               className='inline-flex items-center space-x-1.5 px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition'
             >
               <Plus className='w-3.5 h-3.5' />
-              <span>New Category</span>
+              <span>{t('admin.categories.newCategory')}</span>
             </button>
           </div>
         ) : (
@@ -376,11 +376,11 @@ export default function AdminCategoriesPage() {
             <table className='w-full text-left text-sm text-gray-600'>
               <thead className='bg-gray-50/80 text-xs font-semibold text-gray-700 uppercase border-b border-gray-200'>
                 <tr>
-                  <th scope='col' className='px-4 py-3.5'>Name</th>
-                  <th scope='col' className='px-4 py-3.5'>Slug</th>
-                  <th scope='col' className='px-4 py-3.5'>Description</th>
-                  <th scope='col' className='px-4 py-3.5'>Status</th>
-                  <th scope='col' className='px-4 py-3.5 text-right'>Actions</th>
+                  <th scope='col' className='px-4 py-3.5'>{t('admin.categories.thName')}</th>
+                  <th scope='col' className='px-4 py-3.5'>{t('admin.categories.thSlug')}</th>
+                  <th scope='col' className='px-4 py-3.5'>{t('admin.categories.thDescription')}</th>
+                  <th scope='col' className='px-4 py-3.5'>{t('admin.categories.thStatus')}</th>
+                  <th scope='col' className='px-4 py-3.5 text-right'>{t('admin.categories.thActions')}</th>
                 </tr>
               </thead>
               <tbody className='divide-y divide-gray-100'>
@@ -403,7 +403,7 @@ export default function AdminCategoriesPage() {
                         onClick={() =>
                           toggleActiveMutation.mutate({ id: cat.id, isActive: !cat.isActive })
                         }
-                        title='Click to toggle status'
+                        title='Toggle Status'
                         className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold transition ${
                           cat.isActive
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
@@ -411,7 +411,7 @@ export default function AdminCategoriesPage() {
                         }`}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full ${cat.isActive ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                        <span>{cat.isActive ? 'Active' : 'Inactive'}</span>
+                        <span>{cat.isActive ? t('admin.status.active') : t('admin.status.inactive')}</span>
                       </button>
                     </td>
 
@@ -420,7 +420,7 @@ export default function AdminCategoriesPage() {
                         <button
                           onClick={() => openEditModal(cat)}
                           className='p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 rounded-lg transition'
-                          title='Edit Category'
+                          title={t('admin.categories.editModalTitle')}
                         >
                           <Edit2 className='w-4 h-4' />
                         </button>
@@ -428,7 +428,7 @@ export default function AdminCategoriesPage() {
                           onClick={() => handleDeleteCategory(cat)}
                           disabled={deleteMutation.isPending}
                           className='p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition'
-                          title='Delete Category'
+                          title={t('admin.courses.delete')}
                         >
                           <Trash2 className='w-4 h-4' />
                         </button>
@@ -448,7 +448,7 @@ export default function AdminCategoriesPage() {
           <div className='bg-white w-full max-w-lg rounded-2xl shadow-xl border border-gray-200 p-6 space-y-4 animate-in fade-in zoom-in-95'>
             <div className='flex items-center justify-between border-b border-gray-100 pb-3'>
               <h3 className='text-lg font-bold text-gray-900'>
-                {editingCategory ? 'Edit Category' : 'Create New Category'}
+                {editingCategory ? t('admin.categories.editModalTitle') : t('admin.categories.createModalTitle')}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -468,21 +468,21 @@ export default function AdminCategoriesPage() {
             <form onSubmit={handleFormSubmit} className='space-y-4'>
               <div>
                 <label className='block text-xs font-semibold text-gray-700 mb-1'>
-                  Category Name <span className='text-red-500'>*</span>
+                  {t('admin.categories.nameLabel')} <span className='text-red-500'>*</span>
                 </label>
                 <input
                   type='text'
                   required
                   value={name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder='e.g. Web Development'
+                  placeholder={t('admin.categories.namePlaceholder')}
                   className='w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary'
                 />
               </div>
 
               <div>
                 <label className='block text-xs font-semibold text-gray-700 mb-1'>
-                  URL Slug <span className='text-red-500'>*</span>
+                  {t('admin.categories.slugLabel')} <span className='text-red-500'>*</span>
                 </label>
                 <div className='flex rounded-xl shadow-xs'>
                   <span className='inline-flex items-center px-3 rounded-l-xl border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-xs font-mono'>
@@ -496,7 +496,7 @@ export default function AdminCategoriesPage() {
                       setSlug(e.target.value);
                       setIsSlugManuallyEdited(true);
                     }}
-                    placeholder='web-development'
+                    placeholder={t('admin.categories.slugPlaceholder')}
                     className='flex-1 block w-full px-3.5 py-2 rounded-none rounded-r-xl border border-gray-300 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary'
                   />
                 </div>
@@ -504,13 +504,13 @@ export default function AdminCategoriesPage() {
 
               <div>
                 <label className='block text-xs font-semibold text-gray-700 mb-1'>
-                  Description
+                  {t('admin.categories.descLabel')}
                 </label>
                 <textarea
                   rows={3}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder='Brief description of topics covered under this category...'
+                  placeholder={t('admin.categories.descPlaceholder')}
                   className='w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary'
                 />
               </div>
@@ -524,7 +524,7 @@ export default function AdminCategoriesPage() {
                   className='w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary'
                 />
                 <label htmlFor='isActive' className='text-xs font-semibold text-gray-700'>
-                  Category is Active (Visible for course tagging)
+                  {t('admin.categories.isActiveLabel')}
                 </label>
               </div>
 
@@ -534,7 +534,7 @@ export default function AdminCategoriesPage() {
                   onClick={() => setIsModalOpen(false)}
                   className='px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition'
                 >
-                  Cancel
+                  {t('admin.courseForm.cancel')}
                 </button>
                 <button
                   type='submit'
@@ -542,10 +542,10 @@ export default function AdminCategoriesPage() {
                   className='px-5 py-2 text-xs font-semibold text-white bg-primary hover:bg-primary/90 rounded-xl transition shadow-xs disabled:opacity-50'
                 >
                   {createMutation.isPending || updateMutation.isPending
-                    ? 'Saving...'
+                    ? t('admin.categories.saving')
                     : editingCategory
-                    ? 'Save Changes'
-                    : 'Create Category'}
+                    ? t('admin.categories.saveChanges')
+                    : t('admin.categories.createCategory')}
                 </button>
               </div>
             </form>

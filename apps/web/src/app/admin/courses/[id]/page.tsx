@@ -15,6 +15,7 @@ import { CourseStatusBadge, VisibilityBadge } from '@/components/admin/StatusBad
 import { CurriculumManager } from '@/components/admin/CurriculumManager';
 import { PublishingActions } from '@/components/admin/PublishingActions';
 import { MediaUploader } from '@/components/admin/MediaUploader';
+import { useTranslation } from '@/i18n/client';
 import {
   ArrowLeft,
   Save,
@@ -40,6 +41,7 @@ export default function AdminCourseDetailPage() {
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
+  const { t, formatNumber } = useTranslation();
 
   const courseId = params?.id as string;
   const [activeTab, setActiveTab] = useState<ActiveTab>('curriculum');
@@ -52,7 +54,7 @@ export default function AdminCourseDetailPage() {
   const [categoryId, setCategoryId] = useState('');
   const [instructorId, setInstructorId] = useState('');
   const [price, setPrice] = useState('0.00');
-  const [currency, setCurrency] = useState('USD');
+  const [currency, setCurrency] = useState('BDT');
   const [level, setLevel] = useState<CourseLevel>('BEGINNER');
   const [language, setLanguage] = useState('English');
   const [durationMinutes, setDurationMinutes] = useState(0);
@@ -104,8 +106,8 @@ export default function AdminCourseDetailPage() {
       setDescription(course.description || '');
       setCategoryId(course.categoryId || '');
       setInstructorId(course.instructorId || '');
-      setPrice(course.price !== undefined ? String(course.price) : '0.00');
-      setCurrency(course.currency || 'USD');
+      setPrice(String(course.price ?? '0.00'));
+      setCurrency(course.currency || 'BDT');
       setLevel(course.level || 'BEGINNER');
       setLanguage(course.language || 'English');
       setDurationMinutes(course.durationMinutes || 0);
@@ -115,24 +117,24 @@ export default function AdminCourseDetailPage() {
     }
   }, [course]);
 
-  // Update Course Mutation
+  // Update Mutation
   const updateMutation = useMutation({
     mutationFn: (payload: UpdateCourseRequest) => updateCourse(courseId, payload),
     onSuccess: (updated) => {
+      setSaveSuccess(t('admin.courseForm.saveSuccess'));
       setSaveError(null);
       setFieldErrors({});
-      setSaveSuccess('Course information updated successfully.');
       queryClient.invalidateQueries({ queryKey: ['adminCourse', courseId] });
       queryClient.invalidateQueries({ queryKey: ['adminCourses'] });
-      queryClient.invalidateQueries({ queryKey: ['admin', 'courses'] });
       setTimeout(() => setSaveSuccess(null), 4000);
     },
     onError: (err: any) => {
-      const respData = err?.response?.data;
-      setSaveError(respData?.message || err?.message || 'Failed to update course');
-      if (respData?.errors && typeof respData.errors === 'object') {
-        setFieldErrors(respData.errors);
+      const resp = err?.response?.data;
+      if (resp?.errors) {
+        setFieldErrors(resp.errors);
       }
+      setSaveError(resp?.message || err?.message || t('admin.courseForm.saveError'));
+      setSaveSuccess(null);
     },
   });
 
@@ -144,16 +146,16 @@ export default function AdminCourseDetailPage() {
 
     const payload: UpdateCourseRequest = {
       title: title.trim(),
-      slug: slug.trim() || undefined,
-      shortDescription: shortDescription.trim() || undefined,
-      description: description.trim() || undefined,
+      slug: slug.trim(),
+      shortDescription: shortDescription.trim() || null,
+      description: description.trim() || null,
       categoryId: categoryId || undefined,
       instructorId: isAdmin && instructorId ? instructorId : undefined,
-      price: price || '0.00',
+      price: parseFloat(price) || 0,
       currency,
       level,
-      language,
-      durationMinutes: Number(durationMinutes) || 0,
+      language: language.trim() || 'English',
+      durationMinutes: durationMinutes ? Number(durationMinutes) : undefined,
       visibility,
       thumbnailMediaId: thumbnailMediaId || null,
     };
@@ -165,66 +167,54 @@ export default function AdminCourseDetailPage() {
     return (
       <div className='p-16 text-center'>
         <Loader2 className='w-8 h-8 text-primary animate-spin mx-auto mb-4' />
-        <p className='text-sm text-gray-500'>Loading course details from API...</p>
+        <p className='text-sm text-gray-500'>{t('admin.courses.loadingCourses')}</p>
       </div>
     );
   }
 
   if (isCourseError || !course) {
     return (
-      <div className='max-w-xl mx-auto p-12 bg-white rounded-2xl border border-gray-200 shadow-xs text-center'>
-        <AlertCircle className='w-12 h-12 text-red-500 mx-auto mb-4' />
-        <h2 className='text-xl font-bold text-gray-900 mb-2'>Course Not Found</h2>
-        <p className='text-sm text-gray-600 mb-6'>
-          {(courseError as any)?.response?.data?.message ||
-            'Unable to load the requested course. It may not exist or you may lack permission to access it.'}
+      <div className='max-w-xl mx-auto p-12 text-center bg-white rounded-2xl border border-gray-200 shadow-xs'>
+        <AlertCircle className='w-12 h-12 text-red-500 mx-auto mb-3' />
+        <h3 className='text-lg font-bold text-gray-900 mb-1'>{t('admin.overview.errorLoading')}</h3>
+        <p className='text-xs text-gray-500 mb-6'>
+          {(courseError as any)?.response?.data?.message || 'The requested course does not exist.'}
         </p>
         <Link
           href='/admin/courses'
-          className='inline-flex items-center space-x-2 px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary/90 transition'
+          className='px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition'
         >
-          <ArrowLeft className='w-4 h-4' />
-          <span>Back to Courses</span>
+          {t('admin.courseForm.backToCourses')}
         </Link>
       </div>
     );
   }
 
   const modulesCount = course.modules?.length || 0;
-  const lessonsCount =
-    course.modules?.reduce((acc, m) => acc + (m.lessons?.length || 0), 0) || 0;
 
   return (
-    <div className='space-y-6'>
-      {/* Top Header Card */}
+    <div className='space-y-6 pb-12'>
+      {/* Top Breadcrumb & Metadata Header */}
       <div className='bg-white p-6 rounded-2xl border border-gray-200 shadow-xs'>
-        <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4'>
-          <div className='space-y-2'>
-            <div className='flex items-center space-x-3'>
-              <Link
-                href='/admin/courses'
-                className='p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition'
-                title='Back to course list'
-              >
-                <ArrowLeft className='w-5 h-5' />
-              </Link>
-              <h1 className='text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight'>
+        <div className='flex flex-col lg:flex-row lg:items-center justify-between gap-4'>
+          <div className='flex items-start space-x-3'>
+            <Link
+              href='/admin/courses'
+              className='p-2 rounded-xl border border-gray-200 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition mt-0.5'
+              title={t('admin.courseForm.backToCourses')}
+            >
+              <ArrowLeft className='w-4 h-4' />
+            </Link>
+            <div>
+              <div className='flex items-center space-x-2'>
+                <span className='px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200'>
+                  {course.category?.name || 'Uncategorized'}
+                </span>
+                <span className='text-xs text-gray-400 font-mono'>/{course.slug}</span>
+              </div>
+              <h1 className='text-xl sm:text-2xl font-bold text-gray-900 tracking-tight mt-1'>
                 {course.title}
               </h1>
-            </div>
-
-            <div className='flex flex-wrap items-center gap-2.5 text-xs text-gray-500 pl-8'>
-              <span className='font-mono text-gray-600 bg-gray-100 px-2 py-0.5 rounded'>
-                /{course.slug}
-              </span>
-              <span>•</span>
-              <span>Category: <strong>{course.category?.name || 'Unassigned'}</strong></span>
-              <span>•</span>
-              <span>Instructor: <strong>{course.instructor?.name || 'Assigned'}</strong></span>
-              <span>•</span>
-              <span>{modulesCount} {modulesCount === 1 ? 'Module' : 'Modules'}</span>
-              <span>•</span>
-              <span>{lessonsCount} {lessonsCount === 1 ? 'Lesson' : 'Lessons'}</span>
             </div>
           </div>
 
@@ -245,7 +235,7 @@ export default function AdminCourseDetailPage() {
             }`}
           >
             <Layers className='w-4 h-4' />
-            <span>Curriculum ({modulesCount} modules)</span>
+            <span>{t('admin.courseForm.tabs.curriculum')} ({formatNumber(modulesCount)})</span>
           </button>
 
           <button
@@ -257,7 +247,7 @@ export default function AdminCourseDetailPage() {
             }`}
           >
             <Settings className='w-4 h-4' />
-            <span>Course Information & Metadata</span>
+            <span>{t('admin.courseForm.tabs.settings')}</span>
           </button>
 
           <button
@@ -269,7 +259,7 @@ export default function AdminCourseDetailPage() {
             }`}
           >
             <Send className='w-4 h-4' />
-            <span>Publishing & Status ({course.status})</span>
+            <span>{t('admin.courseForm.tabs.publishing')}</span>
           </button>
         </div>
       </div>
@@ -295,7 +285,7 @@ export default function AdminCourseDetailPage() {
             <div className='p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-center space-x-3 text-sm'>
               <AlertCircle className='w-5 h-5 shrink-0 text-red-500' />
               <div>
-                <p className='font-semibold'>Failed to update course</p>
+                <p className='font-semibold'>{t('admin.courseForm.saveError')}</p>
                 <p className='text-xs mt-0.5'>{saveError}</p>
               </div>
             </div>
@@ -304,12 +294,12 @@ export default function AdminCourseDetailPage() {
           {/* Basic Course Information */}
           <div className='bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-4'>
             <h2 className='text-lg font-semibold text-gray-900 border-b border-gray-100 pb-3'>
-              Course Details
+              {t('admin.courseForm.tabs.settings')}
             </h2>
 
             <div>
               <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                Course Title <span className='text-red-500'>*</span>
+                {t('admin.courseForm.titleLabel')} <span className='text-red-500'>*</span>
               </label>
               <input
                 type='text'
@@ -325,7 +315,7 @@ export default function AdminCourseDetailPage() {
 
             <div>
               <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                URL Slug <span className='text-red-500'>*</span>
+                {t('admin.courseForm.slugLabel')} <span className='text-red-500'>*</span>
               </label>
               <input
                 type='text'
@@ -341,7 +331,7 @@ export default function AdminCourseDetailPage() {
 
             <div>
               <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                Short Summary
+                {t('admin.courseForm.shortDescLabel')}
               </label>
               <textarea
                 rows={2}
@@ -357,7 +347,7 @@ export default function AdminCourseDetailPage() {
 
             <div>
               <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                Full Description / Syllabus Overview
+                {t('admin.courseForm.descLabel')}
               </label>
               <textarea
                 rows={5}
@@ -371,13 +361,13 @@ export default function AdminCourseDetailPage() {
           {/* Classification & Instructor */}
           <div className='bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-4'>
             <h2 className='text-lg font-semibold text-gray-900 border-b border-gray-100 pb-3'>
-              Classification & Instructor
+              {t('admin.courses.thCategory')} & {t('admin.courses.thInstructor')}
             </h2>
 
             <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
               <div>
                 <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                  Category <span className='text-red-500'>*</span>
+                  {t('admin.courseForm.categoryLabel')} <span className='text-red-500'>*</span>
                 </label>
                 <select
                   required
@@ -385,10 +375,10 @@ export default function AdminCourseDetailPage() {
                   onChange={(e) => setCategoryId(e.target.value)}
                   className='w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary'
                 >
-                  <option value=''>Select a Category</option>
+                  <option value=''>{t('admin.courseForm.selectCategory')}</option>
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name} {!c.isActive ? '(Inactive)' : ''}
+                      {c.name} {!c.isActive ? `(${t('admin.status.inactive')})` : ''}
                     </option>
                   ))}
                 </select>
@@ -396,7 +386,7 @@ export default function AdminCourseDetailPage() {
 
               <div>
                 <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                  Instructor
+                  {t('admin.courseForm.instructorLabel')}
                 </label>
                 {isAdmin ? (
                   <select
@@ -413,7 +403,7 @@ export default function AdminCourseDetailPage() {
                 ) : (
                   <div className='px-3.5 py-2 text-sm rounded-xl border border-gray-200 bg-gray-50 text-gray-700 flex items-center justify-between'>
                     <span className='font-medium'>{course.instructor?.name}</span>
-                    <span className='text-xs text-gray-400'>Instructor (Fixed)</span>
+                    <span className='text-xs text-gray-400'>{t('admin.nav.roleInstructor')}</span>
                   </div>
                 )}
               </div>
@@ -423,12 +413,12 @@ export default function AdminCourseDetailPage() {
           {/* Pricing & Metadata */}
           <div className='bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-4'>
             <h2 className='text-lg font-semibold text-gray-900 border-b border-gray-100 pb-3'>
-              Pricing, Level & Thumbnail
+              {t('admin.courses.thPrice')} & {t('admin.courseForm.thumbnailLabel')}
             </h2>
 
             <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4'>
               <div>
-                <label className='block text-xs font-semibold text-gray-700 mb-1.5'>Price</label>
+                <label className='block text-xs font-semibold text-gray-700 mb-1.5'>{t('admin.courseForm.priceLabel')}</label>
                 <input
                   type='number'
                   step='0.01'
@@ -440,35 +430,32 @@ export default function AdminCourseDetailPage() {
               </div>
 
               <div>
-                <label className='block text-xs font-semibold text-gray-700 mb-1.5'>Currency</label>
+                <label className='block text-xs font-semibold text-gray-700 mb-1.5'>{t('admin.courseForm.currencyLabel')}</label>
                 <select
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value)}
                   className='w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary'
                 >
-                  <option value='USD'>USD ($)</option>
-                  <option value='EUR'>EUR (€)</option>
-                  <option value='GBP'>GBP (£)</option>
                   <option value='BDT'>BDT (৳)</option>
+                  <option value='USD'>USD ($)</option>
                 </select>
               </div>
 
               <div>
-                <label className='block text-xs font-semibold text-gray-700 mb-1.5'>Level</label>
+                <label className='block text-xs font-semibold text-gray-700 mb-1.5'>{t('admin.courseForm.levelLabel')}</label>
                 <select
                   value={level}
                   onChange={(e) => setLevel(e.target.value as CourseLevel)}
                   className='w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary'
                 >
-                  <option value='BEGINNER'>Beginner</option>
-                  <option value='INTERMEDIATE'>Intermediate</option>
-                  <option value='ADVANCED'>Advanced</option>
-                  <option value='ALL_LEVELS'>All Levels</option>
+                  <option value='BEGINNER'>{t('admin.courseForm.levelBeginner')}</option>
+                  <option value='INTERMEDIATE'>{t('admin.courseForm.levelIntermediate')}</option>
+                  <option value='ADVANCED'>{t('admin.courseForm.levelAdvanced')}</option>
                 </select>
               </div>
 
               <div>
-                <label className='block text-xs font-semibold text-gray-700 mb-1.5'>Language</label>
+                <label className='block text-xs font-semibold text-gray-700 mb-1.5'>{t('admin.courseForm.languageLabel')}</label>
                 <input
                   type='text'
                   value={language}
@@ -481,7 +468,7 @@ export default function AdminCourseDetailPage() {
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
               <div>
                 <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                  Duration (Minutes)
+                  {t('admin.courseForm.durationLabel')}
                 </label>
                 <input
                   type='number'
@@ -494,15 +481,15 @@ export default function AdminCourseDetailPage() {
 
               <div>
                 <label className='block text-xs font-semibold text-gray-700 mb-1.5'>
-                  Visibility
+                  {t('admin.courseForm.visibilityLabel')}
                 </label>
                 <select
                   value={visibility}
                   onChange={(e) => setVisibility(e.target.value as CourseVisibility)}
                   className='w-full px-3.5 py-2 text-sm rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary'
                 >
-                  <option value='PUBLIC'>Public</option>
-                  <option value='PRIVATE'>Private</option>
+                  <option value='PUBLIC'>{t('admin.courseForm.visibilityPublic')}</option>
+                  <option value='PRIVATE'>{t('admin.courseForm.visibilityPrivate')}</option>
                 </select>
               </div>
             </div>
@@ -510,7 +497,7 @@ export default function AdminCourseDetailPage() {
             {/* Thumbnail */}
             <div className='pt-2'>
               <label className='block text-xs font-semibold text-gray-700 mb-2'>
-                Course Cover Thumbnail
+                {t('admin.courseForm.thumbnailLabel')}
               </label>
               <MediaUploader
                 mediaType='IMAGE'
@@ -535,7 +522,7 @@ export default function AdminCourseDetailPage() {
               className='inline-flex items-center space-x-2 px-6 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary/90 transition shadow-xs disabled:opacity-50'
             >
               <Save className='w-4 h-4' />
-              <span>{updateMutation.isPending ? 'Saving Changes...' : 'Save Settings'}</span>
+              <span>{updateMutation.isPending ? t('admin.courseForm.saving') : t('admin.courseForm.saveChanges')}</span>
             </button>
           </div>
         </form>

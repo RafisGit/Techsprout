@@ -1,7 +1,5 @@
 'use client';
 
-import { formatMoney } from '@/lib/money';
-
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -14,6 +12,7 @@ import {
 } from '@/lib/api/catalog';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { CourseStatusBadge, VisibilityBadge } from '@/components/admin/StatusBadge';
+import { useTranslation } from '@/i18n/client';
 import {
   Search,
   Plus,
@@ -34,6 +33,7 @@ export default function AdminCoursesPage() {
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
+  const { t, formatNumber, formatDate, formatCurrency } = useTranslation();
 
   // Filters and pagination state
   const [page, setPage] = useState(1);
@@ -104,17 +104,17 @@ export default function AdminCoursesPage() {
     },
     onError: (err: any) => {
       setDeleteError(
-        err?.response?.data?.message || err?.message || 'Failed to delete course'
+        err?.response?.data?.message || err?.message || t('admin.courses.deleteError')
       );
     },
   });
 
   const handleDelete = (course: CourseDto) => {
     if (course.status !== 'DRAFT') {
-      alert('Only draft courses can be deleted. Published or archived courses cannot be hard-deleted.');
+      alert(t('admin.courses.deleteConfirm'));
       return;
     }
-    if (confirm(`Are you sure you want to permanently delete draft course "${course.title}"?`)) {
+    if (confirm(t('admin.courses.deleteConfirm'))) {
       setDeleteError(null);
       deleteMutation.mutate(course.id);
     }
@@ -139,12 +139,10 @@ export default function AdminCoursesPage() {
       <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
         <div>
           <h1 className='text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight'>
-            Course Catalog
+            {t('admin.courses.title')}
           </h1>
           <p className='text-sm text-gray-500 mt-1'>
-            {isAdmin
-              ? 'Manage institutional courses, curriculum, metadata, and publishing state'
-              : 'Manage and update your assigned courses, modules, and lessons'}
+            {t('admin.courses.subtitle')}
           </p>
         </div>
 
@@ -155,7 +153,7 @@ export default function AdminCoursesPage() {
               className='inline-flex items-center justify-center space-x-2 px-4 py-2.5 bg-blue-50 text-blue-700 border border-blue-200 text-sm font-semibold rounded-xl hover:bg-blue-100 transition shadow-xs'
             >
               <ClipboardCheck className='w-4 h-4' />
-              <span>Review Queue</span>
+              <span>{t('admin.nav.reviewQueue')}</span>
             </Link>
           )}
 
@@ -164,7 +162,7 @@ export default function AdminCoursesPage() {
             className='inline-flex items-center justify-center space-x-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary/90 transition shadow-xs'
           >
             <Plus className='w-4 h-4' />
-            <span>Create Course</span>
+            <span>{t('admin.courses.newCourse')}</span>
           </Link>
         </div>
       </div>
@@ -179,7 +177,7 @@ export default function AdminCoursesPage() {
             onClick={() => setDeleteError(null)}
             className='text-xs font-semibold hover:underline'
           >
-            Dismiss
+            {t('admin.categories.dismiss')}
           </button>
         </div>
       )}
@@ -197,7 +195,7 @@ export default function AdminCoursesPage() {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              placeholder='Search by title or description...'
+              placeholder={t('admin.courses.searchPlaceholder')}
               className='w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent'
             />
           </div>
@@ -213,7 +211,7 @@ export default function AdminCoursesPage() {
               aria-label='Filter by Category'
               className='w-full px-3 py-2 text-sm rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary'
             >
-              <option value=''>All Categories</option>
+              <option value=''>{t('admin.courses.allCategories')}</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -233,10 +231,10 @@ export default function AdminCoursesPage() {
               aria-label='Filter by Status'
               className='w-full px-3 py-2 text-sm rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary'
             >
-              <option value=''>All Statuses</option>
-              <option value='DRAFT'>Draft</option>
-              <option value='PUBLISHED'>Published</option>
-              <option value='ARCHIVED'>Archived</option>
+              <option value=''>{t('admin.courses.allStatuses')}</option>
+              <option value='DRAFT'>{t('admin.status.draft')}</option>
+              <option value='PUBLISHED'>{t('admin.status.published')}</option>
+              <option value='ARCHIVED'>{t('admin.status.archived')}</option>
             </select>
           </div>
 
@@ -251,11 +249,10 @@ export default function AdminCoursesPage() {
               aria-label='Filter by Level'
               className='w-full px-3 py-2 text-sm rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary'
             >
-              <option value=''>All Levels</option>
-              <option value='BEGINNER'>Beginner</option>
-              <option value='INTERMEDIATE'>Intermediate</option>
-              <option value='ADVANCED'>Advanced</option>
-              <option value='ALL_LEVELS'>All Levels</option>
+              <option value=''>{t('admin.courses.allLevels')}</option>
+              <option value='BEGINNER'>{t('admin.courseForm.levelBeginner')}</option>
+              <option value='INTERMEDIATE'>{t('admin.courseForm.levelIntermediate')}</option>
+              <option value='ADVANCED'>{t('admin.courseForm.levelAdvanced')}</option>
             </select>
           </div>
         </div>
@@ -265,7 +262,7 @@ export default function AdminCoursesPage() {
           <div className='flex flex-wrap items-center gap-3'>
             {isAdmin && (
               <div className='flex items-center space-x-2 text-xs text-gray-600'>
-                <span className='font-medium'>Instructor:</span>
+                <span className='font-medium'>{t('admin.courses.thInstructor')}:</span>
                 <select
                   value={instructorId}
                   onChange={(e) => {
@@ -275,7 +272,7 @@ export default function AdminCoursesPage() {
                   aria-label='Filter by Instructor'
                   className='px-2.5 py-1 text-xs rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary'
                 >
-                  <option value=''>All Instructors</option>
+                  <option value=''>{t('admin.courses.allInstructors')}</option>
                   {instructors.map((ins) => (
                     <option key={ins.id} value={ins.id}>
                       {ins.name} ({ins.email})
@@ -286,7 +283,7 @@ export default function AdminCoursesPage() {
             )}
 
             <div className='flex items-center space-x-2 text-xs text-gray-600'>
-              <span className='font-medium'>Sort:</span>
+              <span className='font-medium'>{t('admin.overview.sortBy')}:</span>
               <button
                 onClick={() => handleSortToggle('createdAt')}
                 className={`px-2 py-1 rounded border text-xs font-medium flex items-center space-x-1 ${
@@ -295,7 +292,7 @@ export default function AdminCoursesPage() {
                     : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                <span>Date</span>
+                <span>{t('admin.overview.sortDate')}</span>
                 <ArrowUpDown className='w-3 h-3' />
               </button>
               <button
@@ -306,7 +303,7 @@ export default function AdminCoursesPage() {
                     : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                <span>Title</span>
+                <span>{t('admin.overview.sortTitle')}</span>
                 <ArrowUpDown className='w-3 h-3' />
               </button>
               <button
@@ -317,7 +314,7 @@ export default function AdminCoursesPage() {
                     : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                <span>Price</span>
+                <span>{t('admin.courses.thPrice')}</span>
                 <ArrowUpDown className='w-3 h-3' />
               </button>
             </div>
@@ -336,7 +333,7 @@ export default function AdminCoursesPage() {
                 }}
                 className='text-xs text-gray-500 hover:text-gray-900 underline'
               >
-                Reset Filters
+                {t('admin.overview.allStatuses')}
               </button>
             )}
 
@@ -357,12 +354,12 @@ export default function AdminCoursesPage() {
         {isLoading ? (
           <div className='p-12 text-center'>
             <div className='w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4' />
-            <p className='text-sm text-gray-500'>Loading courses from API...</p>
+            <p className='text-sm text-gray-500'>{t('admin.courses.loadingCourses')}</p>
           </div>
         ) : isError ? (
           <div className='p-12 text-center max-w-md mx-auto'>
             <AlertCircle className='w-10 h-10 text-red-500 mx-auto mb-3' />
-            <h3 className='text-base font-semibold text-gray-900 mb-1'>Failed to load courses</h3>
+            <h3 className='text-base font-semibold text-gray-900 mb-1'>{t('admin.overview.errorLoading')}</h3>
             <p className='text-xs text-gray-500 mb-4'>
               {(error as any)?.response?.data?.message || (error as any)?.message || 'Network error'}
             </p>
@@ -370,7 +367,7 @@ export default function AdminCoursesPage() {
               onClick={() => refetch()}
               className='px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition'
             >
-              Retry
+              {t('admin.overview.retry')}
             </button>
           </div>
         ) : courses.length === 0 ? (
@@ -378,18 +375,18 @@ export default function AdminCoursesPage() {
             <div className='w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3 text-gray-400'>
               <BookOpen className='w-6 h-6' />
             </div>
-            <h3 className='text-base font-semibold text-gray-900 mb-1'>No courses found</h3>
+            <h3 className='text-base font-semibold text-gray-900 mb-1'>{t('admin.courses.noCourses')}</h3>
             <p className='text-xs text-gray-500 mb-4'>
               {search || categoryId || status || level || instructorId
-                ? 'No courses matched your active filter criteria. Try adjusting your search.'
-                : 'Get started by creating your first course in the institutional catalog.'}
+                ? t('admin.courses.noCoursesDesc')
+                : t('admin.courses.noCoursesDesc')}
             </p>
             <Link
               href='/admin/courses/new'
               className='inline-flex items-center space-x-1.5 px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition'
             >
               <Plus className='w-3.5 h-3.5' />
-              <span>Create Course</span>
+              <span>{t('admin.courses.newCourse')}</span>
             </Link>
           </div>
         ) : (
@@ -397,15 +394,15 @@ export default function AdminCoursesPage() {
             <table className='w-full text-left text-sm text-gray-600'>
               <thead className='bg-gray-50/80 text-xs font-semibold text-gray-700 uppercase border-b border-gray-200'>
                 <tr>
-                  <th scope='col' className='px-4 py-3.5'>Course</th>
-                  <th scope='col' className='px-4 py-3.5'>Category</th>
-                  <th scope='col' className='px-4 py-3.5'>Instructor</th>
-                  <th scope='col' className='px-4 py-3.5'>Status</th>
-                  <th scope='col' className='px-4 py-3.5'>Visibility</th>
-                  <th scope='col' className='px-4 py-3.5'>Level</th>
-                  <th scope='col' className='px-4 py-3.5'>Price</th>
-                  <th scope='col' className='px-4 py-3.5'>Updated</th>
-                  <th scope='col' className='px-4 py-3.5 text-right'>Actions</th>
+                  <th scope='col' className='px-4 py-3.5'>{t('admin.courses.thCourse')}</th>
+                  <th scope='col' className='px-4 py-3.5'>{t('admin.courses.thCategory')}</th>
+                  <th scope='col' className='px-4 py-3.5'>{t('admin.courses.thInstructor')}</th>
+                  <th scope='col' className='px-4 py-3.5'>{t('admin.courses.thStatus')}</th>
+                  <th scope='col' className='px-4 py-3.5'>{t('admin.courses.thVisibility')}</th>
+                  <th scope='col' className='px-4 py-3.5'>{t('admin.overview.thLevel')}</th>
+                  <th scope='col' className='px-4 py-3.5'>{t('admin.courses.thPrice')}</th>
+                  <th scope='col' className='px-4 py-3.5'>{t('admin.overview.thCreatedAt')}</th>
+                  <th scope='col' className='px-4 py-3.5 text-right'>{t('admin.courses.thActions')}</th>
                 </tr>
               </thead>
               <tbody className='divide-y divide-gray-100'>
@@ -413,12 +410,9 @@ export default function AdminCoursesPage() {
                   const formattedPrice =
                     Number(course.price) === 0
                       ? 'Free'
-                      : formatMoney(course.price, course.currency || 'BDT');
+                      : formatCurrency(course.price, course.currency || 'BDT');
 
-                  const formattedDate = new Date(course.updatedAt || course.createdAt).toLocaleDateString(
-                    'en-US',
-                    { month: 'short', day: 'numeric', year: 'numeric' }
-                  );
+                  const formattedDate = formatDate(new Date(course.updatedAt || course.createdAt));
 
                   return (
                     <tr
@@ -503,7 +497,7 @@ export default function AdminCoursesPage() {
                           <Link
                             href={`/admin/courses/${course.id}`}
                             className='p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 rounded-lg transition-colors'
-                            title='Edit Course & Curriculum'
+                            title={t('admin.courses.edit')}
                           >
                             <Edit className='w-4 h-4' />
                           </Link>
@@ -513,7 +507,7 @@ export default function AdminCoursesPage() {
                               onClick={() => handleDelete(course)}
                               disabled={deleteMutation.isPending}
                               className='p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors'
-                              title='Delete Draft'
+                              title={t('admin.courses.delete')}
                             >
                               <Trash2 className='w-4 h-4' />
                             </button>
@@ -532,9 +526,7 @@ export default function AdminCoursesPage() {
         {pagination && pagination.totalPages > 1 && (
           <div className='px-4 py-3.5 border-t border-gray-200 flex items-center justify-between text-xs text-gray-600'>
             <span>
-              Showing page <strong className='font-semibold'>{pagination.page}</strong> of{' '}
-              <strong className='font-semibold'>{pagination.totalPages}</strong> (
-              {pagination.total} total courses)
+              {t('admin.overview.pageOf', { page: formatNumber(pagination.page), totalPages: formatNumber(pagination.totalPages) })} ({formatNumber(pagination.total)} {t('admin.nav.courses')})
             </span>
 
             <div className='flex items-center space-x-2'>
@@ -544,7 +536,7 @@ export default function AdminCoursesPage() {
                 className='px-2.5 py-1.5 rounded-lg border border-gray-300 font-medium flex items-center space-x-1 disabled:opacity-40 hover:bg-gray-50'
               >
                 <ChevronLeft className='w-3.5 h-3.5' />
-                <span>Prev</span>
+                <span>{t('admin.overview.prev')}</span>
               </button>
 
               <button
@@ -552,7 +544,7 @@ export default function AdminCoursesPage() {
                 disabled={!pagination.hasNextPage || isFetching}
                 className='px-2.5 py-1.5 rounded-lg border border-gray-300 font-medium flex items-center space-x-1 disabled:opacity-40 hover:bg-gray-50'
               >
-                <span>Next</span>
+                <span>{t('admin.overview.next')}</span>
                 <ChevronRight className='w-3.5 h-3.5' />
               </button>
             </div>

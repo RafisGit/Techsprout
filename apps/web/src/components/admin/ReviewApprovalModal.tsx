@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, Loader2, Sparkles, AlertCircle } from 'lucide-react';
+import { useTranslation } from '@/i18n/client';
 
 interface ReviewApprovalModalProps {
   courseId: string;
@@ -32,6 +33,7 @@ export function ReviewApprovalModal({
   onSuccess,
 }: ReviewApprovalModalProps) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const approveMutation = useMutation({
@@ -49,7 +51,7 @@ export function ReviewApprovalModal({
       const msg =
         errorObj.response?.data?.message ||
         errorObj.message ||
-        'Failed to approve course review request.';
+        t('admin.courses.deleteError');
       setErrorMessage(msg);
     },
   });
@@ -67,22 +69,24 @@ export function ReviewApprovalModal({
             <Sparkles className='w-6 h-6' />
           </div>
           <DialogTitle className='text-lg font-bold text-gray-900'>
-            Approve Course Publication
+            {t('admin.reviewModals.approveTitle')}
           </DialogTitle>
           <DialogDescription className='text-sm text-gray-600 mt-1'>
-            You are about to approve <strong className='text-gray-900'>{courseTitle || 'this course'}</strong>
-            {instructorName ? ` submitted by ${instructorName}` : ''}.
+            {t('admin.reviewModals.approveDesc', {
+              courseTitle: courseTitle || '',
+              instructorName: instructorName || '',
+            })}
           </DialogDescription>
         </DialogHeader>
 
         <div className='space-y-4 my-2'>
           <div className='p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs space-y-1.5'>
-            <p className='font-semibold'>Institutional Publication Impact:</p>
+            <p className='font-semibold'>{t('admin.reviewModals.approveImpactTitle')}</p>
             <ul className='list-disc list-inside space-y-1 text-emerald-800'>
-              <li>The course will transition to <strong>PUBLISHED</strong> status.</li>
-              <li>It will immediately be listed in the public catalog for student enrollment.</li>
-              <li>A transactional notification will be dispatched alerting the instructor.</li>
-              <li>The review request will be archived as <strong>APPROVED</strong>.</li>
+              <li>{t('admin.reviewModals.approveImpact1')}</li>
+              <li>{t('admin.reviewModals.approveImpact2')}</li>
+              <li>{t('admin.reviewModals.approveImpact3')}</li>
+              <li>{t('admin.reviewModals.approveImpact4')}</li>
             </ul>
           </div>
 
@@ -101,7 +105,7 @@ export function ReviewApprovalModal({
             onClick={() => onOpenChange(false)}
             disabled={approveMutation.isPending}
           >
-            Cancel
+            {t('admin.reviewModals.cancel')}
           </Button>
           <Button
             type='button'
@@ -114,7 +118,11 @@ export function ReviewApprovalModal({
             ) : (
               <CheckCircle2 className='w-4 h-4' />
             )}
-            <span>Approve & Publish</span>
+            <span>
+              {approveMutation.isPending
+                ? t('admin.reviewModals.approving')
+                : t('admin.reviewModals.approveConfirm')}
+            </span>
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertCircle, Loader2, MessageSquareX, RotateCcw } from 'lucide-react';
+import { useTranslation } from '@/i18n/client';
 
 interface ReviewRejectionModalProps {
   courseId: string;
@@ -33,6 +34,7 @@ export function ReviewRejectionModal({
   onSuccess,
 }: ReviewRejectionModalProps) {
   const queryClient = useQueryClient();
+  const { t, formatNumber } = useTranslation();
   const [adminFeedback, setAdminFeedback] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -55,7 +57,7 @@ export function ReviewRejectionModal({
       const msg =
         errorObj.response?.data?.message ||
         errorObj.message ||
-        'Failed to reject course review. Please verify your feedback meets the 5-character minimum.';
+        t('admin.reviewModals.feedbackMin');
       setErrorMessage(msg);
     },
   });
@@ -75,20 +77,21 @@ export function ReviewRejectionModal({
             <MessageSquareX className='w-6 h-6' />
           </div>
           <DialogTitle className='text-lg font-bold text-gray-900'>
-            Request Revisions & Reject Submission
+            {t('admin.reviewModals.rejectTitle')}
           </DialogTitle>
           <DialogDescription className='text-sm text-gray-600 mt-1'>
-            Provide clear, actionable feedback for{' '}
-            <strong className='text-gray-900'>{courseTitle || 'this course'}</strong>
-            {instructorName ? ` (Instructor: ${instructorName})` : ''}.
+            {t('admin.reviewModals.rejectDesc', {
+              courseTitle: courseTitle || '',
+              instructorName: instructorName || '',
+            })}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className='space-y-4 my-2'>
           <div className='p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs space-y-1'>
-            <p className='font-semibold'>Institutional Rejection Policy:</p>
+            <p className='font-semibold'>{t('admin.reviewModals.rejectPolicyTitle')}</p>
             <p className='text-amber-800 leading-relaxed'>
-              This action transitions the course status back to <strong>DRAFT</strong> and unlocks curriculum editing for the instructor. Your feedback will be displayed prominently on the instructor's dashboard to guide their revisions.
+              {t('admin.reviewModals.rejectPolicyDesc')}
             </p>
           </div>
 
@@ -101,13 +104,13 @@ export function ReviewRejectionModal({
 
           <div className='space-y-1.5'>
             <label htmlFor='adminFeedback' className='block text-xs font-bold text-gray-700'>
-              Administrative Feedback <span className='text-red-500'>*</span>
+              {t('admin.reviewModals.feedbackLabel')} <span className='text-red-500'>*</span>
             </label>
             <Textarea
               id='adminFeedback'
               value={adminFeedback}
               onChange={(e) => setAdminFeedback(e.target.value.slice(0, 2000))}
-              placeholder='Specify required adjustments (e.g. "Please add video resources to Module 1 and provide a more comprehensive course description before publication."). Minimum 5 characters.'
+              placeholder={t('admin.reviewModals.feedbackPlaceholder')}
               rows={4}
               required
               className='text-sm'
@@ -116,13 +119,15 @@ export function ReviewRejectionModal({
               <span>
                 {trimmedFeedback.length < 5 ? (
                   <span className='text-amber-600 font-medium'>
-                    Minimum 5 characters required ({trimmedFeedback.length}/5)
+                    {t('admin.reviewModals.feedbackMin')} ({formatNumber(trimmedFeedback.length)}/5)
                   </span>
                 ) : (
-                  <span className='text-emerald-600 font-medium'>Validation passed</span>
+                  <span className='text-emerald-600 font-medium'>
+                    ✓
+                  </span>
                 )}
               </span>
-              <span>{adminFeedback.length} / 2000</span>
+              <span>{t('admin.reviewModals.charsCount', { count: formatNumber(adminFeedback.length) })}</span>
             </div>
           </div>
 
@@ -133,7 +138,7 @@ export function ReviewRejectionModal({
               onClick={() => onOpenChange(false)}
               disabled={rejectMutation.isPending}
             >
-              Cancel
+              {t('admin.reviewModals.cancel')}
             </Button>
             <Button
               type='submit'
@@ -145,7 +150,11 @@ export function ReviewRejectionModal({
               ) : (
                 <RotateCcw className='w-4 h-4' />
               )}
-              <span>Submit Rejection & Feedback</span>
+              <span>
+                {rejectMutation.isPending
+                  ? t('admin.reviewModals.rejecting')
+                  : t('admin.reviewModals.rejectConfirm')}
+              </span>
             </Button>
           </DialogFooter>
         </form>
