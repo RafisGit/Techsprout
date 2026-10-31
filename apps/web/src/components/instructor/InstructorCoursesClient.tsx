@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchInstructorCourses } from '@/lib/api/instructor';
 import { CourseReviewModal } from '@/components/instructor/CourseReviewModal';
 import { ReviewWithdrawalModal } from '@/components/instructor/ReviewWithdrawalModal';
+import { useTranslation } from '@/i18n';
 import { Button } from '@/components/ui/button';
 import {
   PlusCircle,
@@ -15,9 +16,6 @@ import {
   RotateCcw,
   FileEdit,
   ExternalLink,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
   Users,
   BarChart3,
 } from 'lucide-react';
@@ -28,6 +26,7 @@ export function InstructorCoursesClient() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [reviewModalCourseId, setReviewModalCourseId] = useState<string | null>(null);
   const [withdrawModalCourse, setWithdrawModalCourse] = useState<CourseDto | null>(null);
+  const { t, locale, formatCurrency, formatDate } = useTranslation();
 
   const {
     data: coursesData,
@@ -49,10 +48,10 @@ export function InstructorCoursesClient() {
   );
 
   const statusTabs = [
-    { label: 'All Courses', value: 'ALL' },
-    { label: 'Draft', value: 'DRAFT' },
-    { label: 'In Review', value: 'IN_REVIEW' },
-    { label: 'Published', value: 'PUBLISHED' },
+    { label: t('instructor.courses.tabs.all'), value: 'ALL' },
+    { label: t('instructor.courses.tabs.draft'), value: 'DRAFT' },
+    { label: t('instructor.courses.tabs.inReview'), value: 'IN_REVIEW' },
+    { label: t('instructor.courses.tabs.published'), value: 'PUBLISHED' },
   ];
 
   return (
@@ -60,15 +59,15 @@ export function InstructorCoursesClient() {
       {/* Header */}
       <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-xs'>
         <div>
-          <h1 className='text-2xl font-bold text-gray-900'>My Teaching Courses</h1>
+          <h1 className='text-2xl font-bold text-gray-900'>{t('instructor.courses.title')}</h1>
           <p className='text-sm text-gray-600 mt-1'>
-            Manage your course portfolio, draft curriculum, and prepare submissions for institutional review.
+            {t('instructor.courses.subtitle')}
           </p>
         </div>
         <Link href='/admin/courses/new'>
           <Button className='bg-primary text-white hover:bg-primary/90 flex items-center gap-2'>
             <PlusCircle className='w-4 h-4' />
-            <span>Create New Course</span>
+            <span>{t('instructor.courses.createNewCourse')}</span>
           </Button>
         </Link>
       </div>
@@ -98,7 +97,7 @@ export function InstructorCoursesClient() {
             type='text'
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder='Search your courses...'
+            placeholder={t('instructor.courses.searchPlaceholder')}
             className='w-full pl-9 pr-4 py-1.5 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary'
           />
           <Search className='w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2' />
@@ -115,9 +114,9 @@ export function InstructorCoursesClient() {
           </div>
         ) : isError ? (
           <div className='p-8 text-center'>
-            <p className='text-red-600 font-medium'>Failed to load instructor courses.</p>
+            <p className='text-red-600 font-medium'>{t('instructor.courses.failedToLoad')}</p>
             <Button variant='outline' size='sm' className='mt-3' onClick={() => refetch()}>
-              Retry
+              {t('actions.retry')}
             </Button>
           </div>
         ) : filteredCourses.length === 0 ? (
@@ -125,16 +124,16 @@ export function InstructorCoursesClient() {
             <div className='w-16 h-16 rounded-2xl bg-gray-100 text-gray-400 mx-auto flex items-center justify-center mb-4'>
               <BookOpen className='w-8 h-8' />
             </div>
-            <h3 className='text-lg font-bold text-gray-900'>No courses found</h3>
+            <h3 className='text-lg font-bold text-gray-900'>{t('instructor.courses.noCoursesFound')}</h3>
             <p className='text-sm text-gray-500 max-w-sm mx-auto mt-1 mb-6'>
               {searchQuery
-                ? `No courses matching "${searchQuery}". Try adjusting your search or filter.`
-                : 'You have not created any courses in this category yet.'}
+                ? t('instructor.courses.noMatchingCourses', { query: searchQuery })
+                : t('instructor.courses.noCategoryCourses')}
             </p>
             <Link href='/admin/courses/new'>
               <Button className='bg-primary text-white hover:bg-primary/90'>
                 <PlusCircle className='w-4 h-4 mr-2' />
-                Create a Course
+                {t('instructor.courses.createCourse')}
               </Button>
             </Link>
           </div>
@@ -148,6 +147,13 @@ export function InstructorCoursesClient() {
                 ARCHIVED: 'bg-slate-50 text-slate-700 border-slate-200',
               }[course.status] || 'bg-gray-50 text-gray-700 border-gray-200';
 
+              const statusLabel = {
+                DRAFT: t('instructor.courses.tabs.draft'),
+                IN_REVIEW: t('instructor.courses.tabs.inReview'),
+                PUBLISHED: t('instructor.courses.tabs.published'),
+                ARCHIVED: t('instructor.courses.tabs.archived'),
+              }[course.status] || course.status;
+
               return (
                 <div
                   key={course.id}
@@ -159,13 +165,13 @@ export function InstructorCoursesClient() {
                       <span
                         className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${statusBadgeStyles}`}
                       >
-                        {course.status}
+                        {statusLabel}
                       </span>
                     </div>
                     <div className='flex flex-wrap items-center gap-4 text-xs text-gray-500 mt-2'>
-                      <span>Price: <strong>{course.price} {course.currency}</strong></span>
-                      <span>Slug: <code className='text-gray-600 bg-gray-100 px-1 py-0.5 rounded'>{course.slug}</code></span>
-                      <span>Updated: {course.updatedAt ? new Date(course.updatedAt).toLocaleDateString() : 'N/A'}</span>
+                      <span>{t('instructor.courses.price')} <strong>{formatCurrency(course.price, course.currency)}</strong></span>
+                      <span>{t('instructor.courses.slug')} <code className='text-gray-600 bg-gray-100 px-1 py-0.5 rounded'>{course.slug}</code></span>
+                      <span>{t('instructor.courses.updated')} {course.updatedAt ? formatDate(course.updatedAt) : 'N/A'}</span>
                     </div>
                   </div>
 
@@ -178,7 +184,7 @@ export function InstructorCoursesClient() {
                         className='bg-primary text-white hover:bg-primary/90 flex items-center gap-1.5'
                       >
                         <Send className='w-4 h-4' />
-                        <span>Submit for Review</span>
+                        <span>{t('instructor.courses.actions.submitForReview')}</span>
                       </Button>
                     )}
 
@@ -190,7 +196,7 @@ export function InstructorCoursesClient() {
                         className='border-blue-300 text-blue-800 hover:bg-blue-50 flex items-center gap-1.5'
                       >
                         <RotateCcw className='w-4 h-4' />
-                        <span>Withdraw Review</span>
+                        <span>{t('instructor.courses.actions.withdrawReview')}</span>
                       </Button>
                     )}
 
@@ -198,7 +204,7 @@ export function InstructorCoursesClient() {
                       <Link href={`/courses/${course.slug}`} target='_blank' rel='noopener noreferrer'>
                         <Button variant='outline' size='sm' className='flex items-center gap-1.5 text-emerald-700 border-emerald-300 hover:bg-emerald-50'>
                           <ExternalLink className='w-4 h-4' />
-                          <span>View Live</span>
+                          <span>{t('instructor.courses.actions.viewLive')}</span>
                         </Button>
                       </Link>
                     )}
@@ -206,21 +212,21 @@ export function InstructorCoursesClient() {
                     <Link href={`/instructor/courses/${course.id}/analytics`}>
                       <Button variant='outline' size='sm' className='flex items-center gap-1.5 text-purple-700 border-purple-200 hover:bg-purple-50'>
                         <BarChart3 className='w-4 h-4' />
-                        <span>Analytics</span>
+                        <span>{t('instructor.courses.actions.analytics')}</span>
                       </Button>
                     </Link>
 
                     <Link href={`/instructor/courses/${course.id}/learners`}>
                       <Button variant='outline' size='sm' className='flex items-center gap-1.5 text-blue-700 border-blue-200 hover:bg-blue-50'>
                         <Users className='w-4 h-4' />
-                        <span>Learners</span>
+                        <span>{t('instructor.courses.actions.learners')}</span>
                       </Button>
                     </Link>
 
                     <Link href={`/admin/courses/${course.id}`}>
                       <Button variant='outline' size='sm' className='flex items-center gap-1.5'>
                         <FileEdit className='w-4 h-4' />
-                        <span>{course.status === 'IN_REVIEW' ? 'View Curriculum' : 'Edit Curriculum'}</span>
+                        <span>{course.status === 'IN_REVIEW' ? t('instructor.courses.actions.viewCurriculum') : t('instructor.courses.actions.editCurriculum')}</span>
                       </Button>
                     </Link>
                   </div>

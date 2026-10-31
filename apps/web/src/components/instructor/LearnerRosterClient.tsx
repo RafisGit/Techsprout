@@ -11,6 +11,7 @@ import {
 } from '@/lib/api/instructor';
 import { LearnerRosterTable, type RosterSortField } from '@/components/instructor/LearnerRosterTable';
 import { serializeRosterToCsv, generateRosterCsvFilename, downloadCsvFile } from '@/lib/roster-csv';
+import { useTranslation } from '@/i18n';
 import { Button } from '@/components/ui/button';
 import {
   Users,
@@ -33,6 +34,7 @@ interface LearnerRosterClientProps {
 }
 
 export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
+  const { t, formatNumber } = useTranslation();
   const [page, setPage] = useState<number>(1);
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -62,11 +64,7 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
   }, [debouncedSearch]);
 
   // Query Course metadata
-  const {
-    data: course,
-    isLoading: isLoadingCourse,
-    isError: isCourseError,
-  } = useQuery({
+  const { data: course } = useQuery({
     queryKey: ['instructorCourse', courseId],
     queryFn: () => fetchInstructorCourseById(courseId),
     enabled: !!courseId,
@@ -176,10 +174,10 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
   };
 
   const statusTabs = [
-    { label: 'All Enrollments', value: 'ALL' },
-    { label: 'Active', value: 'ACTIVE' },
-    { label: 'Completed', value: 'COMPLETED' },
-    { label: 'Cancelled', value: 'CANCELLED' },
+    { label: t('instructor.learners.tabs.all'), value: 'ALL' },
+    { label: t('instructor.learners.tabs.active'), value: 'ACTIVE' },
+    { label: t('instructor.learners.tabs.completed'), value: 'COMPLETED' },
+    { label: t('instructor.learners.tabs.cancelled'), value: 'CANCELLED' },
   ];
 
   return (
@@ -193,7 +191,7 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
               className='hover:text-primary transition-colors flex items-center gap-1 font-medium'
             >
               <ArrowLeft className='w-3.5 h-3.5' />
-              <span>Back to Teaching Courses</span>
+              <span>{t('instructor.learners.backToCourses')}</span>
             </Link>
             <span>/</span>
             <span className='text-gray-700 font-semibold truncate max-w-xs'>
@@ -203,7 +201,7 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
 
           <div className='flex items-center gap-3'>
             <h1 className='text-2xl font-bold text-gray-900 tracking-tight'>
-              Course Learner Roster
+              {t('instructor.learners.title')}
             </h1>
             {course?.status && (
               <span className='px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200'>
@@ -212,7 +210,7 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
             )}
           </div>
           <p className='text-xs text-gray-600 mt-0.5 max-w-2xl'>
-            Monitor student enrollments, module completion rates, and individual learner progress for this course.
+            {t('instructor.learners.subtitle')}
           </p>
         </div>
 
@@ -224,14 +222,14 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
               className='flex items-center gap-1.5 text-purple-700 border-purple-200 hover:bg-purple-50'
             >
               <BarChart3 className='w-4 h-4' />
-              <span>Course Analytics</span>
+              <span>{t('instructor.learners.courseAnalytics')}</span>
             </Button>
           </Link>
 
           <Link href={`/admin/courses/${courseId}`}>
             <Button variant='outline' size='sm' className='flex items-center gap-1.5'>
               <FileEdit className='w-4 h-4' />
-              <span>Edit Curriculum</span>
+              <span>{t('instructor.learners.editCurriculum')}</span>
             </Button>
           </Link>
 
@@ -240,14 +238,14 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
             onClick={handleExportCsv}
             disabled={isExporting || totalEnrolled === 0}
             className='bg-primary text-white hover:bg-primary/90 flex items-center gap-1.5'
-            title={totalEnrolled === 0 ? 'No students enrolled to export' : 'Download roster as RFC-4180 CSV'}
+            title={totalEnrolled === 0 ? t('instructor.learners.noLearnersToExport') : t('instructor.learners.downloadRosterTitle')}
           >
             {isExporting ? (
               <Loader2 className='w-4 h-4 animate-spin' />
             ) : (
               <Download className='w-4 h-4' />
             )}
-            <span>{isExporting ? 'Exporting...' : 'Export CSV'}</span>
+            <span>{isExporting ? t('instructor.learners.exporting') : t('instructor.learners.exportCsv')}</span>
           </Button>
         </div>
       </div>
@@ -263,7 +261,7 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
             onClick={() => setExportError(null)}
             className='text-xs font-semibold hover:underline text-red-700'
           >
-            Dismiss
+            {t('instructor.learners.dismiss')}
           </button>
         </div>
       )}
@@ -272,9 +270,9 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
       <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4'>
         <div className='bg-white p-5 rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between'>
           <div>
-            <p className='text-xs text-gray-500 font-medium'>Total Enrolled</p>
-            <h3 className='text-2xl font-bold text-gray-900 mt-1'>{totalEnrolled}</h3>
-            <p className='text-[11px] text-gray-400 mt-0.5'>Cumulative enrollments</p>
+            <p className='text-xs text-gray-500 font-medium'>{t('instructor.learners.metrics.totalEnrolled')}</p>
+            <h3 className='text-2xl font-bold text-gray-900 mt-1'>{formatNumber(totalEnrolled)}</h3>
+            <p className='text-[11px] text-gray-400 mt-0.5'>{t('instructor.learners.metrics.cumulativeEnrollments')}</p>
           </div>
           <div className='w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center flex-shrink-0'>
             <Users className='w-5 h-5' />
@@ -283,9 +281,9 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
 
         <div className='bg-white p-5 rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between'>
           <div>
-            <p className='text-xs text-gray-500 font-medium'>Active Learners</p>
-            <h3 className='text-2xl font-bold text-gray-900 mt-1'>{activeCount}</h3>
-            <p className='text-[11px] text-emerald-600 font-medium mt-0.5'>Currently progressing</p>
+            <p className='text-xs text-gray-500 font-medium'>{t('instructor.learners.metrics.activeLearners')}</p>
+            <h3 className='text-2xl font-bold text-gray-900 mt-1'>{formatNumber(activeCount)}</h3>
+            <p className='text-[11px] text-emerald-600 font-medium mt-0.5'>{t('instructor.learners.metrics.currentlyProgressing')}</p>
           </div>
           <div className='w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0'>
             <Clock className='w-5 h-5' />
@@ -294,9 +292,9 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
 
         <div className='bg-white p-5 rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between'>
           <div>
-            <p className='text-xs text-gray-500 font-medium'>Completed Course</p>
-            <h3 className='text-2xl font-bold text-gray-900 mt-1'>{completedCount}</h3>
-            <p className='text-[11px] text-blue-600 font-medium mt-0.5'>100% curriculum finished</p>
+            <p className='text-xs text-gray-500 font-medium'>{t('instructor.learners.metrics.completedCourse')}</p>
+            <h3 className='text-2xl font-bold text-gray-900 mt-1'>{formatNumber(completedCount)}</h3>
+            <p className='text-[11px] text-blue-600 font-medium mt-0.5'>{t('instructor.learners.metrics.curriculumFinished')}</p>
           </div>
           <div className='w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0'>
             <CheckCircle2 className='w-5 h-5' />
@@ -305,9 +303,9 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
 
         <div className='bg-white p-5 rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between'>
           <div>
-            <p className='text-xs text-gray-500 font-medium'>Completion Rate</p>
-            <h3 className='text-2xl font-bold text-gray-900 mt-1'>{completionRate}%</h3>
-            <p className='text-[11px] text-gray-400 mt-0.5'>Of enrolled students</p>
+            <p className='text-xs text-gray-500 font-medium'>{t('instructor.learners.metrics.completionRate')}</p>
+            <h3 className='text-2xl font-bold text-gray-900 mt-1'>{formatNumber(completionRate)}%</h3>
+            <p className='text-[11px] text-gray-400 mt-0.5'>{t('instructor.learners.metrics.ofEnrolled')}</p>
           </div>
           <div className='w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0'>
             <TrendingUp className='w-5 h-5' />
@@ -340,7 +338,7 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
             type='text'
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder='Search by learner name or email...'
+            placeholder={t('instructor.learners.searchPlaceholder')}
             className='w-full pl-9 pr-4 py-1.5 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary'
           />
           <Search className='w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2' />
@@ -351,7 +349,11 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
       <div className='bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden'>
         <div className='p-4 border-b border-gray-100 flex items-center justify-between text-xs text-gray-500'>
           <span>
-            Showing <strong>{rawItems.length}</strong> of <strong>{pagination.total}</strong> {debouncedSearch ? 'matching' : 'enrolled'} learners
+            {t('instructor.learners.showingCount', {
+              shown: formatNumber(rawItems.length),
+              total: formatNumber(pagination.total),
+              type: debouncedSearch ? t('instructor.learners.matching') : t('instructor.learners.enrolled'),
+            })}
           </span>
           {searchQuery && (
             <button
@@ -361,7 +363,7 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
               }}
               className='text-primary hover:underline font-medium'
             >
-              Clear Search
+              {t('instructor.learners.clearSearch')}
             </button>
           )}
         </div>
@@ -385,7 +387,11 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
         {pagination.totalPages > 1 && (
           <div className='p-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-600 bg-gray-50/50'>
             <span>
-              Page <strong>{pagination.page}</strong> of <strong>{pagination.totalPages}</strong> ({pagination.total} learners total)
+              {t('instructor.learners.pageInfo', {
+                page: formatNumber(pagination.page),
+                totalPages: formatNumber(pagination.totalPages),
+                total: formatNumber(pagination.total),
+              })}
             </span>
             <div className='flex items-center gap-2'>
               <Button
@@ -395,7 +401,7 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
                 disabled={!pagination.hasPreviousPage}
               >
                 <ChevronLeft className='w-4 h-4 mr-1' />
-                Previous
+                {t('instructor.learners.previous')}
               </Button>
               <Button
                 variant='outline'
@@ -403,7 +409,7 @@ export function LearnerRosterClient({ courseId }: LearnerRosterClientProps) {
                 onClick={() => setPage((p) => Math.min(p + 1, pagination.totalPages))}
                 disabled={!pagination.hasNextPage}
               >
-                Next
+                {t('instructor.learners.next')}
                 <ChevronRight className='w-4 h-4 ml-1' />
               </Button>
             </div>

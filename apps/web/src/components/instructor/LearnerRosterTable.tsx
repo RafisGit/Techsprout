@@ -2,6 +2,7 @@
 
 import React from 'react';
 import type { CourseEnrollmentItem } from '@/lib/api/instructor';
+import { useTranslation } from '@/i18n';
 import {
   Users,
   CheckCircle2,
@@ -44,6 +45,8 @@ export function LearnerRosterTable({
   onSortChange,
   className = '',
 }: LearnerRosterTableProps) {
+  const { t, formatDate, formatNumber } = useTranslation();
+
   // Loading skeleton state
   if (isLoading) {
     return (
@@ -62,13 +65,13 @@ export function LearnerRosterTable({
         <div className='w-12 h-12 rounded-2xl bg-red-50 text-red-600 mx-auto flex items-center justify-center mb-3'>
           <AlertCircle className='w-6 h-6' />
         </div>
-        <h3 className='text-base font-bold text-gray-900'>Failed to load learner roster</h3>
+        <h3 className='text-base font-bold text-gray-900'>{t('instructor.learners.table.failedToLoad')}</h3>
         <p className='text-xs text-gray-500 max-w-md mx-auto mt-1'>
-          {errorMessage || 'An error occurred while fetching the course enrollments. Please check your connection or permissions.'}
+          {errorMessage || t('instructor.learners.table.failedToLoadDesc')}
         </p>
         {onRetry && (
           <Button variant='outline' size='sm' onClick={onRetry} className='mt-4'>
-            Retry Loading
+            {t('instructor.learners.table.retry')}
           </Button>
         )}
       </div>
@@ -83,12 +86,12 @@ export function LearnerRosterTable({
           {searchQuery ? <Search className='w-6 h-6' /> : <Users className='w-6 h-6' />}
         </div>
         <h3 className='text-base font-bold text-gray-900'>
-          {searchQuery ? 'No matching learners found' : 'No students enrolled yet'}
+          {searchQuery ? t('instructor.learners.table.noMatchTitle') : t('instructor.learners.table.emptyTitle')}
         </h3>
         <p className='text-xs text-gray-500 max-w-sm mx-auto mt-1'>
           {searchQuery
-            ? `No learners matched "${searchQuery}". Try searching with a different name or email.`
-            : 'When students enroll in this published course, their learning progress and roster information will appear here.'}
+            ? t('instructor.learners.table.noMatchDesc', { query: searchQuery })
+            : t('instructor.learners.table.emptyDesc')}
         </p>
       </div>
     );
@@ -100,14 +103,14 @@ export function LearnerRosterTable({
         return (
           <span className='inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200'>
             <CheckCircle2 className='w-3 h-3 text-blue-600' />
-            <span>Completed</span>
+            <span>{t('instructor.learners.table.completed')}</span>
           </span>
         );
       case 'CANCELLED':
         return (
           <span className='inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200'>
             <XCircle className='w-3 h-3 text-gray-500' />
-            <span>Cancelled</span>
+            <span>{t('instructor.learners.table.cancelled')}</span>
           </span>
         );
       case 'ACTIVE':
@@ -115,7 +118,7 @@ export function LearnerRosterTable({
         return (
           <span className='inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200'>
             <Clock className='w-3 h-3 text-emerald-600' />
-            <span>Active</span>
+            <span>{t('instructor.learners.table.active')}</span>
           </span>
         );
     }
@@ -155,14 +158,14 @@ export function LearnerRosterTable({
                     onClick={() => onSortChange('name')}
                     className='group flex items-center gap-1.5 hover:text-gray-900 font-semibold focus:outline-none'
                   >
-                    <span>Learner</span>
+                    <span>{t('instructor.learners.table.learner')}</span>
                     {renderSortIndicator('name')}
                   </button>
                 ) : (
-                  <span>Learner</span>
+                  <span>{t('instructor.learners.table.learner')}</span>
                 )}
               </th>
-              <th scope='col' className='px-6 py-3.5'>Status</th>
+              <th scope='col' className='px-6 py-3.5'>{t('instructor.learners.table.status')}</th>
               <th scope='col' className='px-6 py-3.5'>
                 {onSortChange ? (
                   <button
@@ -170,11 +173,11 @@ export function LearnerRosterTable({
                     onClick={() => onSortChange('progressPercentage')}
                     className='group flex items-center gap-1.5 hover:text-gray-900 font-semibold focus:outline-none'
                   >
-                    <span>Course Progress</span>
+                    <span>{t('instructor.learners.table.courseProgress')}</span>
                     {renderSortIndicator('progressPercentage')}
                   </button>
                 ) : (
-                  <span>Course Progress</span>
+                  <span>{t('instructor.learners.table.courseProgress')}</span>
                 )}
               </th>
               <th scope='col' className='px-6 py-3.5'>
@@ -184,14 +187,14 @@ export function LearnerRosterTable({
                     onClick={() => onSortChange('enrolledAt')}
                     className='group flex items-center gap-1.5 hover:text-gray-900 font-semibold focus:outline-none'
                   >
-                    <span>Enrolled Date</span>
+                    <span>{t('instructor.learners.table.enrolledDate')}</span>
                     {renderSortIndicator('enrolledAt')}
                   </button>
                 ) : (
-                  <span>Enrolled Date</span>
+                  <span>{t('instructor.learners.table.enrolledDate')}</span>
                 )}
               </th>
-              <th scope='col' className='px-6 py-3.5'>Completion Date</th>
+              <th scope='col' className='px-6 py-3.5'>{t('instructor.learners.table.completionDate')}</th>
             </tr>
           </thead>
           <tbody className='divide-y divide-gray-100'>
@@ -219,9 +222,9 @@ export function LearnerRosterTable({
                 <td className='px-6 py-4 whitespace-nowrap'>
                   <div className='w-36 space-y-1.5'>
                     <div className='flex items-center justify-between text-xs font-medium'>
-                      <span className='text-gray-700'>{item.progressPercentage}%</span>
+                      <span className='text-gray-700'>{formatNumber(item.progressPercentage)}%</span>
                       {item.progressPercentage === 100 && (
-                        <span className='text-emerald-600 font-semibold text-[10px]'>Done</span>
+                        <span className='text-emerald-600 font-semibold text-[10px]'>{t('instructor.learners.table.done')}</span>
                       )}
                     </div>
                     <div
@@ -230,7 +233,7 @@ export function LearnerRosterTable({
                       aria-valuenow={item.progressPercentage}
                       aria-valuemin={0}
                       aria-valuemax={100}
-                      aria-label={`Course progress: ${item.progressPercentage}%`}
+                      aria-label={t('instructor.learners.table.progressLabel', { percent: formatNumber(item.progressPercentage) })}
                     >
                       <div
                         className={`h-full rounded-full transition-all duration-300 ${
@@ -248,12 +251,12 @@ export function LearnerRosterTable({
 
                 {/* Enrolled Date */}
                 <td className='px-6 py-4 whitespace-nowrap text-xs text-gray-600'>
-                  {new Date(item.enrolledAt).toLocaleDateString()}
+                  {formatDate(item.enrolledAt)}
                 </td>
 
                 {/* Completion Date */}
                 <td className='px-6 py-4 whitespace-nowrap text-xs text-gray-500'>
-                  {item.completedAt ? new Date(item.completedAt).toLocaleDateString() : '—'}
+                  {item.completedAt ? formatDate(item.completedAt) : '—'}
                 </td>
               </tr>
             ))}
@@ -284,8 +287,8 @@ export function LearnerRosterTable({
             {/* Mobile Progress Bar */}
             <div className='space-y-1 bg-gray-50 p-2.5 rounded-lg border border-gray-100'>
               <div className='flex items-center justify-between text-xs'>
-                <span className='text-gray-600 font-medium'>Progress</span>
-                <span className='font-bold text-gray-900'>{item.progressPercentage}%</span>
+                <span className='text-gray-600 font-medium'>{t('instructor.learners.table.progress')}</span>
+                <span className='font-bold text-gray-900'>{formatNumber(item.progressPercentage)}%</span>
               </div>
               <div
                 className='w-full bg-gray-200 rounded-full h-1.5 overflow-hidden'
@@ -293,7 +296,7 @@ export function LearnerRosterTable({
                 aria-valuenow={item.progressPercentage}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                aria-label={`Course progress: ${item.progressPercentage}%`}
+                aria-label={t('instructor.learners.table.progressLabel', { percent: formatNumber(item.progressPercentage) })}
               >
                 <div
                   className={`h-full rounded-full transition-all duration-300 ${
@@ -312,12 +315,12 @@ export function LearnerRosterTable({
             <div className='flex items-center justify-between text-xs text-gray-500 pt-1'>
               <span className='flex items-center gap-1'>
                 <Calendar className='w-3.5 h-3.5 text-gray-400' />
-                Enrolled: {new Date(item.enrolledAt).toLocaleDateString()}
+                {t('instructor.learners.table.enrolledOn', { date: formatDate(item.enrolledAt) })}
               </span>
               <span>
                 {item.completedAt
-                  ? `Completed: ${new Date(item.completedAt).toLocaleDateString()}`
-                  : 'In progress'}
+                  ? t('instructor.learners.table.completedOn', { date: formatDate(item.completedAt) })
+                  : t('instructor.learners.table.inProgress')}
               </span>
             </div>
           </div>

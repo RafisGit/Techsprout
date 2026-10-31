@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { withdrawCourseReview } from '@/lib/api/instructor';
+import { useTranslation } from '@/i18n';
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,7 @@ export function ReviewWithdrawalModal({
   onSuccess,
 }: ReviewWithdrawalModalProps) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const withdrawMutation = useMutation({
@@ -48,7 +50,7 @@ export function ReviewWithdrawalModal({
       const msg =
         errorObj.response?.data?.message ||
         errorObj.message ||
-        'Failed to withdraw review request. The course state may have already changed.';
+        t('instructor.review.failedToWithdraw');
       setErrorMessage(msg);
     },
   });
@@ -66,22 +68,21 @@ export function ReviewWithdrawalModal({
             <AlertTriangle className='w-6 h-6' />
           </div>
           <DialogTitle className='text-lg font-bold text-gray-900'>
-            Withdraw Course Review Request
+            {t('instructor.review.withdrawalTitle')}
           </DialogTitle>
           <DialogDescription className='text-sm text-gray-600 mt-1'>
-            Are you sure you want to withdraw the submission for{' '}
-            <strong className='text-gray-900'>{courseTitle || 'this course'}</strong>?
+            {t('instructor.review.withdrawalDesc', { title: courseTitle || 'this course' })}
           </DialogDescription>
         </DialogHeader>
 
         <div className='space-y-4 my-2'>
           <div className='p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs space-y-1.5'>
-            <p className='font-semibold'>What happens when you withdraw?</p>
+            <p className='font-semibold'>{t('instructor.review.withdrawalWhatHappens')}</p>
             <ul className='list-disc list-inside space-y-1 text-amber-800'>
-              <li>The course will immediately return to <strong>DRAFT</strong> status.</li>
-              <li>Curriculum editing will be fully unlocked so you can modify modules and lessons.</li>
-              <li>The pending submission will be removed from the institutional review queue.</li>
-              <li>You can resubmit whenever your revisions are ready.</li>
+              <li>{t('instructor.review.withdrawalPoints.returnToDraft')}</li>
+              <li>{t('instructor.review.withdrawalPoints.unlocked')}</li>
+              <li>{t('instructor.review.withdrawalPoints.removedFromQueue')}</li>
+              <li>{t('instructor.review.withdrawalPoints.resubmitReady')}</li>
             </ul>
           </div>
 
@@ -99,7 +100,7 @@ export function ReviewWithdrawalModal({
             onClick={() => onOpenChange(false)}
             disabled={withdrawMutation.isPending}
           >
-            Keep in Review
+            {t('instructor.review.keepInReview')}
           </Button>
           <Button
             type='button'
@@ -113,7 +114,7 @@ export function ReviewWithdrawalModal({
             ) : (
               <RotateCcw className='w-4 h-4' />
             )}
-            <span>Confirm Withdrawal</span>
+            <span>{withdrawMutation.isPending ? t('instructor.review.withdrawing') : t('instructor.review.confirmWithdrawal')}</span>
           </Button>
         </DialogFooter>
       </DialogContent>

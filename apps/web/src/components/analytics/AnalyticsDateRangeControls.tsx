@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import type { AnalyticsInterval } from '@techsprout/contracts';
+import { useTranslation } from '@/i18n';
 import { Button } from '@/components/ui/button';
-import { Calendar, Filter, AlertCircle } from 'lucide-react';
+import { Filter, AlertCircle } from 'lucide-react';
 
 export interface DateRangeFilterState {
   startDate?: string;
@@ -29,6 +30,7 @@ export function AnalyticsDateRangeControls({
   value,
   onChange,
 }: AnalyticsDateRangeControlsProps) {
+  const { t } = useTranslation();
   const [activePreset, setActivePreset] = useState<PresetOption>('30d');
   const [customStart, setCustomStart] = useState<string>(value.startDate || '');
   const [customEnd, setCustomEnd] = useState<string>(value.endDate || '');
@@ -81,7 +83,7 @@ export function AnalyticsDateRangeControls({
 
   const handleCustomApply = () => {
     if (customStart && customEnd && customStart > customEnd) {
-      setValidationError('Start date cannot be after end date.');
+      setValidationError(t('instructor.analytics.dateRange.dateError'));
       return;
     }
     setValidationError(null);
@@ -107,7 +109,7 @@ export function AnalyticsDateRangeControls({
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Last 7 Days
+            {t('instructor.analytics.dateRange.last7Days')}
           </button>
           <button
             type='button'
@@ -118,7 +120,7 @@ export function AnalyticsDateRangeControls({
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Last 30 Days
+            {t('instructor.analytics.dateRange.last30Days')}
           </button>
           <button
             type='button'
@@ -129,13 +131,13 @@ export function AnalyticsDateRangeControls({
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Last 90 Days
+            {t('instructor.analytics.dateRange.last90Days')}
           </button>
         </div>
 
         {/* Interval Selector */}
         <div className='flex items-center gap-2 text-xs'>
-          <span className='text-gray-500 font-medium'>Interval:</span>
+          <span className='text-gray-500 font-medium'>{t('instructor.analytics.dateRange.interval')}</span>
           <select
             value={selectedInterval}
             onChange={(e) => {
@@ -149,8 +151,8 @@ export function AnalyticsDateRangeControls({
             }}
             className='bg-gray-50 border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 font-medium focus:ring-2 focus:ring-primary focus:outline-none'
           >
-            <option value='day'>Daily</option>
-            <option value='week'>Weekly</option>
+            <option value='day'>{t('instructor.analytics.dateRange.daily')}</option>
+            <option value='week'>{t('instructor.analytics.dateRange.weekly')}</option>
           </select>
         </div>
       </div>
@@ -159,7 +161,7 @@ export function AnalyticsDateRangeControls({
       <div className='flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100 text-xs'>
         <div className='flex items-center gap-1.5'>
           <label htmlFor='analytics-start-date' className='text-gray-500 font-medium'>
-            From:
+            {t('instructor.analytics.dateRange.from')}
           </label>
           <input
             id='analytics-start-date'
@@ -175,7 +177,7 @@ export function AnalyticsDateRangeControls({
 
         <div className='flex items-center gap-1.5'>
           <label htmlFor='analytics-end-date' className='text-gray-500 font-medium'>
-            To:
+            {t('instructor.analytics.dateRange.to')}
           </label>
           <input
             id='analytics-end-date'
@@ -197,7 +199,7 @@ export function AnalyticsDateRangeControls({
           className='text-xs h-7 px-3'
         >
           <Filter className='w-3 h-3 mr-1' />
-          Apply Range
+          {t('instructor.analytics.dateRange.applyRange')}
         </Button>
 
         {validationError && (

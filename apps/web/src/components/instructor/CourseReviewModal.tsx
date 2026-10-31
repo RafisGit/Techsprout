@@ -6,6 +6,7 @@ import {
   fetchInstructorCourseById,
   submitCourseForReview,
 } from '@/lib/api/instructor';
+import { useTranslation } from '@/i18n';
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle2, AlertCircle, Loader2, Send, HelpCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Loader2, Send } from 'lucide-react';
 
 interface CourseReviewModalProps {
   courseId: string;
@@ -28,12 +29,12 @@ interface CourseReviewModalProps {
 
 export function CourseReviewModal({
   courseId,
-  courseTitle,
   open,
   onOpenChange,
   onSuccess,
 }: CourseReviewModalProps) {
   const queryClient = useQueryClient();
+  const { t, formatNumber } = useTranslation();
   const [submissionNotes, setSubmissionNotes] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -85,7 +86,7 @@ export function CourseReviewModal({
         errorObj.response?.data?.details?.missingRequirements?.join(', ') ||
         errorObj.response?.data?.message ||
         errorObj.message ||
-        'Failed to submit course for review. Please check all requirements.';
+        t('instructor.review.failedToLoadDetails');
       setErrorMessage(msg);
     },
   });
@@ -100,32 +101,40 @@ export function CourseReviewModal({
   const checklistItems = [
     {
       id: 'title',
-      label: 'Course Title',
-      description: course?.title ? `"${course.title}"` : 'Missing title',
+      label: t('instructor.review.checklist.title'),
+      description: course?.title ? `"${course.title}"` : t('instructor.review.checklist.titleMissing'),
       passed: hasTitle,
     },
     {
       id: 'description',
-      label: 'Course Description',
-      description: hasDescription ? 'Detailed syllabus description provided' : 'Missing description',
+      label: t('instructor.review.checklist.description'),
+      description: hasDescription
+        ? t('instructor.review.checklist.descriptionProvided')
+        : t('instructor.review.checklist.descriptionMissing'),
       passed: hasDescription,
     },
     {
       id: 'thumbnail',
-      label: 'Thumbnail Media',
-      description: hasThumbnail ? 'Course cover image attached' : 'Thumbnail image required',
+      label: t('instructor.review.checklist.thumbnail'),
+      description: hasThumbnail
+        ? t('instructor.review.checklist.thumbnailProvided')
+        : t('instructor.review.checklist.thumbnailRequired'),
       passed: hasThumbnail,
     },
     {
       id: 'modules',
-      label: 'Curriculum Modules',
-      description: hasModules ? `${moduleCount} module(s) created` : 'At least 1 module required',
+      label: t('instructor.review.checklist.modules'),
+      description: hasModules
+        ? t('instructor.review.checklist.modulesCount', { count: formatNumber(moduleCount) })
+        : t('instructor.review.checklist.modulesRequired'),
       passed: hasModules,
     },
     {
       id: 'lessons',
-      label: 'Lessons & Content',
-      description: hasLessons ? `${lessonCount} lesson(s) authored` : 'At least 1 lesson required across modules',
+      label: t('instructor.review.checklist.lessons'),
+      description: hasLessons
+        ? t('instructor.review.checklist.lessonsCount', { count: formatNumber(lessonCount) })
+        : t('instructor.review.checklist.lessonsRequired'),
       passed: hasLessons,
     },
   ];
@@ -135,10 +144,10 @@ export function CourseReviewModal({
       <DialogContent className='sm:max-w-xl max-h-[90vh] overflow-y-auto'>
         <DialogHeader>
           <DialogTitle className='text-xl font-bold text-gray-900'>
-            Submit Course for Institutional Review
+            {t('instructor.review.modalTitle')}
           </DialogTitle>
           <DialogDescription className='text-sm text-gray-600 mt-1'>
-            Before publishing to the TechSprout catalog, courses undergo administrative review to ensure curriculum quality and academic standards.
+            {t('instructor.review.modalDesc')}
           </DialogDescription>
         </DialogHeader>
 
@@ -150,7 +159,7 @@ export function CourseReviewModal({
           </div>
         ) : isCourseError ? (
           <div className='p-4 bg-red-50 text-red-700 rounded-xl border border-red-200 text-sm'>
-            Failed to load course details for preflight verification. Please close and try again.
+            {t('instructor.review.failedToLoadDetails')}
           </div>
         ) : (
           <form onSubmit={handleSubmit} className='space-y-6 mt-2'>
@@ -159,7 +168,7 @@ export function CourseReviewModal({
               <div className='p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs flex items-start gap-2.5'>
                 <AlertCircle className='w-4 h-4 text-red-600 flex-shrink-0 mt-0.5' />
                 <div>
-                  <p className='font-semibold'>Submission Blocked</p>
+                  <p className='font-semibold'>{t('instructor.review.submissionBlocked')}</p>
                   <p className='mt-0.5 text-red-700'>{errorMessage}</p>
                 </div>
               </div>
@@ -169,7 +178,7 @@ export function CourseReviewModal({
             <div className='bg-gray-50/70 p-4 rounded-xl border border-gray-200 space-y-3'>
               <div className='flex items-center justify-between'>
                 <span className='text-xs font-bold text-gray-700 uppercase tracking-wider'>
-                  Curriculum Preflight Checklist
+                  {t('instructor.review.preflightChecklist')}
                 </span>
                 <span
                   className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
@@ -178,7 +187,7 @@ export function CourseReviewModal({
                       : 'bg-amber-50 text-amber-700 border-amber-200'
                   }`}
                 >
-                  {isEligible ? '5 / 5 Complete' : 'Incomplete Requirements'}
+                  {isEligible ? t('instructor.review.allComplete') : t('instructor.review.incompleteRequirements')}
                 </span>
               </div>
 
@@ -205,7 +214,7 @@ export function CourseReviewModal({
                           : 'text-amber-700 bg-amber-100/60'
                       }`}
                     >
-                      {item.passed ? 'Pass' : 'Missing'}
+                      {item.passed ? t('instructor.review.pass') : t('instructor.review.missing')}
                     </span>
                   </div>
                 ))}
@@ -217,7 +226,7 @@ export function CourseReviewModal({
               <div className='p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-start gap-2'>
                 <AlertCircle className='w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5' />
                 <p>
-                  Your course does not yet meet all preflight conditions. Please return to the curriculum editor to add the missing items before submitting for review.
+                  {t('instructor.review.ineligibleNotice')}
                 </p>
               </div>
             )}
@@ -225,20 +234,20 @@ export function CourseReviewModal({
             {/* Submission Notes */}
             <div className='space-y-1.5'>
               <label htmlFor='submissionNotes' className='block text-xs font-semibold text-gray-700'>
-                Notes for Institutional Reviewer <span className='text-gray-400 font-normal'>(Optional)</span>
+                {t('instructor.review.notesLabel')} <span className='text-gray-400 font-normal'>{t('instructor.review.notesOptional')}</span>
               </label>
               <Textarea
                 id='submissionNotes'
                 value={submissionNotes}
                 onChange={(e) => setSubmissionNotes(e.target.value.slice(0, 2000))}
-                placeholder='Add any comments, context, or revision notes for the administrative reviewer...'
+                placeholder={t('instructor.review.notesPlaceholder')}
                 rows={3}
                 disabled={!isEligible || submitMutation.isPending}
                 className='text-sm'
               />
               <div className='flex justify-end'>
                 <span className='text-[11px] text-gray-400'>
-                  {submissionNotes.length} / 2000 characters
+                  {t('instructor.review.charCount', { count: formatNumber(submissionNotes.length) })}
                 </span>
               </div>
             </div>
@@ -250,7 +259,7 @@ export function CourseReviewModal({
                 onClick={() => onOpenChange(false)}
                 disabled={submitMutation.isPending}
               >
-                Cancel
+                {t('instructor.review.cancel')}
               </Button>
               <Button
                 type='submit'
@@ -262,7 +271,7 @@ export function CourseReviewModal({
                 ) : (
                   <Send className='w-4 h-4' />
                 )}
-                <span>Submit for Review</span>
+                <span>{submitMutation.isPending ? t('instructor.review.submitting') : t('instructor.review.submitForReview')}</span>
               </Button>
             </DialogFooter>
           </form>

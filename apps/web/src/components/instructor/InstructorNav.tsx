@@ -6,29 +6,31 @@ import { usePathname } from 'next/navigation';
 import { LayoutDashboard, BookOpen, User, Wallet, UserCheck, LogOut } from 'lucide-react';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { logoutUser } from '@/lib/session';
+import { useTranslation } from '@/i18n';
 
 export function InstructorNav() {
   const pathname = usePathname();
   const { data: user } = useCurrentUser();
+  const { t } = useTranslation();
 
   const navLinks = [
     {
-      title: 'Dashboard',
+      title: t('instructor.nav.dashboard'),
       href: '/instructor/dashboard',
       icon: LayoutDashboard,
     },
     {
-      title: 'My Courses',
+      title: t('instructor.nav.courses'),
       href: '/instructor/courses',
       icon: BookOpen,
     },
     {
-      title: 'Earnings & Payouts',
+      title: t('instructor.nav.earnings'),
       href: '/instructor/earnings',
       icon: Wallet,
     },
     {
-      title: 'Profile',
+      title: t('instructor.nav.profile'),
       href: '/instructor/profile',
       icon: User,
     },
@@ -39,7 +41,7 @@ export function InstructorNav() {
       <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
         {/* Navigation tabs */}
         <nav
-          aria-label='Instructor Portal Navigation'
+          aria-label={t('instructor.nav.portalAria')}
           className='flex items-center space-x-1 sm:space-x-2 overflow-x-auto'
         >
           {navLinks.map((link) => {
@@ -74,15 +76,15 @@ export function InstructorNav() {
               <span className='font-medium text-gray-700'>{user.name}</span>
             </div>
             <span className='px-2 py-0.5 rounded-full font-semibold capitalize bg-emerald-50 text-emerald-700 border border-emerald-200'>
-              {user.role}
+              {user.role === 'instructor' ? t('instructor.nav.instructorBadge') : user.role}
             </span>
             <button
               onClick={() => logoutUser()}
               className='flex items-center gap-1 ml-2 text-xs text-gray-500 hover:text-red-600 font-medium transition-colors cursor-pointer'
-              title='Sign Out'
+              title={t('instructor.nav.signOut')}
             >
               <LogOut className='w-3.5 h-3.5' />
-              <span>Sign Out</span>
+              <span>{t('instructor.nav.signOut')}</span>
             </button>
           </div>
         )}

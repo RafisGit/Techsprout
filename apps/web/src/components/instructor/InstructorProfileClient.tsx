@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import {
@@ -10,22 +9,17 @@ import {
 } from '@/lib/api/instructor';
 import { MediaUploader } from '@/components/admin/MediaUploader';
 import { InstructorBioCard } from '@/components/public/InstructorBioCard';
+import { useTranslation } from '@/i18n';
 import { Button } from '@/components/ui/button';
 import {
-  User,
-  Mail,
-  AtSign,
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
   Loader2,
   Eye,
   FileEdit,
-  Globe,
-  Award,
   Sparkles,
   Info,
-  ArrowRight,
   RefreshCw,
 } from 'lucide-react';
 import type { UpdateInstructorProfileRequest } from '@techsprout/contracts';
@@ -42,6 +36,7 @@ function isValidUrl(val: string): boolean {
 
 export function InstructorProfileClient() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const { data: currentUser, isLoading: isUserLoading } = useCurrentUser();
 
   const {
@@ -102,7 +97,7 @@ export function InstructorProfileClient() {
       queryClient.invalidateQueries({ queryKey: ['myInstructorProfile'] });
       setStatusMessage({
         type: 'success',
-        text: 'Your instructor profile has been saved successfully.',
+        text: t('instructor.profile.savedSuccess'),
       });
       setFieldErrors({});
       // Update local state with returned values
@@ -122,7 +117,7 @@ export function InstructorProfileClient() {
       const serverMessage =
         err?.response?.data?.message ||
         err?.message ||
-        'Failed to save profile. Please check your inputs and try again.';
+        t('instructor.profile.failedToSave');
       const errors = err?.response?.data?.details || {};
       const formattedErrors: Record<string, string> = {};
       Object.keys(errors).forEach((key) => {
@@ -145,32 +140,32 @@ export function InstructorProfileClient() {
 
     // Bounds and validation checks
     if (headline.length > 150) {
-      errors.headline = 'Headline cannot exceed 150 characters.';
+      errors.headline = t('instructor.profile.errors.headlineLength');
     }
     if (bio.length > 2000) {
-      errors.bio = 'Bio cannot exceed 2000 characters.';
+      errors.bio = t('instructor.profile.errors.bioLength');
     }
     if (credentials.length > 500) {
-      errors.credentials = 'Credentials cannot exceed 500 characters.';
+      errors.credentials = t('instructor.profile.errors.credentialsLength');
     }
     if (parsedExpertiseAreas.length > 10) {
-      errors.expertise = 'Maximum 10 expertise areas allowed.';
+      errors.expertise = t('instructor.profile.errors.maxExpertise');
     }
     if (websiteUrl && !isValidUrl(websiteUrl)) {
-      errors.websiteUrl = 'Please enter a valid website URL (including https://).';
+      errors.websiteUrl = t('instructor.profile.errors.invalidWebsite');
     }
     if (linkedinUrl && !isValidUrl(linkedinUrl)) {
-      errors.linkedinUrl = 'Please enter a valid LinkedIn URL (including https://).';
+      errors.linkedinUrl = t('instructor.profile.errors.invalidLinkedin');
     }
     if (githubUrl && !isValidUrl(githubUrl)) {
-      errors.githubUrl = 'Please enter a valid GitHub URL (including https://).';
+      errors.githubUrl = t('instructor.profile.errors.invalidGithub');
     }
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       setStatusMessage({
         type: 'error',
-        text: 'Please correct the highlighted errors before saving.',
+        text: t('instructor.profile.correctErrors'),
       });
       return;
     }
@@ -248,14 +243,14 @@ export function InstructorProfileClient() {
         <div className="w-12 h-12 rounded-xl bg-red-50 text-red-500 flex items-center justify-center mx-auto">
           <AlertCircle className="w-6 h-6" />
         </div>
-        <h2 className="text-lg font-bold text-gray-900">Unable to Load Profile</h2>
+        <h2 className="text-lg font-bold text-gray-900">{t('instructor.profile.unableToLoad')}</h2>
         <p className="text-xs text-gray-500">
           {(profileFetchError as any)?.response?.data?.message ||
-            'There was an error communicating with the instructor profile service.'}
+            t('instructor.profile.serviceError')}
         </p>
         <Button onClick={() => refetch()} size="sm" variant="outline">
           <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-          Retry
+          {t('instructor.profile.retry')}
         </Button>
       </div>
     );
@@ -267,14 +262,14 @@ export function InstructorProfileClient() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-gray-900">Instructor Profile</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{t('instructor.profile.title')}</h1>
             <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              Verified Faculty
+              {t('instructor.profile.verifiedFaculty')}
             </span>
           </div>
           <p className="text-sm text-gray-600 mt-1">
-            Manage your public educator identity, biography, teaching credentials, and external links.
+            {t('instructor.profile.subtitle')}
           </p>
         </div>
 
@@ -290,7 +285,7 @@ export function InstructorProfileClient() {
             }`}
           >
             <FileEdit className="w-3.5 h-3.5" />
-            <span>Edit Profile</span>
+            <span>{t('instructor.profile.editProfile')}</span>
           </button>
           <button
             type="button"
@@ -302,7 +297,7 @@ export function InstructorProfileClient() {
             }`}
           >
             <Eye className="w-3.5 h-3.5" />
-            <span>Public Preview</span>
+            <span>{t('instructor.profile.publicPreview')}</span>
           </button>
         </div>
       </div>
@@ -312,9 +307,9 @@ export function InstructorProfileClient() {
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 flex items-start gap-3">
           <Sparkles className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
           <div className="text-sm">
-            <p className="font-semibold">First-Time Profile Setup</p>
+            <p className="font-semibold">{t('instructor.profile.firstTimeSetupTitle')}</p>
             <p className="mt-0.5 text-amber-800 text-xs leading-relaxed">
-              You haven&apos;t configured your public educator profile yet. Complete the fields below and save to showcase your academic credentials, biography, and expertise on your published course pages.
+              {t('instructor.profile.firstTimeSetupDesc')}
             </p>
           </div>
         </div>
@@ -341,7 +336,7 @@ export function InstructorProfileClient() {
             onClick={() => setStatusMessage(null)}
             className="text-xs opacity-60 hover:opacity-100"
           >
-            Dismiss
+            {t('instructor.profile.dismiss')}
           </button>
         </div>
       )}
@@ -352,9 +347,9 @@ export function InstructorProfileClient() {
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 flex items-start gap-3">
             <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
             <div className="text-xs text-blue-800">
-              <p className="font-semibold">Catalog Course Preview</p>
+              <p className="font-semibold">{t('instructor.profile.previewNoticeTitle')}</p>
               <p className="mt-0.5">
-                This is exactly how your biography, credentials, and social links appear to learners on your public course catalog pages.
+                {t('instructor.profile.previewNoticeDesc')}
               </p>
             </div>
           </div>
@@ -380,20 +375,20 @@ export function InstructorProfileClient() {
           <div className="bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 shadow-xs space-y-6">
             <div className="flex items-center justify-between border-b border-gray-100 pb-4">
               <div>
-                <h2 className="text-base font-bold text-gray-900">Institutional Identity</h2>
+                <h2 className="text-base font-bold text-gray-900">{t('instructor.profile.identitySection')}</h2>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Verified account credentials tied to your LMS profile.
+                  {t('instructor.profile.identitySubtitle')}
                 </p>
               </div>
               <span className="text-xs text-gray-400 font-medium bg-gray-50 px-2.5 py-1 rounded-md border border-gray-200/60">
-                Private Account Data
+                {t('instructor.profile.privateAccountData')}
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div className="p-3.5 bg-gray-50/70 rounded-xl border border-gray-100">
                 <span className="text-gray-400 font-semibold uppercase tracking-wider block mb-1">
-                  Full Name
+                  {t('instructor.profile.fullName')}
                 </span>
                 <span className="font-semibold text-gray-900 text-sm">
                   {currentUser?.name || '—'}
@@ -401,7 +396,7 @@ export function InstructorProfileClient() {
               </div>
               <div className="p-3.5 bg-gray-50/70 rounded-xl border border-gray-100">
                 <span className="text-gray-400 font-semibold uppercase tracking-wider block mb-1">
-                  Email Address
+                  {t('instructor.profile.emailAddress')}
                 </span>
                 <span className="font-semibold text-gray-900 text-sm">
                   {currentUser?.email || '—'}
@@ -413,9 +408,9 @@ export function InstructorProfileClient() {
           {/* Section 2: Avatar Media */}
           <div className="bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 shadow-xs space-y-4">
             <div className="border-b border-gray-100 pb-4">
-              <h2 className="text-base font-bold text-gray-900">Profile Avatar</h2>
+              <h2 className="text-base font-bold text-gray-900">{t('instructor.profile.avatarSection')}</h2>
               <p className="text-xs text-gray-500 mt-0.5">
-                Upload a professional headshot to display across the public course catalog.
+                {t('instructor.profile.avatarSubtitle')}
               </p>
             </div>
 
@@ -425,8 +420,8 @@ export function InstructorProfileClient() {
                 folder="techsprout/images/avatars"
                 currentUrl={avatarUrl}
                 currentMediaId={avatarMediaId}
-                label="Instructor Avatar"
-                helperText="Upload a square JPEG, PNG, or WebP image."
+                label={t('instructor.profile.avatarLabel')}
+                helperText={t('instructor.profile.avatarHelper')}
                 onMediaSelect={(asset) => {
                   if (asset) {
                     setAvatarMediaId(asset.id);
@@ -447,9 +442,9 @@ export function InstructorProfileClient() {
           {/* Section 3: Public Biography & Credentials */}
           <div className="bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 shadow-xs space-y-6">
             <div className="border-b border-gray-100 pb-4">
-              <h2 className="text-base font-bold text-gray-900">Public Educator Profile</h2>
+              <h2 className="text-base font-bold text-gray-900">{t('instructor.profile.publicSection')}</h2>
               <p className="text-xs text-gray-500 mt-0.5">
-                This information is displayed publicly on course detail pages.
+                {t('instructor.profile.publicSubtitle')}
               </p>
             </div>
 
@@ -457,7 +452,7 @@ export function InstructorProfileClient() {
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs">
                 <label htmlFor="headline" className="font-semibold text-gray-700">
-                  Professional Headline
+                  {t('instructor.profile.headline')}
                 </label>
                 <span
                   className={`font-mono text-[11px] ${
@@ -473,7 +468,7 @@ export function InstructorProfileClient() {
                 value={headline}
                 maxLength={150}
                 onChange={(e) => setHeadline(e.target.value)}
-                placeholder="e.g. Principal Systems Architect & Visiting Faculty"
+                placeholder={t('instructor.profile.headlinePlaceholder')}
                 className={`w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 ${
                   fieldErrors.headline ? 'border-red-300 bg-red-50/20' : 'border-gray-200'
                 }`}
@@ -487,7 +482,7 @@ export function InstructorProfileClient() {
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs">
                 <label htmlFor="credentials" className="font-semibold text-gray-700">
-                  Academic & Professional Credentials
+                  {t('instructor.profile.credentials')}
                 </label>
                 <span
                   className={`font-mono text-[11px] ${
@@ -503,7 +498,7 @@ export function InstructorProfileClient() {
                 value={credentials}
                 maxLength={500}
                 onChange={(e) => setCredentials(e.target.value)}
-                placeholder="e.g. Ph.D. in Computer Engineering, Stanford University"
+                placeholder={t('instructor.profile.credentialsPlaceholder')}
                 className={`w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 ${
                   fieldErrors.credentials ? 'border-red-300 bg-red-50/20' : 'border-gray-200'
                 }`}
@@ -517,10 +512,10 @@ export function InstructorProfileClient() {
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs">
                 <label htmlFor="expertise" className="font-semibold text-gray-700">
-                  Areas of Expertise
+                  {t('instructor.profile.expertise')}
                 </label>
                 <span className="text-gray-400 text-[11px]">
-                  Comma-separated tags (max 10)
+                  {t('instructor.profile.expertiseSubtitle')}
                 </span>
               </div>
               <input
@@ -528,7 +523,7 @@ export function InstructorProfileClient() {
                 type="text"
                 value={expertiseInput}
                 onChange={(e) => setExpertiseInput(e.target.value)}
-                placeholder="e.g. Computer Architecture, RISC-V, Embedded Systems"
+                placeholder={t('instructor.profile.expertisePlaceholder')}
                 className={`w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 ${
                   fieldErrors.expertise ? 'border-red-300 bg-red-50/20' : 'border-gray-200'
                 }`}
@@ -554,7 +549,7 @@ export function InstructorProfileClient() {
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs">
                 <label htmlFor="bio" className="font-semibold text-gray-700">
-                  Biography
+                  {t('instructor.profile.bio')}
                 </label>
                 <span
                   className={`font-mono text-[11px] ${
@@ -570,7 +565,7 @@ export function InstructorProfileClient() {
                 value={bio}
                 maxLength={2000}
                 onChange={(e) => setBio(e.target.value)}
-                placeholder="Tell learners about your background, industry experience, research interests, and teaching philosophy..."
+                placeholder={t('instructor.profile.bioPlaceholder')}
                 className={`w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y leading-relaxed ${
                   fieldErrors.bio ? 'border-red-300 bg-red-50/20' : 'border-gray-200'
                 }`}
@@ -584,9 +579,9 @@ export function InstructorProfileClient() {
           {/* Section 4: Public External Links */}
           <div className="bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 shadow-xs space-y-6">
             <div className="border-b border-gray-100 pb-4">
-              <h2 className="text-base font-bold text-gray-900">External & Social Profiles</h2>
+              <h2 className="text-base font-bold text-gray-900">{t('instructor.profile.externalSection')}</h2>
               <p className="text-xs text-gray-500 mt-0.5">
-                Optional links to your professional websites and academic publications.
+                {t('instructor.profile.externalSubtitle')}
               </p>
             </div>
 
@@ -594,14 +589,14 @@ export function InstructorProfileClient() {
               {/* Website */}
               <div className="space-y-1.5">
                 <label htmlFor="websiteUrl" className="text-xs font-semibold text-gray-700 block">
-                  Personal Website / Academic Lab
+                  {t('instructor.profile.websiteUrl')}
                 </label>
                 <input
                   id="websiteUrl"
                   type="url"
                   value={websiteUrl}
                   onChange={(e) => setWebsiteUrl(e.target.value)}
-                  placeholder="https://techsprout.edu/faculty/yourname"
+                  placeholder={t('instructor.profile.websitePlaceholder')}
                   className={`w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 ${
                     fieldErrors.websiteUrl ? 'border-red-300 bg-red-50/20' : 'border-gray-200'
                   }`}
@@ -614,14 +609,14 @@ export function InstructorProfileClient() {
               {/* LinkedIn */}
               <div className="space-y-1.5">
                 <label htmlFor="linkedinUrl" className="text-xs font-semibold text-gray-700 block">
-                  LinkedIn Profile URL
+                  {t('instructor.profile.linkedinUrl')}
                 </label>
                 <input
                   id="linkedinUrl"
                   type="url"
                   value={linkedinUrl}
                   onChange={(e) => setLinkedinUrl(e.target.value)}
-                  placeholder="https://linkedin.com/in/yourprofile"
+                  placeholder={t('instructor.profile.linkedinPlaceholder')}
                   className={`w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 ${
                     fieldErrors.linkedinUrl ? 'border-red-300 bg-red-50/20' : 'border-gray-200'
                   }`}
@@ -634,14 +629,14 @@ export function InstructorProfileClient() {
               {/* GitHub */}
               <div className="space-y-1.5">
                 <label htmlFor="githubUrl" className="text-xs font-semibold text-gray-700 block">
-                  GitHub Profile URL
+                  {t('instructor.profile.githubUrl')}
                 </label>
                 <input
                   id="githubUrl"
                   type="url"
                   value={githubUrl}
                   onChange={(e) => setGithubUrl(e.target.value)}
-                  placeholder="https://github.com/yourusername"
+                  placeholder={t('instructor.profile.githubPlaceholder')}
                   className={`w-full px-3.5 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 ${
                     fieldErrors.githubUrl ? 'border-red-300 bg-red-50/20' : 'border-gray-200'
                   }`}
@@ -662,7 +657,7 @@ export function InstructorProfileClient() {
               onClick={handleReset}
               disabled={saveMutation.isPending}
             >
-              Reset Changes
+              {t('instructor.profile.resetChanges')}
             </Button>
 
             <div className="flex items-center gap-3">
@@ -673,7 +668,7 @@ export function InstructorProfileClient() {
                 onClick={() => setActiveTab('preview')}
               >
                 <Eye className="w-3.5 h-3.5 mr-1.5" />
-                Preview Bio
+                {t('instructor.profile.previewBio')}
               </Button>
 
               <Button
@@ -685,10 +680,10 @@ export function InstructorProfileClient() {
                 {saveMutation.isPending ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Saving Profile...
+                    {t('instructor.profile.savingProfile')}
                   </>
                 ) : (
-                  'Save Profile'
+                  t('instructor.profile.saveProfile')
                 )}
               </Button>
             </div>

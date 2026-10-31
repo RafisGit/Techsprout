@@ -7,7 +7,6 @@ import {
   fetchInstructorCourseById,
   fetchCourseAnalytics,
   fetchCourseRetentionAnalytics,
-  type CourseAnalyticsDetailDto,
 } from '@/lib/api/instructor';
 import { TrendLineChart } from '@/components/analytics/TrendLineChart';
 import { ProgressDistributionBar } from '@/components/analytics/ProgressDistributionBar';
@@ -18,6 +17,7 @@ import {
   AnalyticsDateRangeControls,
   type DateRangeFilterState,
 } from '@/components/analytics/AnalyticsDateRangeControls';
+import { useTranslation } from '@/i18n';
 import { Button } from '@/components/ui/button';
 import {
   ArrowLeft,
@@ -29,8 +29,6 @@ import {
   AlertCircle,
   ShieldAlert,
   Loader2,
-  BarChart3,
-  Calendar,
   Sparkles,
 } from 'lucide-react';
 
@@ -59,13 +57,10 @@ function getDefaultDateRange(): DateRangeFilterState {
 
 export function CourseAnalyticsClient({ courseId }: CourseAnalyticsClientProps) {
   const [filterState, setFilterState] = useState<DateRangeFilterState>(getDefaultDateRange());
+  const { t, formatNumber } = useTranslation();
 
   // Fetch course metadata
-  const {
-    data: course,
-    isLoading: isLoadingCourse,
-    isError: isCourseError,
-  } = useQuery({
+  const { data: course } = useQuery({
     queryKey: ['instructorCourse', courseId],
     queryFn: () => fetchInstructorCourseById(courseId),
     enabled: !!courseId,
@@ -118,7 +113,7 @@ export function CourseAnalyticsClient({ courseId }: CourseAnalyticsClientProps) 
   const errorMessage =
     (analyticsError as { response?: { data?: { message?: string } } })?.response?.data?.message ||
     (analyticsError as { message?: string })?.message ||
-    'Failed to load course analytics.';
+    t('instructor.analytics.errors.serviceErrorTitle');
 
   return (
     <div className='space-y-6'>
@@ -131,19 +126,19 @@ export function CourseAnalyticsClient({ courseId }: CourseAnalyticsClientProps) 
               className='hover:text-primary transition-colors flex items-center gap-1 font-medium'
             >
               <ArrowLeft className='w-3.5 h-3.5' />
-              <span>Back to Teaching Courses</span>
+              <span>{t('instructor.analytics.backToCourses')}</span>
             </Link>
             <span>/</span>
             <span className='text-gray-700 font-semibold truncate max-w-xs'>
               {course?.title || analytics?.courseTitle || 'Course'}
             </span>
             <span>/</span>
-            <span className='text-primary font-semibold'>Analytics</span>
+            <span className='text-primary font-semibold'>{t('instructor.analytics.title')}</span>
           </div>
 
           <div className='flex items-center gap-3'>
             <h1 className='text-2xl font-bold text-gray-900 tracking-tight'>
-              Course Analytics & Performance
+              {t('instructor.analytics.title')}
             </h1>
             {course?.status && (
               <span className='px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200'>
@@ -153,12 +148,12 @@ export function CourseAnalyticsClient({ courseId }: CourseAnalyticsClientProps) 
             {isFetchingAnalytics && !isLoadingAnalytics && (
               <span className='inline-flex items-center gap-1 text-[11px] text-gray-400 font-medium'>
                 <Loader2 className='w-3 h-3 animate-spin text-primary' />
-                <span>Refreshing...</span>
+                <span>{t('instructor.analytics.refreshing')}</span>
               </span>
             )}
           </div>
           <p className='text-xs text-gray-600 mt-0.5 max-w-2xl'>
-            Evaluate student enrollment growth, syllabus completion rates, lesson drop-off trends, and quiz performance.
+            {t('instructor.analytics.subtitle')}
           </p>
         </div>
 
@@ -170,14 +165,14 @@ export function CourseAnalyticsClient({ courseId }: CourseAnalyticsClientProps) 
               className='flex items-center gap-1.5 text-blue-700 border-blue-200 hover:bg-blue-50'
             >
               <Users className='w-4 h-4' />
-              <span>Learner Roster</span>
+              <span>{t('instructor.analytics.learnerRoster')}</span>
             </Button>
           </Link>
 
           <Link href={`/admin/courses/${courseId}`}>
             <Button variant='outline' size='sm' className='flex items-center gap-1.5'>
               <FileEdit className='w-4 h-4' />
-              <span>Edit Curriculum</span>
+              <span>{t('instructor.analytics.editCurriculum')}</span>
             </Button>
           </Link>
         </div>
@@ -196,25 +191,25 @@ export function CourseAnalyticsClient({ courseId }: CourseAnalyticsClientProps) 
             <div className='space-y-1 flex-1'>
               <h3 className='text-sm font-bold text-gray-900'>
                 {isForbidden
-                  ? 'Access Forbidden'
+                  ? t('instructor.analytics.errors.forbiddenTitle')
                   : isNotFound
-                  ? 'Course Analytics Not Found'
+                  ? t('instructor.analytics.errors.notFoundTitle')
                   : isUnauthorized
-                  ? 'Authentication Required'
-                  : 'Analytics Service Error'}
+                  ? t('instructor.analytics.errors.unauthorizedTitle')
+                  : t('instructor.analytics.errors.serviceErrorTitle')}
               </h3>
               <p className='text-xs text-gray-600'>
                 {isForbidden
-                  ? 'You do not own or have permission to access analytics for this course.'
+                  ? t('instructor.analytics.errors.forbiddenDesc')
                   : isNotFound
-                  ? 'The requested course does not exist or has been removed.'
+                  ? t('instructor.analytics.errors.notFoundDesc')
                   : isUnauthorized
-                  ? 'Please sign in as an authorized instructor to view this analytics report.'
+                  ? t('instructor.analytics.errors.unauthorizedDesc')
                   : errorMessage}
               </p>
               <div className='pt-2'>
                 <Button variant='outline' size='sm' onClick={() => refetch()} className='text-xs'>
-                  Retry Analytics Request
+                  {t('instructor.analytics.errors.retry')}
                 </Button>
               </div>
             </div>
@@ -243,12 +238,14 @@ export function CourseAnalyticsClient({ courseId }: CourseAnalyticsClientProps) 
             <div className='p-4 bg-amber-50/75 border border-amber-200 rounded-2xl flex items-start gap-3'>
               <ShieldAlert className='w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5' />
               <div className='text-xs text-amber-900'>
-                <span className='font-bold'>Privacy Notice (Small Cohort):</span> This course has{' '}
-                {analytics.metrics.totalEnrolled}{' '}
-                {analytics.metrics.totalEnrolled === 1 ? 'enrolled learner' : 'enrolled learners'}.
-                With fewer than 5 learners, individual performance is aggregated to maintain learner
-                privacy. Sequential drop-off rates and completion averages should be interpreted
-                cautiously due to small sample size.
+                <span className='font-bold'>{t('instructor.analytics.privacyNoticeTitle')}</span>{' '}
+                {t('instructor.analytics.privacyNoticeDesc', {
+                  count: formatNumber(analytics.metrics.totalEnrolled),
+                  learnerOrLearners:
+                    analytics.metrics.totalEnrolled === 1
+                      ? t('instructor.analytics.learner')
+                      : t('instructor.analytics.learners'),
+                })}
               </div>
             </div>
           )}
@@ -258,55 +255,69 @@ export function CourseAnalyticsClient({ courseId }: CourseAnalyticsClientProps) 
             {/* Total Enrolled */}
             <div className='p-5 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
               <div className='flex items-center justify-between'>
-                <span className='text-xs font-medium text-gray-500'>Total Enrolled</span>
+                <span className='text-xs font-medium text-gray-500'>
+                  {t('instructor.analytics.metrics.totalEnrolled')}
+                </span>
                 <div className='w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center'>
                   <Users className='w-4 h-4' />
                 </div>
               </div>
               <div className='mt-3'>
                 <div className='text-2xl font-extrabold text-gray-900'>
-                  {analytics.metrics.totalEnrolled}
+                  {formatNumber(analytics.metrics.totalEnrolled)}
                 </div>
-                <p className='text-[11px] text-gray-400 mt-0.5'>Cumulative enrollments</p>
+                <p className='text-[11px] text-gray-400 mt-0.5'>
+                  {t('instructor.analytics.metrics.cumulativeEnrollments')}
+                </p>
               </div>
             </div>
 
             {/* Course Completions */}
             <div className='p-5 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
               <div className='flex items-center justify-between'>
-                <span className='text-xs font-medium text-gray-500'>Completions</span>
+                <span className='text-xs font-medium text-gray-500'>
+                  {t('instructor.analytics.metrics.completions')}
+                </span>
                 <div className='w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center'>
                   <CheckCircle2 className='w-4 h-4' />
                 </div>
               </div>
               <div className='mt-3'>
                 <div className='text-2xl font-extrabold text-gray-900'>
-                  {analytics.metrics.totalCompleted}
+                  {formatNumber(analytics.metrics.totalCompleted)}
                 </div>
-                <p className='text-[11px] text-gray-400 mt-0.5'>Finished all lessons</p>
+                <p className='text-[11px] text-gray-400 mt-0.5'>
+                  {t('instructor.analytics.metrics.finishedLessons')}
+                </p>
               </div>
             </div>
 
             {/* Completion Rate */}
             <div className='p-5 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
               <div className='flex items-center justify-between'>
-                <span className='text-xs font-medium text-gray-500'>Completion Rate</span>
+                <span className='text-xs font-medium text-gray-500'>
+                  {t('instructor.analytics.metrics.completionRate')}
+                </span>
                 <div className='w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center'>
                   <TrendingUp className='w-4 h-4' />
                 </div>
               </div>
               <div className='mt-3'>
                 <div className='text-2xl font-extrabold text-gray-900'>
-                  {analytics.metrics.completionRate}%
+                  {formatNumber(analytics.metrics.completionRate)}%
                 </div>
-                <p className='text-[11px] text-gray-400 mt-0.5'>Of enrolled students</p>
+                <p className='text-[11px] text-gray-400 mt-0.5'>
+                  {t('instructor.analytics.metrics.ofEnrolled')}
+                </p>
               </div>
             </div>
 
             {/* Avg Days to Complete */}
             <div className='p-5 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
               <div className='flex items-center justify-between'>
-                <span className='text-xs font-medium text-gray-500'>Avg Duration</span>
+                <span className='text-xs font-medium text-gray-500'>
+                  {t('instructor.analytics.metrics.avgDuration')}
+                </span>
                 <div className='w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center'>
                   <Clock className='w-4 h-4' />
                 </div>
@@ -314,13 +325,13 @@ export function CourseAnalyticsClient({ courseId }: CourseAnalyticsClientProps) 
               <div className='mt-3'>
                 <div className='text-2xl font-extrabold text-gray-900'>
                   {analytics.metrics.averageDaysToComplete != null
-                    ? `${analytics.metrics.averageDaysToComplete}d`
+                    ? `${formatNumber(analytics.metrics.averageDaysToComplete)}d`
                     : 'N/A'}
                 </div>
                 <p className='text-[11px] text-gray-400 mt-0.5'>
                   {analytics.metrics.averageDaysToComplete != null
-                    ? 'Days from enrollment'
-                    : 'Insufficient data'}
+                    ? t('instructor.analytics.metrics.daysFromEnrollment')
+                    : t('instructor.analytics.metrics.insufficientData')}
                 </p>
               </div>
             </div>
@@ -328,16 +339,20 @@ export function CourseAnalyticsClient({ courseId }: CourseAnalyticsClientProps) 
             {/* Active Learners (30d) */}
             <div className='p-5 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
               <div className='flex items-center justify-between'>
-                <span className='text-xs font-medium text-gray-500'>30-Day Active</span>
+                <span className='text-xs font-medium text-gray-500'>
+                  {t('instructor.analytics.metrics.active30d')}
+                </span>
                 <div className='w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center'>
                   <Sparkles className='w-4 h-4' />
                 </div>
               </div>
               <div className='mt-3'>
                 <div className='text-2xl font-extrabold text-gray-900'>
-                  {analytics.metrics.activeLearners30d}
+                  {formatNumber(analytics.metrics.activeLearners30d)}
                 </div>
-                <p className='text-[11px] text-gray-400 mt-0.5'>Engaged last 30 days</p>
+                <p className='text-[11px] text-gray-400 mt-0.5'>
+                  {t('instructor.analytics.metrics.engagedLast30d')}
+                </p>
               </div>
             </div>
           </div>
@@ -345,7 +360,7 @@ export function CourseAnalyticsClient({ courseId }: CourseAnalyticsClientProps) 
           {/* Section 1: Enrollment Growth Trend */}
           <TrendLineChart
             data={analytics.enrollmentTrend}
-            title='Course Enrollment Trend'
+            title={t('instructor.analytics.sections.enrollmentTrend')}
             interval={filterState.interval}
           />
 

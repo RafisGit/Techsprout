@@ -478,4 +478,181 @@ describe('Phase 10.1 / WP-P10-01: Internationalization Foundation & Localization
       expect(tBn('orders.paidOn', { date: '৩১ অক্টোবর, ২০২৬' })).toBe('পরিশোধের তারিখ: ৩১ অক্টোবর, ২০২৬');
     });
   });
+
+  // =========================================================================
+  // 12. WP-P10-03: INSTRUCTOR PORTAL LOCALIZATION
+  // =========================================================================
+  describe('12. WP-P10-03: Complete Instructor Portal Bangla & English Localization', () => {
+    it('12.1 provides complete instructor layout and navigation in English and Bangla', () => {
+      expect(en.instructor.portal).toBe('Instructor Portal');
+      expect(bn.instructor.portal).toBe('প্রশিক্ষক পোর্টাল');
+      expect(en.instructor.accessDeniedTitle).toBe('Access Denied (403 Forbidden)');
+      expect(bn.instructor.accessDeniedTitle).toBe('প্রবেশাধিকার সংরক্ষিত (৪০৩ নিষিদ্ধ)');
+      expect(en.instructor.nav.dashboard).toBe('Dashboard');
+      expect(bn.instructor.nav.dashboard).toBe('ড্যাশবোর্ড');
+      expect(en.instructor.nav.courses).toBe('My Courses');
+      expect(bn.instructor.nav.courses).toBe('আমার কোর্সসমূহ');
+      expect(en.instructor.nav.earnings).toBe('Earnings & Payouts');
+      expect(bn.instructor.nav.earnings).toBe('উপার্জন ও পেআউট');
+      expect(en.instructor.nav.profile).toBe('Profile');
+      expect(bn.instructor.nav.profile).toBe('প্রোফাইল');
+      expect(en.instructor.nav.signOut).toBe('Sign Out');
+      expect(bn.instructor.nav.signOut).toBe('লগআউট');
+    });
+
+    it('12.2 provides complete instructor dashboard metrics and breakdown tables in English and Bangla', () => {
+      expect(en.instructor.dashboard.portfolioAnalytics).toBe('Portfolio Learning Analytics');
+      expect(bn.instructor.dashboard.portfolioAnalytics).toBe('পোর্টফোলিও লার্নিং অ্যানালিটিক্স');
+      expect(en.instructor.dashboard.uniqueLearners).toBe('Unique Learners');
+      expect(bn.instructor.dashboard.uniqueLearners).toBe('অনন্য শিক্ষার্থী');
+      expect(en.instructor.dashboard.courseCompletions).toBe('Course Completions');
+      expect(bn.instructor.dashboard.courseCompletions).toBe('কোর্স সমাপ্তি');
+      expect(en.instructor.dashboard.portfolioCompletionRate).toBe('Portfolio Completion Rate');
+      expect(bn.instructor.dashboard.portfolioCompletionRate).toBe('পোর্টফোলিও সমাপ্তির হার');
+      expect(en.instructor.dashboard.activeLearners30d).toBe('30-Day Active Learners');
+      expect(bn.instructor.dashboard.activeLearners30d).toBe('৩০ দিনের সক্রিয় শিক্ষার্থী');
+      expect(en.instructor.dashboard.table.courseTitle).toBe('Course Title');
+      expect(bn.instructor.dashboard.table.courseTitle).toBe('কোর্সের শিরোনাম');
+      expect(en.instructor.dashboard.table.enrolled).toBe('Enrolled');
+      expect(bn.instructor.dashboard.table.enrolled).toBe('ভর্তিকৃত');
+      expect(en.instructor.dashboard.cards.teachingCourses).toBe('My Teaching Courses');
+      expect(bn.instructor.dashboard.cards.teachingCourses).toBe('আমার পাঠদান কোর্সসমূহ');
+    });
+
+    it('12.3 provides complete course management, review, and withdrawal modal strings in English and Bangla', () => {
+      expect(en.instructor.courses.title).toBe('My Teaching Courses');
+      expect(bn.instructor.courses.title).toBe('আমার পাঠদান কোর্সসমূহ');
+      expect(en.instructor.courses.tabs.inReview).toBe('In Review');
+      expect(bn.instructor.courses.tabs.inReview).toBe('পর্যালোচনাধীন');
+      expect(en.instructor.courses.actions.submitForReview).toBe('Submit for Review');
+      expect(bn.instructor.courses.actions.submitForReview).toBe('পর্যালোচনার জন্য জমা দিন');
+      expect(en.instructor.courses.actions.withdrawReview).toBe('Withdraw Review');
+      expect(bn.instructor.courses.actions.withdrawReview).toBe('পর্যালোচনা প্রত্যাহার করুন');
+      expect(en.instructor.review.modalTitle).toBe('Submit Course for Institutional Review');
+      expect(bn.instructor.review.modalTitle).toBe('প্রাতিষ্ঠানিক পর্যালোচনার জন্য কোর্স জমা দিন');
+      expect(en.instructor.review.preflightChecklist).toBe('Curriculum Preflight Checklist');
+      expect(bn.instructor.review.preflightChecklist).toBe('পাঠ্যক্রমের প্রাথমিক যাচাই তালিকা');
+      expect(en.instructor.review.withdrawalTitle).toBe('Withdraw Course Review Request');
+      expect(bn.instructor.review.withdrawalTitle).toBe('কোর্স পর্যালোচনা আবেদন প্রত্যাহার');
+      expect(en.instructor.review.underReviewTitle).toBe('Under Administrative Review');
+      expect(bn.instructor.review.underReviewTitle).toBe('প্রশাসনিক পর্যালোচনাধীন');
+      expect(en.instructor.review.revisionsRequestedTitle).toBe('Revisions Requested by Administration');
+      expect(bn.instructor.review.revisionsRequestedTitle).toBe('প্রশাসন কর্তৃক সংশোধনের অনুরোধ');
+    });
+
+    it('12.4 provides complete learner roster, table headers, and CSV export strings in English and Bangla', () => {
+      expect(en.instructor.learners.title).toBe('Course Learner Roster');
+      expect(bn.instructor.learners.title).toBe('কোর্সের শিক্ষার্থী তালিকা');
+      expect(en.instructor.learners.exportCsv).toBe('Export CSV');
+      expect(bn.instructor.learners.exportCsv).toBe('CSV এক্সপোর্ট');
+      expect(en.instructor.learners.table.learner).toBe('Learner');
+      expect(bn.instructor.learners.table.learner).toBe('শিক্ষার্থী');
+      expect(en.instructor.learners.table.courseProgress).toBe('Course Progress');
+      expect(bn.instructor.learners.table.courseProgress).toBe('কোর্সের অগ্রগতি');
+      expect(en.instructor.learners.metrics.activeLearners).toBe('Active Learners');
+      expect(bn.instructor.learners.metrics.activeLearners).toBe('সক্রিয় শিক্ষার্থী');
+    });
+
+    it('12.5 provides complete course analytics, date ranges, and privacy notices in English and Bangla', () => {
+      expect(en.instructor.analytics.title).toBe('Course Analytics & Performance');
+      expect(bn.instructor.analytics.title).toBe('কোর্স অ্যানালিটিক্স ও পারফরম্যান্স');
+      expect(en.instructor.analytics.dateRange.last7Days).toBe('Last 7 Days');
+      expect(bn.instructor.analytics.dateRange.last7Days).toBe('গত ৭ দিন');
+      expect(en.instructor.analytics.dateRange.last30Days).toBe('Last 30 Days');
+      expect(bn.instructor.analytics.dateRange.last30Days).toBe('গত ৩০ দিন');
+      expect(en.instructor.analytics.dateRange.applyRange).toBe('Apply Range');
+      expect(bn.instructor.analytics.dateRange.applyRange).toBe('প্রয়োগ করুন');
+      expect(en.instructor.analytics.privacyNoticeTitle).toBe('Privacy Notice (Small Cohort):');
+      expect(bn.instructor.analytics.privacyNoticeTitle).toBe('গোপনীয়তা বিজ্ঞপ্তি (ছোট দল):');
+    });
+
+    it('12.6 provides complete instructor earnings, ledger, and payout modal strings in English and Bangla', () => {
+      expect(en.instructor.earnings.title).toBe('Earnings & Payouts');
+      expect(bn.instructor.earnings.title).toBe('উপার্জন ও পেআউট');
+      expect(en.instructor.earnings.availableBalance).toBe('Available for Payout');
+      expect(bn.instructor.earnings.availableBalance).toBe('উত্তোলনের জন্য প্রস্তুত ব্যালেন্স');
+      expect(en.instructor.earnings.escrowPending).toBe('14-Day Escrow');
+      expect(bn.instructor.earnings.escrowPending).toBe('১৪ দিনের এসক্রো');
+      expect(en.instructor.earnings.lifetimeEarnings).toBe('Lifetime Earnings');
+      expect(bn.instructor.earnings.lifetimeEarnings).toBe('সর্বমোট মোট আয়');
+      expect(en.instructor.earnings.modal.title).toBe('Request Payout');
+      expect(bn.instructor.earnings.modal.title).toBe('পেআউট অনুরোধ করুন');
+      expect(en.instructor.earnings.modal.methods.bkash).toBe('bKash');
+      expect(bn.instructor.earnings.modal.methods.bkash).toBe('বিকাশ');
+      expect(en.instructor.earnings.modal.methods.nagad).toBe('Nagad');
+      expect(bn.instructor.earnings.modal.methods.nagad).toBe('নগদ');
+      expect(en.instructor.earnings.modal.methods.bankTransfer).toBe('Bank Wire');
+      expect(bn.instructor.earnings.modal.methods.bankTransfer).toBe('ব্যাংক স্থানান্তর');
+      expect(en.instructor.earnings.ledger.title).toBe('Double-Entry Ledger Statement');
+      expect(bn.instructor.earnings.ledger.title).toBe('দ্বৈত-প্রবিষ্টি লেজার স্টেটমেন্ট');
+    });
+
+    it('12.7 provides complete instructor profile, faculty verification, and bio editor strings in English and Bangla', () => {
+      expect(en.instructor.profile.title).toBe('Instructor Profile');
+      expect(bn.instructor.profile.title).toBe('প্রশিক্ষক প্রোফাইল');
+      expect(en.instructor.profile.verifiedFaculty).toBe('Verified Faculty');
+      expect(bn.instructor.profile.verifiedFaculty).toBe('যাচাইকৃত অনুষদ');
+      expect(en.instructor.profile.identitySection).toBe('Institutional Identity');
+      expect(bn.instructor.profile.identitySection).toBe('প্রাতিষ্ঠানিক পরিচয়');
+      expect(en.instructor.profile.publicSection).toBe('Public Educator Profile');
+      expect(bn.instructor.profile.publicSection).toBe('পাবলিক এডুকেটর প্রোফাইল');
+      expect(en.instructor.profile.headline).toBe('Professional Headline');
+      expect(bn.instructor.profile.headline).toBe('পেশাদার শিরোনাম');
+      expect(en.instructor.profile.credentials).toBe('Academic & Professional Credentials');
+      expect(bn.instructor.profile.credentials).toBe('একাডেমিক ও পেশাদার প্রশংসাপত্র');
+      expect(en.instructor.profile.bio).toBe('Biography');
+      expect(bn.instructor.profile.bio).toBe('জীবনী');
+    });
+
+    it('12.8 strictly formats BDT currency without dollar signs across English and Bangla', () => {
+      // English BDT format
+      expect(formatCurrency(1000, 'en', 'BDT')).toBe('BDT 1,000.00');
+      expect(formatCurrency(50.5, 'en', 'BDT')).toBe('BDT 50.50');
+      expect(formatCurrency(0, 'en', 'BDT')).toBe('BDT 0.00');
+
+      // Bangla BDT format
+      expect(formatCurrency(1000, 'bn', 'BDT')).toBe('BDT ১,০০০.০০');
+      expect(formatCurrency(50.5, 'bn', 'BDT')).toBe('BDT ৫০.৫০');
+      expect(formatCurrency(0, 'bn', 'BDT')).toBe('BDT ০.০০');
+
+      // Never contains dollar signs
+      expect(formatCurrency(1500, 'en', 'BDT')).not.toContain('$');
+      expect(formatCurrency(1500, 'bn', 'BDT')).not.toContain('$');
+    });
+
+    it('12.9 handles parameter substitution across instructor domains', () => {
+      const tEn = createTranslate('en');
+      const tBn = createTranslate('bn');
+
+      expect(tEn('instructor.dashboard.welcome', { name: 'Dr. Tariq' })).toBe('Welcome back, Dr. Tariq!');
+      expect(tBn('instructor.dashboard.welcome', { name: 'ড. তারিক' })).toBe('স্বাগতম, ড. তারিক!');
+
+      expect(tEn('instructor.review.withdrawalDesc', { title: 'Python 101' })).toBe('Are you sure you want to withdraw the submission for Python 101?');
+      expect(tBn('instructor.review.withdrawalDesc', { title: 'পাইথন ১০১' })).toBe('আপনি কি নিশ্চিত যে আপনি পাইথন ১০১-এর জন্য জমা দেওয়া আবেদন প্রত্যাহার করতে চান?');
+
+      expect(tEn('instructor.learners.showingCount', { shown: '10', total: '25', type: 'enrolled' })).toBe('Showing 10 of 25 enrolled learners');
+      expect(tBn('instructor.learners.showingCount', { shown: '১০', total: '২৫', type: 'ভর্তিকৃত' })).toBe('২৫ জন ভর্তিকৃত শিক্ষার্থীর মধ্যে ১০ জন প্রদর্শিত হচ্ছে');
+    });
+
+    it('12.10 verifies bidirectional 100% dictionary key parity including the instructor namespace', () => {
+      function compareKeys(objA: any, objB: any, path: string = '', missingPrefix: string): string[] {
+        const missing: string[] = [];
+        for (const key of Object.keys(objA)) {
+          const currentPath = path ? `${path}.${key}` : key;
+          if (objB[key] === undefined) {
+            missing.push(`${missingPrefix}: ${currentPath}`);
+          } else if (typeof objA[key] === 'object' && objA[key] !== null) {
+            missing.push(...compareKeys(objA[key], objB[key], currentPath, missingPrefix));
+          }
+        }
+        return missing;
+      }
+
+      const missingInBn = compareKeys(en, bn, '', 'Missing in Bangla');
+      const missingInEn = compareKeys(bn, en, '', 'Missing in English');
+
+      expect(missingInBn).toEqual([]);
+      expect(missingInEn).toEqual([]);
+    });
+  });
 });

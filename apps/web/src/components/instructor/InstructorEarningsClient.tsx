@@ -9,6 +9,7 @@ import {
   submitPayoutRequest,
   type RequestPayoutDto,
 } from '@/lib/api/instructor';
+import { useTranslation, formatCurrency, Locale } from '@/i18n';
 import { Button } from '@/components/ui/button';
 import {
   Wallet,
@@ -17,16 +18,17 @@ import {
   TrendingUp,
   Download,
   AlertCircle,
-  CheckCircle2,
-  XCircle,
   Banknote,
   Smartphone,
   Building,
   RefreshCw,
 } from 'lucide-react';
 
-export function formatBdtCents(cents?: number | null): string {
+export function formatBdtCents(cents?: number | null, locale: Locale = 'en'): string {
   const safeCents = typeof cents === 'number' && Number.isFinite(cents) ? cents : 0;
+  if (locale === 'bn') {
+    return formatCurrency(safeCents / 100, 'bn', 'BDT');
+  }
   const bdt = (safeCents / 100).toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -36,6 +38,7 @@ export function formatBdtCents(cents?: number | null): string {
 
 export function InstructorEarningsClient() {
   const queryClient = useQueryClient();
+  const { t, locale, formatDate } = useTranslation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [payoutAmountBdt, setPayoutAmountBdt] = useState('');
   const [payoutMethod, setPayoutMethod] = useState<'BKASH' | 'NAGAD' | 'BANK_TRANSFER'>('BKASH');
@@ -46,7 +49,6 @@ export function InstructorEarningsClient() {
   const {
     data: earningsData,
     isLoading: isLoadingEarnings,
-    isError: isEarningsError,
     refetch: refetchEarnings,
   } = useQuery({
     queryKey: ['instructorEarnings'],
@@ -88,7 +90,7 @@ export function InstructorEarningsClient() {
     },
     onError: (err: any) => {
       const msg =
-        err?.response?.data?.message || err?.message || 'Failed to submit payout request';
+        err?.response?.data?.message || err?.message || t('instructor.earnings.modal.errors.failedToSubmit');
       setFormError(msg);
     },
   });
@@ -105,23 +107,27 @@ export function InstructorEarningsClient() {
 
     const bdtNum = parseFloat(payoutAmountBdt);
     if (isNaN(bdtNum) || bdtNum <= 0) {
-      setFormError('Please enter a valid payout amount');
+      setFormError(t('instructor.earnings.modal.errors.validAmount'));
       return;
     }
 
     const amountCents = Math.round(bdtNum * 100);
     if (amountCents < 5000) {
-      setFormError('Minimum payout amount is 50.00 BDT (5,000 poisha)');
+      setFormError(t('instructor.earnings.modal.errors.minAmount'));
       return;
     }
 
     if (amountCents > availableCents) {
-      setFormError(`Insufficient available balance. You have ${formatBdtCents(availableCents)} available.`);
+      setFormError(
+        t('instructor.earnings.modal.errors.insufficientBalance', {
+          balance: formatBdtCents(availableCents, locale),
+        })
+      );
       return;
     }
 
     if (!accountDetails.trim() || accountDetails.trim().length < 5) {
-      setFormError('Please provide complete account/phone details (at least 5 characters)');
+      setFormError(t('instructor.earnings.modal.errors.completeDetails'));
       return;
     }
 
@@ -161,9 +167,9 @@ export function InstructorEarningsClient() {
       {/* Page Header */}
       <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
         <div>
-          <h1 className='text-2xl font-bold tracking-tight text-gray-900'>Earnings & Payouts</h1>
+          <h1 className='text-2xl font-bold tracking-tight text-gray-900'>{t('instructor.earnings.title')}</h1>
           <p className='text-sm text-gray-500 mt-1'>
-            Double-entry marketplace accounting, 14-day escrow protection, and withdrawal management.
+            {t('instructor.earnings.subtitle')}
           </p>
         </div>
         <div className='flex items-center gap-3'>
@@ -178,7 +184,7 @@ export function InstructorEarningsClient() {
             className='flex items-center gap-2'
           >
             <RefreshCw className='w-4 h-4' />
-            <span>Refresh</span>
+            <span>{t('instructor.earnings.refresh')}</span>
           </Button>
           <Button
             onClick={() => setIsModalOpen(true)}
@@ -186,7 +192,7 @@ export function InstructorEarningsClient() {
             className='bg-primary text-white hover:bg-primary/90 flex items-center gap-2'
           >
             <ArrowUpRight className='w-4 h-4' />
-            <span>Request Payout</span>
+            <span>{t('instructor.earnings.requestPayout')}</span>
           </Button>
         </div>
       </div>
@@ -196,64 +202,64 @@ export function InstructorEarningsClient() {
         {/* Available Balance */}
         <div className='p-6 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
           <div className='flex items-center justify-between text-gray-500 mb-2'>
-            <span className='text-sm font-medium'>Available for Payout</span>
+            <span className='text-sm font-medium'>{t('instructor.earnings.availableBalance')}</span>
             <div className='p-2 bg-emerald-50 text-emerald-600 rounded-lg'>
               <Wallet className='w-5 h-5' />
             </div>
           </div>
           <div>
             <div className='text-2xl font-extrabold text-gray-900'>
-              {isLoadingEarnings ? '...' : formatBdtCents(availableCents)}
+              {isLoadingEarnings ? '...' : formatBdtCents(availableCents, locale)}
             </div>
-            <p className='text-xs text-gray-500 mt-1'>Immediate withdrawal eligible</p>
+            <p className='text-xs text-gray-500 mt-1'>{t('instructor.earnings.immediateWithdrawal')}</p>
           </div>
         </div>
 
         {/* 14-Day Escrow Pending */}
         <div className='p-6 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
           <div className='flex items-center justify-between text-gray-500 mb-2'>
-            <span className='text-sm font-medium'>14-Day Escrow</span>
+            <span className='text-sm font-medium'>{t('instructor.earnings.escrowPending')}</span>
             <div className='p-2 bg-amber-50 text-amber-600 rounded-lg'>
               <Clock className='w-5 h-5' />
             </div>
           </div>
           <div>
             <div className='text-2xl font-extrabold text-gray-900'>
-              {isLoadingEarnings ? '...' : formatBdtCents(pendingCents)}
+              {isLoadingEarnings ? '...' : formatBdtCents(pendingCents, locale)}
             </div>
-            <p className='text-xs text-amber-600 mt-1'>Held during student refund window</p>
+            <p className='text-xs text-amber-600 mt-1'>{t('instructor.earnings.escrowDesc')}</p>
           </div>
         </div>
 
         {/* In-Flight Hold */}
         <div className='p-6 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
           <div className='flex items-center justify-between text-gray-500 mb-2'>
-            <span className='text-sm font-medium'>In-Flight Payouts</span>
+            <span className='text-sm font-medium'>{t('instructor.earnings.inFlightPayouts')}</span>
             <div className='p-2 bg-blue-50 text-blue-600 rounded-lg'>
               <Banknote className='w-5 h-5' />
             </div>
           </div>
           <div>
             <div className='text-2xl font-extrabold text-gray-900'>
-              {isLoadingEarnings ? '...' : formatBdtCents(inFlightCents)}
+              {isLoadingEarnings ? '...' : formatBdtCents(inFlightCents, locale)}
             </div>
-            <p className='text-xs text-blue-600 mt-1'>Awaiting administrative settlement</p>
+            <p className='text-xs text-blue-600 mt-1'>{t('instructor.earnings.inFlightDesc')}</p>
           </div>
         </div>
 
         {/* Lifetime Earnings */}
         <div className='p-6 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
           <div className='flex items-center justify-between text-gray-500 mb-2'>
-            <span className='text-sm font-medium'>Lifetime Earnings</span>
+            <span className='text-sm font-medium'>{t('instructor.earnings.lifetimeEarnings')}</span>
             <div className='p-2 bg-purple-50 text-purple-600 rounded-lg'>
               <TrendingUp className='w-5 h-5' />
             </div>
           </div>
           <div>
             <div className='text-2xl font-extrabold text-gray-900'>
-              {isLoadingEarnings ? '...' : formatBdtCents(lifetimeCents)}
+              {isLoadingEarnings ? '...' : formatBdtCents(lifetimeCents, locale)}
             </div>
-            <p className='text-xs text-gray-500 mt-1'>Cumulative net revenue (70%)</p>
+            <p className='text-xs text-gray-500 mt-1'>{t('instructor.earnings.lifetimeDesc')}</p>
           </div>
         </div>
       </div>
@@ -262,56 +268,56 @@ export function InstructorEarningsClient() {
       <div className='bg-white rounded-2xl border border-gray-200 shadow-xs p-6'>
         <div className='flex items-center justify-between mb-5'>
           <div>
-            <h2 className='text-lg font-bold text-gray-900'>Payout Requests</h2>
-            <p className='text-sm text-gray-500'>History of disbursement requests and administrative reviews.</p>
+            <h2 className='text-lg font-bold text-gray-900'>{t('instructor.earnings.payoutRequests')}</h2>
+            <p className='text-sm text-gray-500'>{t('instructor.earnings.payoutHistorySubtitle')}</p>
           </div>
         </div>
 
         {isLoadingPayouts ? (
-          <div className='py-8 text-center text-gray-500 text-sm'>Loading payout requests...</div>
+          <div className='py-8 text-center text-gray-500 text-sm'>{t('instructor.earnings.loadingRequests')}</div>
         ) : payoutsData?.data && payoutsData.data.length > 0 ? (
           <div className='overflow-x-auto'>
             <table className='w-full text-left border-collapse text-sm'>
               <thead>
                 <tr className='border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider font-semibold'>
-                  <th className='py-3 px-4'>Request #</th>
-                  <th className='py-3 px-4'>Requested Date</th>
-                  <th className='py-3 px-4'>Amount</th>
-                  <th className='py-3 px-4'>Method</th>
-                  <th className='py-3 px-4'>Destination</th>
-                  <th className='py-3 px-4'>Status</th>
-                  <th className='py-3 px-4'>Settlement Ref</th>
+                  <th className='py-3 px-4'>{t('instructor.earnings.table.requestNumber')}</th>
+                  <th className='py-3 px-4'>{t('instructor.earnings.table.requestedDate')}</th>
+                  <th className='py-3 px-4'>{t('instructor.earnings.table.amount')}</th>
+                  <th className='py-3 px-4'>{t('instructor.earnings.table.method')}</th>
+                  <th className='py-3 px-4'>{t('instructor.earnings.table.destination')}</th>
+                  <th className='py-3 px-4'>{t('instructor.earnings.table.status')}</th>
+                  <th className='py-3 px-4'>{t('instructor.earnings.table.settlementRef')}</th>
                 </tr>
               </thead>
               <tbody className='divide-y divide-gray-100'>
                 {payoutsData.data.map((p) => {
                   let badge = (
                     <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800'>
-                      Pending Review
+                      {t('instructor.earnings.table.statuses.pending')}
                     </span>
                   );
                   if (p.status === 'APPROVED') {
                     badge = (
                       <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800'>
-                        Approved
+                        {t('instructor.earnings.table.statuses.approved')}
                       </span>
                     );
                   } else if (p.status === 'SETTLED') {
                     badge = (
                       <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800'>
-                        Disbursed & Settled
+                        {t('instructor.earnings.table.statuses.settled')}
                       </span>
                     );
                   } else if (p.status === 'REJECTED') {
                     badge = (
                       <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800'>
-                        Rejected
+                        {t('instructor.earnings.table.statuses.rejected')}
                       </span>
                     );
                   } else if (p.status === 'FAILED') {
                     badge = (
                       <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800'>
-                        Failed
+                        {t('instructor.earnings.table.statuses.failed')}
                       </span>
                     );
                   }
@@ -320,20 +326,16 @@ export function InstructorEarningsClient() {
                     <tr key={p.id} className='hover:bg-gray-50/50'>
                       <td className='py-3 px-4 font-mono font-medium text-gray-900'>{p.requestNumber}</td>
                       <td className='py-3 px-4 text-gray-600'>
-                        {new Date(p.requestedAt).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
+                        {formatDate(p.requestedAt)}
                       </td>
                       <td className='py-3 px-4 font-semibold text-gray-900'>
-                        {formatBdtCents(p.amountCents)}
+                        {formatBdtCents(p.amountCents, locale)}
                       </td>
                       <td className='py-3 px-4 font-medium text-gray-700'>{p.payoutMethod}</td>
                       <td className='py-3 px-4 text-gray-600 max-w-xs truncate'>{p.accountDetails}</td>
                       <td className='py-3 px-4'>{badge}</td>
                       <td className='py-3 px-4 font-mono text-xs text-gray-500'>
-                        {p.settlementReference || (p.rejectionReason ? `Reason: ${p.rejectionReason}` : '—')}
+                        {p.settlementReference || (p.rejectionReason ? t('instructor.earnings.table.reason', { reason: p.rejectionReason }) : '—')}
                       </td>
                     </tr>
                   );
@@ -343,7 +345,7 @@ export function InstructorEarningsClient() {
           </div>
         ) : (
           <div className='py-8 text-center text-gray-400 text-sm'>
-            No payout requests submitted yet.
+            {t('instructor.earnings.noRequests')}
           </div>
         )}
       </div>
@@ -352,9 +354,9 @@ export function InstructorEarningsClient() {
       <div className='bg-white rounded-2xl border border-gray-200 shadow-xs p-6'>
         <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5'>
           <div>
-            <h2 className='text-lg font-bold text-gray-900'>Double-Entry Ledger Statement</h2>
+            <h2 className='text-lg font-bold text-gray-900'>{t('instructor.earnings.ledger.title')}</h2>
             <p className='text-sm text-gray-500'>
-              Immutable financial journal entries for all purchases, commissions, escrow settlements, and withdrawals.
+              {t('instructor.earnings.ledger.subtitle')}
             </p>
           </div>
           <Button
@@ -365,23 +367,23 @@ export function InstructorEarningsClient() {
             className='flex items-center gap-2'
           >
             <Download className='w-4 h-4' />
-            <span>Export CSV</span>
+            <span>{t('instructor.earnings.ledger.exportCsv')}</span>
           </Button>
         </div>
 
         {isLoadingLedger ? (
-          <div className='py-8 text-center text-gray-500 text-sm'>Loading ledger statement...</div>
+          <div className='py-8 text-center text-gray-500 text-sm'>{t('instructor.earnings.ledger.loadingLedger')}</div>
         ) : ledgerData?.entries && ledgerData.entries.length > 0 ? (
           <div className='overflow-x-auto'>
             <table className='w-full text-left border-collapse text-sm'>
               <thead>
                 <tr className='border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider font-semibold'>
-                  <th className='py-3 px-4'>Date</th>
-                  <th className='py-3 px-4'>Type</th>
-                  <th className='py-3 px-4'>Account</th>
-                  <th className='py-3 px-4'>Direction</th>
-                  <th className='py-3 px-4'>Amount</th>
-                  <th className='py-3 px-4'>Description</th>
+                  <th className='py-3 px-4'>{t('instructor.earnings.ledger.date')}</th>
+                  <th className='py-3 px-4'>{t('instructor.earnings.ledger.type')}</th>
+                  <th className='py-3 px-4'>{t('instructor.earnings.ledger.account')}</th>
+                  <th className='py-3 px-4'>{t('instructor.earnings.ledger.direction')}</th>
+                  <th className='py-3 px-4'>{t('instructor.earnings.ledger.amount')}</th>
+                  <th className='py-3 px-4'>{t('instructor.earnings.ledger.description')}</th>
                 </tr>
               </thead>
               <tbody className='divide-y divide-gray-100'>
@@ -390,12 +392,7 @@ export function InstructorEarningsClient() {
                   return (
                     <tr key={entry.id} className='hover:bg-gray-50/50'>
                       <td className='py-3 px-4 text-gray-600 whitespace-nowrap'>
-                        {new Date(entry.createdAt).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {formatDate(entry.createdAt)}
                       </td>
                       <td className='py-3 px-4 font-mono text-xs text-gray-700'>
                         {entry.transactionType || 'TRANSACTION'}
@@ -407,7 +404,7 @@ export function InstructorEarningsClient() {
                             isCredit ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
                           }`}
                         >
-                          {entry.direction}
+                          {isCredit ? t('instructor.earnings.ledger.credit') : t('instructor.earnings.ledger.debit')}
                         </span>
                       </td>
                       <td
@@ -415,7 +412,7 @@ export function InstructorEarningsClient() {
                           isCredit ? 'text-emerald-700' : 'text-gray-900'
                         }`}
                       >
-                        {formatBdtCents(entry.amountCents)}
+                        {formatBdtCents(entry.amountCents, locale)}
                       </td>
                       <td className='py-3 px-4 text-gray-600 max-w-md truncate'>{entry.description}</td>
                     </tr>
@@ -426,7 +423,7 @@ export function InstructorEarningsClient() {
           </div>
         ) : (
           <div className='py-8 text-center text-gray-400 text-sm'>
-            No ledger transactions recorded yet.
+            {t('instructor.earnings.ledger.noTransactions')}
           </div>
         )}
       </div>
@@ -436,7 +433,7 @@ export function InstructorEarningsClient() {
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4'>
           <div className='bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl relative'>
             <div className='flex items-center justify-between mb-4'>
-              <h3 className='text-lg font-bold text-gray-900'>Request Payout</h3>
+              <h3 className='text-lg font-bold text-gray-900'>{t('instructor.earnings.modal.title')}</h3>
               <button
                 type='button'
                 onClick={() => {
@@ -450,7 +447,7 @@ export function InstructorEarningsClient() {
             </div>
 
             <p className='text-sm text-gray-600 mb-4'>
-              Withdraw your available earnings to your verified Mobile Financial Services (bKash/Nagad) account or bank wire.
+              {t('instructor.earnings.modal.description')}
             </p>
 
             {formError && (
@@ -463,16 +460,16 @@ export function InstructorEarningsClient() {
             <form onSubmit={handleRequestPayout} className='space-y-4'>
               <div>
                 <label className='block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1'>
-                  Available Balance
+                  {t('instructor.earnings.modal.availableBalance')}
                 </label>
                 <div className='text-sm font-semibold text-emerald-700 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200'>
-                  {formatBdtCents(availableCents)}
+                  {formatBdtCents(availableCents, locale)}
                 </div>
               </div>
 
               <div>
                 <label className='block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1'>
-                  Payout Amount (BDT)
+                  {t('instructor.earnings.modal.payoutAmount')}
                 </label>
                 <input
                   type='number'
@@ -481,16 +478,16 @@ export function InstructorEarningsClient() {
                   max={(availableCents / 100).toFixed(2)}
                   value={payoutAmountBdt}
                   onChange={(e) => setPayoutAmountBdt(e.target.value)}
-                  placeholder='e.g. 1500.00'
+                  placeholder={t('instructor.earnings.modal.amountPlaceholder')}
                   required
                   className='w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary'
                 />
-                <p className='text-xs text-gray-500 mt-1'>Minimum withdrawal is 50.00 BDT</p>
+                <p className='text-xs text-gray-500 mt-1'>{t('instructor.earnings.modal.minWithdrawal')}</p>
               </div>
 
               <div>
                 <label className='block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1'>
-                  Payout Method
+                  {t('instructor.earnings.modal.payoutMethod')}
                 </label>
                 <div className='grid grid-cols-3 gap-2'>
                   {(['BKASH', 'NAGAD', 'BANK_TRANSFER'] as const).map((m) => (
@@ -500,14 +497,14 @@ export function InstructorEarningsClient() {
                       onClick={() => setPayoutMethod(m)}
                       className={`p-2.5 text-xs font-semibold rounded-lg border flex flex-col items-center gap-1 transition-colors ${
                         payoutMethod === m
-                          ? 'border-primary bg-primary/5 text-primary'
+                           ? 'border-primary bg-primary/5 text-primary'
                           : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
                       }`}
                     >
                       {m === 'BKASH' && <Smartphone className='w-4 h-4' />}
                       {m === 'NAGAD' && <Smartphone className='w-4 h-4' />}
                       {m === 'BANK_TRANSFER' && <Building className='w-4 h-4' />}
-                      <span>{m === 'BANK_TRANSFER' ? 'Bank Wire' : m}</span>
+                      <span>{m === 'BANK_TRANSFER' ? t('instructor.earnings.modal.methods.bankTransfer') : m === 'BKASH' ? t('instructor.earnings.modal.methods.bkash') : t('instructor.earnings.modal.methods.nagad')}</span>
                     </button>
                   ))}
                 </div>
@@ -515,7 +512,7 @@ export function InstructorEarningsClient() {
 
               <div>
                 <label className='block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1'>
-                  Account Details / Number
+                  {t('instructor.earnings.modal.accountDetails')}
                 </label>
                 <textarea
                   rows={2}
@@ -523,8 +520,8 @@ export function InstructorEarningsClient() {
                   onChange={(e) => setAccountDetails(e.target.value)}
                   placeholder={
                     payoutMethod === 'BANK_TRANSFER'
-                      ? 'Account Name, Bank Name, Account Number, Branch / Routing No.'
-                      : 'Personal bKash/Nagad mobile number (e.g. 01700000000)'
+                      ? t('instructor.earnings.modal.bankPlaceholder')
+                      : t('instructor.earnings.modal.mobilePlaceholder')
                   }
                   required
                   className='w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary'
@@ -540,14 +537,14 @@ export function InstructorEarningsClient() {
                     setFormError(null);
                   }}
                 >
-                  Cancel
+                  {t('instructor.earnings.modal.cancel')}
                 </Button>
                 <Button
                   type='submit'
                   disabled={payoutMutation.isPending}
                   className='bg-primary text-white hover:bg-primary/90'
                 >
-                  {payoutMutation.isPending ? 'Submitting...' : 'Confirm Request'}
+                  {payoutMutation.isPending ? t('instructor.earnings.modal.submitting') : t('instructor.earnings.modal.confirmRequest')}
                 </Button>
               </div>
             </form>

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useTranslation } from '@/i18n';
 import { Button } from '@/components/ui/button';
 import {
   Clock,
@@ -12,7 +13,6 @@ import {
   ExternalLink,
   MessageSquareQuote,
   Calendar,
-  User,
 } from 'lucide-react';
 import type { ReviewRequestSummary } from '@/lib/api/instructor';
 
@@ -27,7 +27,6 @@ interface CourseReviewStatusCardProps {
 }
 
 export function CourseReviewStatusCard({
-  courseId,
   courseStatus,
   courseSlug,
   reviewRequest,
@@ -35,6 +34,8 @@ export function CourseReviewStatusCard({
   onWithdrawReview,
   className = '',
 }: CourseReviewStatusCardProps) {
+  const { t, formatDate } = useTranslation();
+
   // If the course is currently in review
   if (courseStatus === 'IN_REVIEW') {
     return (
@@ -49,30 +50,32 @@ export function CourseReviewStatusCard({
             <div>
               <div className='flex items-center gap-2'>
                 <h4 className='font-bold text-base text-blue-950'>
-                  Under Administrative Review
+                  {t('instructor.review.underReviewTitle')}
                 </h4>
                 <span className='px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-300'>
-                  Pending Decision
+                  {t('instructor.review.pendingDecision')}
                 </span>
               </div>
               <p className='text-xs text-blue-800 mt-1 max-w-xl'>
-                Your course was submitted for institutional review and is awaiting evaluation by academic administrators. While under review, curriculum editing is temporarily locked to maintain integrity.
+                {t('instructor.review.underReviewDesc')}
               </p>
               {reviewRequest?.submittedAt && (
                 <div className='flex items-center gap-2 text-xs text-blue-700 mt-2 font-medium'>
                   <Calendar className='w-3.5 h-3.5' />
                   <span>
-                    Submitted on: {new Date(reviewRequest.submittedAt).toLocaleDateString()} at{' '}
-                    {new Date(reviewRequest.submittedAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
+                    {t('instructor.review.submittedOn', {
+                      date: formatDate(reviewRequest.submittedAt),
+                      time: new Date(reviewRequest.submittedAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }),
                     })}
                   </span>
                 </div>
               )}
               {reviewRequest?.submissionNotes && (
                 <div className='mt-2.5 p-2.5 bg-white/70 rounded-lg border border-blue-200 text-xs text-blue-900'>
-                  <span className='font-semibold'>Your submission notes: </span>
+                  <span className='font-semibold'>{t('instructor.review.yourSubmissionNotes')} </span>
                   {reviewRequest.submissionNotes}
                 </div>
               )}
@@ -88,7 +91,7 @@ export function CourseReviewStatusCard({
                 className='border-blue-300 text-blue-800 hover:bg-blue-100 flex items-center gap-1.5'
               >
                 <RotateCcw className='w-4 h-4' />
-                <span>Withdraw Review</span>
+                <span>{t('instructor.courses.actions.withdrawReview')}</span>
               </Button>
             </div>
           )}
@@ -111,14 +114,14 @@ export function CourseReviewStatusCard({
             <div className='space-y-2'>
               <div className='flex items-center gap-2'>
                 <h4 className='font-bold text-base text-amber-950'>
-                  Revisions Requested by Administration
+                  {t('instructor.review.revisionsRequestedTitle')}
                 </h4>
                 <span className='px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300'>
-                  Action Required
+                  {t('instructor.review.actionRequired')}
                 </span>
               </div>
               <p className='text-xs text-amber-800 max-w-xl'>
-                An administrator reviewed your course submission and requested revisions before it can be approved for publication.
+                {t('instructor.review.revisionsRequestedDesc')}
               </p>
 
               {/* Administrative Feedback Quote */}
@@ -126,17 +129,19 @@ export function CourseReviewStatusCard({
                 <div className='p-3.5 bg-white rounded-xl border border-amber-300 shadow-2xs space-y-1.5'>
                   <div className='flex items-center gap-2 text-xs font-bold text-amber-900'>
                     <MessageSquareQuote className='w-4 h-4 text-amber-600' />
-                    <span>Administrative Review Feedback:</span>
+                    <span>{t('instructor.review.adminFeedback')}</span>
                   </div>
                   <p className='text-xs text-gray-800 leading-relaxed whitespace-pre-wrap pl-6'>
                     {reviewRequest.adminFeedback}
                   </p>
                   {reviewRequest.reviewedAt && (
                     <div className='text-[11px] text-gray-500 pl-6 pt-1 flex items-center gap-2'>
-                      {reviewRequest.reviewer?.name && (
-                        <span>Reviewed by: <strong>{reviewRequest.reviewer.name}</strong> &bull; </span>
-                      )}
-                      <span>{new Date(reviewRequest.reviewedAt).toLocaleDateString()}</span>
+                      <span>
+                        {t('instructor.review.reviewedBy', {
+                          name: reviewRequest.reviewer?.name || '',
+                          date: formatDate(reviewRequest.reviewedAt),
+                        })}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -152,7 +157,7 @@ export function CourseReviewStatusCard({
                 className='bg-primary text-white hover:bg-primary/90 flex items-center gap-1.5'
               >
                 <Send className='w-4 h-4' />
-                <span>Resubmit for Review</span>
+                <span>{t('instructor.review.resubmitForReview')}</span>
               </Button>
             </div>
           )}
@@ -173,10 +178,10 @@ export function CourseReviewStatusCard({
           </div>
           <div>
             <h4 className='font-bold text-sm text-emerald-950'>
-              Published & Live in Public Catalog
+              {t('instructor.review.publishedTitle')}
             </h4>
             <p className='text-xs text-emerald-800 mt-0.5'>
-              Students can view, enroll, and purchase this course.
+              {t('instructor.review.publishedDesc')}
             </p>
           </div>
         </div>
@@ -188,7 +193,7 @@ export function CourseReviewStatusCard({
             rel='noopener noreferrer'
             className='inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-900 hover:underline'
           >
-            <span>View Public Listing</span>
+            <span>{t('instructor.review.viewPublicListing')}</span>
             <ExternalLink className='w-3.5 h-3.5' />
           </Link>
         )}

@@ -470,18 +470,23 @@ export function LessonAssignments({
                           </span>
                         </div>
                         <div className='text-gray-500 flex items-center gap-2'>
-                          <span>Version {formatNumber(sub.version)}</span>
+                          <span>{t('assignments.version', { version: formatNumber(sub.version) })}</span>
                           <span>•</span>
                           <span>{sub.originalFilename}</span>
                           <span>•</span>
                           <span>{formatDate(sub.submittedAt)}</span>
                         </div>
                         {sub.studentNotes && (
-                          <p className='text-gray-600 italic text-[11px]'>Note: "{sub.studentNotes}"</p>
+                          <p className='text-gray-600 italic text-[11px]'>{t('assignments.notePrefix', { notes: sub.studentNotes })}</p>
                         )}
                         {sub.grade && (
                           <p className='text-emerald-700 font-bold'>
-                            Score: {formatNumber(sub.grade.score)}/{formatNumber(activeAssignment.maxScore)} {t('quiz.pts')} ({formatNumber(sub.grade.percentage)}%)
+                            {t('assignments.scoreLabel', {
+                              score: formatNumber(sub.grade.score),
+                              maxScore: formatNumber(activeAssignment.maxScore),
+                              pts: t('quiz.pts'),
+                              percentage: formatNumber(sub.grade.percentage),
+                            })}
                           </p>
                         )}
                       </div>
@@ -504,7 +509,7 @@ export function LessonAssignments({
                           }}
                           className='rounded-lg text-xs font-semibold px-3 py-1.5 bg-primary text-white hover:bg-primary/90'
                         >
-                          {sub.status === 'GRADED' ? 'Re-grade' : 'Grade'}
+                          {sub.status === 'GRADED' ? t('assignments.regrade') : t('assignments.gradeAction')}
                         </Button>
                       </div>
                     </div>
@@ -517,7 +522,7 @@ export function LessonAssignments({
                 <div className='p-4 rounded-xl border border-primary/30 bg-purple-50/50 space-y-3 mt-4'>
                   <div className='flex items-center justify-between'>
                     <span className='text-xs font-bold text-gray-900 uppercase tracking-wider'>
-                      Evaluate Submission
+                      {t('assignments.evaluateSubmission')}
                     </span>
                     <Button
                       size='sm'
@@ -532,7 +537,7 @@ export function LessonAssignments({
                   <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
                     <div className='space-y-1'>
                       <label className='text-xs font-semibold text-gray-700'>
-                        Numeric Score (Max: {formatNumber(activeAssignment.maxScore)})
+                        {t('assignments.numericScore', { maxScore: formatNumber(activeAssignment.maxScore) })}
                       </label>
                       <input
                         type='number'
@@ -544,12 +549,12 @@ export function LessonAssignments({
                       />
                     </div>
                     <div className='space-y-1 sm:col-span-2'>
-                      <label className='text-xs font-semibold text-gray-700'>Written Feedback</label>
+                      <label className='text-xs font-semibold text-gray-700'>{t('assignments.writtenFeedback')}</label>
                       <textarea
                         rows={3}
                         value={gradeFeedback}
                         onChange={(e) => setGradeFeedback(e.target.value)}
-                        placeholder='Great job implementing the requested features...'
+                        placeholder={t('assignments.feedbackPlaceholder')}
                         className='w-full rounded-xl border border-gray-200 bg-white p-2.5 text-xs focus:outline-none focus:border-primary'
                       />
                     </div>
@@ -561,7 +566,7 @@ export function LessonAssignments({
                       disabled={gradeMutation.isPending}
                       className='rounded-xl text-xs font-bold px-4 py-2 bg-primary text-white hover:bg-primary/90'
                     >
-                      {gradeMutation.isPending ? <Loader2 className='w-4 h-4 animate-spin' /> : 'Save Grade'}
+                      {gradeMutation.isPending ? <Loader2 className='w-4 h-4 animate-spin' /> : t('assignments.saveGrade')}
                     </Button>
                   </div>
                 </div>

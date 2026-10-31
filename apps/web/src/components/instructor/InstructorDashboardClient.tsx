@@ -9,6 +9,7 @@ import {
   type InstructorCourseBreakdownDto,
 } from '@/lib/api/instructor';
 import { useCurrentUser } from '@/lib/useCurrentUser';
+import { useTranslation } from '@/i18n';
 import { Button } from '@/components/ui/button';
 import {
   BookOpen,
@@ -23,17 +24,16 @@ import {
   CheckCircle2,
   BarChart3,
   AlertCircle,
-  ExternalLink,
 } from 'lucide-react';
 
 export function InstructorDashboardClient() {
   const { data: user } = useCurrentUser();
+  const { t, formatNumber } = useTranslation();
 
   // Query Courses Metadata
   const {
     data: coursesData,
     isLoading: isLoadingCourses,
-    isError: isCoursesError,
     refetch: refetchCourses,
   } = useQuery({
     queryKey: ['instructorCourses', 'dashboard'],
@@ -68,17 +68,19 @@ export function InstructorDashboardClient() {
       <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-xs'>
         <div>
           <h1 className='text-2xl font-bold text-gray-900'>
-            Welcome back, {user?.name || 'Educator'}!
+            {t('instructor.dashboard.welcome', {
+              name: user?.name || t('instructor.dashboard.educator'),
+            })}
           </h1>
           <p className='text-sm text-gray-600 mt-1'>
-            Manage your courses, oversee student learning progress, and explore curriculum analytics.
+            {t('instructor.dashboard.subtitle')}
           </p>
         </div>
         <div className='flex items-center gap-3'>
           <Link href='/admin/courses/new'>
             <Button className='bg-primary text-white hover:bg-primary/90 flex items-center gap-2'>
               <PlusCircle className='w-4 h-4' />
-              <span>Create New Course</span>
+              <span>{t('instructor.dashboard.createNewCourse')}</span>
             </Button>
           </Link>
         </div>
@@ -88,9 +90,11 @@ export function InstructorDashboardClient() {
       <div className='space-y-3'>
         <div className='flex items-center justify-between'>
           <div>
-            <h2 className='text-lg font-bold text-gray-900'>Portfolio Learning Analytics</h2>
+            <h2 className='text-lg font-bold text-gray-900'>
+              {t('instructor.dashboard.portfolioAnalytics')}
+            </h2>
             <p className='text-xs text-gray-500'>
-              Real-time student engagement and completion rates across all your authored courses.
+              {t('instructor.dashboard.portfolioSubtitle')}
             </p>
           </div>
           {isAnalyticsError && (
@@ -100,7 +104,7 @@ export function InstructorDashboardClient() {
               onClick={() => refetchAnalytics()}
               className='text-xs text-rose-600 border-rose-200'
             >
-              Retry Analytics
+              {t('instructor.dashboard.retryAnalytics')}
             </Button>
           )}
         </div>
@@ -109,7 +113,9 @@ export function InstructorDashboardClient() {
           {/* Metric 1: Total Unique Enrolled Learners */}
           <div className='p-6 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
             <div className='flex items-center justify-between'>
-              <span className='text-sm font-medium text-gray-500'>Unique Learners</span>
+              <span className='text-sm font-medium text-gray-500'>
+                {t('instructor.dashboard.uniqueLearners')}
+              </span>
               <div className='w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center'>
                 <Users className='w-5 h-5' />
               </div>
@@ -119,17 +125,21 @@ export function InstructorDashboardClient() {
                 <div className='h-8 w-16 bg-gray-200 animate-pulse rounded-md' />
               ) : (
                 <div className='text-3xl font-extrabold text-gray-900'>
-                  {analyticsOverview?.totalUniqueStudents ?? 0}
+                  {formatNumber(analyticsOverview?.totalUniqueStudents ?? 0)}
                 </div>
               )}
-              <p className='text-xs text-gray-500 mt-1'>Distinct students enrolled</p>
+              <p className='text-xs text-gray-500 mt-1'>
+                {t('instructor.dashboard.distinctStudents')}
+              </p>
             </div>
           </div>
 
           {/* Metric 2: Total Course Completions */}
           <div className='p-6 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
             <div className='flex items-center justify-between'>
-              <span className='text-sm font-medium text-gray-500'>Course Completions</span>
+              <span className='text-sm font-medium text-gray-500'>
+                {t('instructor.dashboard.courseCompletions')}
+              </span>
               <div className='w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center'>
                 <CheckCircle2 className='w-5 h-5' />
               </div>
@@ -139,17 +149,21 @@ export function InstructorDashboardClient() {
                 <div className='h-8 w-16 bg-gray-200 animate-pulse rounded-md' />
               ) : (
                 <div className='text-3xl font-extrabold text-gray-900'>
-                  {analyticsOverview?.totalCourseCompletions ?? 0}
+                  {formatNumber(analyticsOverview?.totalCourseCompletions ?? 0)}
                 </div>
               )}
-              <p className='text-xs text-gray-500 mt-1'>Certificates/completions awarded</p>
+              <p className='text-xs text-gray-500 mt-1'>
+                {t('instructor.dashboard.certificatesAwarded')}
+              </p>
             </div>
           </div>
 
           {/* Metric 3: Portfolio Completion Rate */}
           <div className='p-6 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
             <div className='flex items-center justify-between'>
-              <span className='text-sm font-medium text-gray-500'>Portfolio Completion Rate</span>
+              <span className='text-sm font-medium text-gray-500'>
+                {t('instructor.dashboard.portfolioCompletionRate')}
+              </span>
               <div className='w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center'>
                 <TrendingUp className='w-5 h-5' />
               </div>
@@ -159,17 +173,21 @@ export function InstructorDashboardClient() {
                 <div className='h-8 w-16 bg-gray-200 animate-pulse rounded-md' />
               ) : (
                 <div className='text-3xl font-extrabold text-gray-900'>
-                  {analyticsOverview?.portfolioCompletionRate ?? 0}%
+                  {formatNumber(analyticsOverview?.portfolioCompletionRate ?? 0)}%
                 </div>
               )}
-              <p className='text-xs text-gray-500 mt-1'>Weighted average completion</p>
+              <p className='text-xs text-gray-500 mt-1'>
+                {t('instructor.dashboard.weightedAvgCompletion')}
+              </p>
             </div>
           </div>
 
           {/* Metric 4: 30-Day Active Learners */}
           <div className='p-6 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
             <div className='flex items-center justify-between'>
-              <span className='text-sm font-medium text-gray-500'>30-Day Active Learners</span>
+              <span className='text-sm font-medium text-gray-500'>
+                {t('instructor.dashboard.activeLearners30d')}
+              </span>
               <div className='w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center'>
                 <Sparkles className='w-5 h-5' />
               </div>
@@ -179,10 +197,12 @@ export function InstructorDashboardClient() {
                 <div className='h-8 w-16 bg-gray-200 animate-pulse rounded-md' />
               ) : (
                 <div className='text-3xl font-extrabold text-gray-900'>
-                  {analyticsOverview?.activeLearners30d ?? 0}
+                  {formatNumber(analyticsOverview?.activeLearners30d ?? 0)}
                 </div>
               )}
-              <p className='text-xs text-gray-500 mt-1'>Students active in past month</p>
+              <p className='text-xs text-gray-500 mt-1'>
+                {t('instructor.dashboard.activeInPastMonth')}
+              </p>
             </div>
           </div>
         </div>
@@ -192,16 +212,18 @@ export function InstructorDashboardClient() {
       <div className='bg-white rounded-2xl border border-gray-200 shadow-xs p-6 space-y-4'>
         <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-4'>
           <div>
-            <h2 className='text-lg font-bold text-gray-900'>Course Performance & Analytics</h2>
+            <h2 className='text-lg font-bold text-gray-900'>
+              {t('instructor.dashboard.coursePerformance')}
+            </h2>
             <p className='text-xs text-gray-500'>
-              Detailed breakdown of enrollment figures, completions, and syllabus progress per course.
+              {t('instructor.dashboard.performanceSubtitle')}
             </p>
           </div>
           <Link
             href='/instructor/courses'
             className='text-xs font-semibold text-primary hover:underline flex items-center gap-1'
           >
-            <span>Manage All Courses</span>
+            <span>{t('instructor.dashboard.manageAllCourses')}</span>
             <ArrowRight className='w-3.5 h-3.5' />
           </Link>
         </div>
@@ -216,18 +238,20 @@ export function InstructorDashboardClient() {
           <div className='p-4 bg-rose-50 text-rose-700 rounded-xl border border-rose-200 flex items-center justify-between'>
             <div className='flex items-center gap-2 text-xs font-medium'>
               <AlertCircle className='w-4 h-4' />
-              <span>Failed to load course breakdown metrics.</span>
+              <span>{t('instructor.dashboard.failedToLoadBreakdown')}</span>
             </div>
             <Button variant='outline' size='sm' onClick={() => refetchAnalytics()}>
-              Retry
+              {t('actions.retry')}
             </Button>
           </div>
         ) : courseBreakdowns.length === 0 ? (
           <div className='text-center py-8 text-gray-500 text-xs'>
             <BarChart3 className='w-8 h-8 text-gray-400 mx-auto mb-2' />
-            <p className='font-medium text-gray-700'>No course analytics recorded yet.</p>
+            <p className='font-medium text-gray-700'>
+              {t('instructor.dashboard.noAnalyticsRecorded')}
+            </p>
             <p className='text-gray-400 mt-0.5'>
-              Once courses are published and students enroll, breakdown metrics will appear here.
+              {t('instructor.dashboard.noAnalyticsDesc')}
             </p>
           </div>
         ) : (
@@ -236,25 +260,25 @@ export function InstructorDashboardClient() {
               <thead className='bg-gray-50/75 text-gray-700 font-semibold'>
                 <tr>
                   <th scope='col' className='px-4 py-3'>
-                    Course Title
+                    {t('instructor.dashboard.table.courseTitle')}
                   </th>
                   <th scope='col' className='px-4 py-3 text-center'>
-                    Status
+                    {t('instructor.dashboard.table.status')}
                   </th>
                   <th scope='col' className='px-4 py-3 text-center'>
-                    Enrolled
+                    {t('instructor.dashboard.table.enrolled')}
                   </th>
                   <th scope='col' className='px-4 py-3 text-center'>
-                    Completions
+                    {t('instructor.dashboard.table.completions')}
                   </th>
                   <th scope='col' className='px-4 py-3 min-w-[140px]'>
-                    Completion Rate
+                    {t('instructor.dashboard.table.completionRate')}
                   </th>
                   <th scope='col' className='px-4 py-3 text-center'>
-                    Avg Progress
+                    {t('instructor.dashboard.table.avgProgress')}
                   </th>
                   <th scope='col' className='px-4 py-3 text-right'>
-                    Deep-Dive Actions
+                    {t('instructor.dashboard.table.actions')}
                   </th>
                 </tr>
               </thead>
@@ -266,6 +290,13 @@ export function InstructorDashboardClient() {
                     PUBLISHED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
                     ARCHIVED: 'bg-slate-50 text-slate-700 border-slate-200',
                   }[item.status] || 'bg-gray-50 text-gray-700 border-gray-200';
+
+                  const statusLabel = {
+                    DRAFT: t('instructor.courses.tabs.draft'),
+                    IN_REVIEW: t('instructor.courses.tabs.inReview'),
+                    PUBLISHED: t('instructor.courses.tabs.published'),
+                    ARCHIVED: t('instructor.courses.tabs.archived'),
+                  }[item.status] || item.status;
 
                   return (
                     <tr key={item.courseId} className='hover:bg-gray-50/75 transition-colors'>
@@ -282,22 +313,22 @@ export function InstructorDashboardClient() {
                         <span
                           className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${statusBadgeStyles}`}
                         >
-                          {item.status}
+                          {statusLabel}
                         </span>
                       </td>
 
                       <td className='px-4 py-3 text-center font-semibold text-gray-900'>
-                        {item.totalEnrolled}
+                        {formatNumber(item.totalEnrolled)}
                       </td>
 
                       <td className='px-4 py-3 text-center font-semibold text-gray-900'>
-                        {item.completedCount}
+                        {formatNumber(item.completedCount)}
                       </td>
 
                       <td className='px-4 py-3'>
                         <div className='space-y-1'>
                           <div className='flex items-center justify-between text-xs font-semibold text-gray-700'>
-                            <span>{item.completionRate}%</span>
+                            <span>{formatNumber(item.completionRate)}%</span>
                           </div>
                           <div className='w-full bg-gray-100 h-1.5 rounded-full overflow-hidden'>
                             <div
@@ -309,7 +340,7 @@ export function InstructorDashboardClient() {
                       </td>
 
                       <td className='px-4 py-3 text-center font-medium text-gray-700'>
-                        {item.averageProgressPercentage}%
+                        {formatNumber(item.averageProgressPercentage)}%
                       </td>
 
                       <td className='px-4 py-3 text-right'>
@@ -321,7 +352,7 @@ export function InstructorDashboardClient() {
                               className='h-7 text-xs text-purple-700 border-purple-200 hover:bg-purple-50 flex items-center gap-1'
                             >
                               <BarChart3 className='w-3 h-3' />
-                              <span>Analytics</span>
+                              <span>{t('instructor.dashboard.table.analytics')}</span>
                             </Button>
                           </Link>
                           <Link href={`/instructor/courses/${item.courseId}/learners`}>
@@ -331,7 +362,7 @@ export function InstructorDashboardClient() {
                               className='h-7 text-xs text-blue-700 border-blue-200 hover:bg-blue-50 flex items-center gap-1'
                             >
                               <Users className='w-3 h-3' />
-                              <span>Learners</span>
+                              <span>{t('instructor.dashboard.table.learners')}</span>
                             </Button>
                           </Link>
                         </div>
@@ -350,7 +381,9 @@ export function InstructorDashboardClient() {
         {/* Metric 1: Published Courses */}
         <div className='p-6 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
           <div className='flex items-center justify-between'>
-            <span className='text-sm font-medium text-gray-500'>Active Courses</span>
+            <span className='text-sm font-medium text-gray-500'>
+              {t('instructor.dashboard.activeCourses')}
+            </span>
             <div className='w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center'>
               <BookOpen className='w-5 h-5' />
             </div>
@@ -359,16 +392,22 @@ export function InstructorDashboardClient() {
             {isLoadingCourses ? (
               <div className='h-8 w-16 bg-gray-200 animate-pulse rounded-md' />
             ) : (
-              <div className='text-3xl font-extrabold text-gray-900'>{publishedCount}</div>
+              <div className='text-3xl font-extrabold text-gray-900'>
+                {formatNumber(publishedCount)}
+              </div>
             )}
-            <p className='text-xs text-gray-500 mt-1'>Live in the public catalog</p>
+            <p className='text-xs text-gray-500 mt-1'>
+              {t('instructor.dashboard.liveInCatalog')}
+            </p>
           </div>
         </div>
 
         {/* Metric 2: Draft Courses */}
         <div className='p-6 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
           <div className='flex items-center justify-between'>
-            <span className='text-sm font-medium text-gray-500'>Draft Courses</span>
+            <span className='text-sm font-medium text-gray-500'>
+              {t('instructor.dashboard.draftCourses')}
+            </span>
             <div className='w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center'>
               <FileEdit className='w-5 h-5' />
             </div>
@@ -377,16 +416,22 @@ export function InstructorDashboardClient() {
             {isLoadingCourses ? (
               <div className='h-8 w-16 bg-gray-200 animate-pulse rounded-md' />
             ) : (
-              <div className='text-3xl font-extrabold text-gray-900'>{draftCount}</div>
+              <div className='text-3xl font-extrabold text-gray-900'>
+                {formatNumber(draftCount)}
+              </div>
             )}
-            <p className='text-xs text-gray-500 mt-1'>Curriculum in development</p>
+            <p className='text-xs text-gray-500 mt-1'>
+              {t('instructor.dashboard.curriculumInDev')}
+            </p>
           </div>
         </div>
 
         {/* Metric 3: Under Review */}
         <div className='p-6 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
           <div className='flex items-center justify-between'>
-            <span className='text-sm font-medium text-gray-500'>Under Review</span>
+            <span className='text-sm font-medium text-gray-500'>
+              {t('instructor.dashboard.underReview')}
+            </span>
             <div className='w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center'>
               <Clock className='w-5 h-5' />
             </div>
@@ -395,16 +440,22 @@ export function InstructorDashboardClient() {
             {isLoadingCourses ? (
               <div className='h-8 w-16 bg-gray-200 animate-pulse rounded-md' />
             ) : (
-              <div className='text-3xl font-extrabold text-blue-600'>{inReviewCount}</div>
+              <div className='text-3xl font-extrabold text-blue-600'>
+                {formatNumber(inReviewCount)}
+              </div>
             )}
-            <p className='text-xs text-gray-500 mt-1'>Pending admin review</p>
+            <p className='text-xs text-gray-500 mt-1'>
+              {t('instructor.dashboard.pendingAdminReview')}
+            </p>
           </div>
         </div>
 
         {/* Metric 4: Total Portfolio */}
         <div className='p-6 bg-white rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between'>
           <div className='flex items-center justify-between'>
-            <span className='text-sm font-medium text-gray-500'>Total Portfolio</span>
+            <span className='text-sm font-medium text-gray-500'>
+              {t('instructor.dashboard.totalPortfolio')}
+            </span>
             <div className='w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center'>
               <GraduationCap className='w-5 h-5' />
             </div>
@@ -413,9 +464,13 @@ export function InstructorDashboardClient() {
             {isLoadingCourses ? (
               <div className='h-8 w-16 bg-gray-200 animate-pulse rounded-md' />
             ) : (
-              <div className='text-3xl font-extrabold text-gray-900'>{totalCourses}</div>
+              <div className='text-3xl font-extrabold text-gray-900'>
+                {formatNumber(totalCourses)}
+              </div>
             )}
-            <p className='text-xs text-gray-500 mt-1'>Total authored courses</p>
+            <p className='text-xs text-gray-500 mt-1'>
+              {t('instructor.dashboard.totalAuthoredCourses')}
+            </p>
           </div>
         </div>
       </div>
@@ -427,9 +482,11 @@ export function InstructorDashboardClient() {
             <div className='w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4'>
               <BookOpen className='w-5 h-5' />
             </div>
-            <h3 className='text-lg font-bold text-gray-900'>My Teaching Courses</h3>
+            <h3 className='text-lg font-bold text-gray-900'>
+              {t('instructor.dashboard.cards.teachingCourses')}
+            </h3>
             <p className='text-sm text-gray-600 mt-2'>
-              View all your authored courses, organize modules and lessons, and inspect learner rosters and analytics.
+              {t('instructor.dashboard.cards.teachingDesc')}
             </p>
           </div>
           <div className='mt-6'>
@@ -437,7 +494,7 @@ export function InstructorDashboardClient() {
               href='/instructor/courses'
               className='inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline'
             >
-              <span>Go to Courses</span>
+              <span>{t('instructor.dashboard.cards.goToCourses')}</span>
               <ArrowRight className='w-4 h-4' />
             </Link>
           </div>
@@ -448,9 +505,11 @@ export function InstructorDashboardClient() {
             <div className='w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4'>
               <Sparkles className='w-5 h-5' />
             </div>
-            <h3 className='text-lg font-bold text-gray-900'>Course Authoring Wizard</h3>
+            <h3 className='text-lg font-bold text-gray-900'>
+              {t('instructor.dashboard.cards.authoringWizard')}
+            </h3>
             <p className='text-sm text-gray-600 mt-2'>
-              Create a new course draft, set pricing in BDT, select academic categories, and design your syllabus.
+              {t('instructor.dashboard.cards.authoringDesc')}
             </p>
           </div>
           <div className='mt-6'>
@@ -458,7 +517,7 @@ export function InstructorDashboardClient() {
               href='/admin/courses/new'
               className='inline-flex items-center gap-2 text-sm font-semibold text-amber-600 hover:underline'
             >
-              <span>Draft a New Course</span>
+              <span>{t('instructor.dashboard.cards.draftNewCourse')}</span>
               <ArrowRight className='w-4 h-4' />
             </Link>
           </div>
@@ -469,9 +528,11 @@ export function InstructorDashboardClient() {
             <div className='w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4'>
               <Users className='w-5 h-5' />
             </div>
-            <h3 className='text-lg font-bold text-gray-900'>Instructor Profile</h3>
+            <h3 className='text-lg font-bold text-gray-900'>
+              {t('instructor.dashboard.cards.instructorProfile')}
+            </h3>
             <p className='text-sm text-gray-600 mt-2'>
-              View your educator account details, verified credentials, and institutional teaching affiliation.
+              {t('instructor.dashboard.cards.profileDesc')}
             </p>
           </div>
           <div className='mt-6'>
@@ -479,7 +540,7 @@ export function InstructorDashboardClient() {
               href='/instructor/profile'
               className='inline-flex items-center gap-2 text-sm font-semibold text-emerald-600 hover:underline'
             >
-              <span>View Profile</span>
+              <span>{t('instructor.dashboard.cards.viewProfile')}</span>
               <ArrowRight className='w-4 h-4' />
             </Link>
           </div>
