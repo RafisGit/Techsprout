@@ -38,3 +38,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# database backups and infrastructure manifests
+*.dump
+*.dump.*
+*.backup
+*.sql.gz
+backups/
+TechSproutBackups/
+*-manifest.json
+*.backup-manifest.json
