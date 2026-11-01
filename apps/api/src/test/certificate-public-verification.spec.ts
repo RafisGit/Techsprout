@@ -434,7 +434,7 @@ describe('Phase 11.3 / WP-P11-03 — Public Certificate Verification & QR Valida
 
     // 2. Parse PDF and extract embedded QR barcode image
     const parser = new PDFParse(new Uint8Array(pdfBuffer));
-    await parser.load();
+    await (parser as any).load();
     const imageResult = await parser.getImage({ imageBuffer: true });
     const images = (imageResult as any).pages[0].images;
 

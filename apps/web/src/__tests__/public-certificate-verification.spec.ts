@@ -307,4 +307,37 @@ describe('Phase 11.3 / WP-P11-03 — Public Certificate Verification Page Suite 
     expect(html).not.toContain('password');
     expect(html).not.toContain('db_id');
   });
+
+  // =========================================================================
+  // TEST 9: SCORE DISCLOSURE PRIVACY INVARIANT (WP-P11-04)
+  // =========================================================================
+  it('Test 9: Public verification omits score section when finalScorePercentage is null or undefined (unapproved score)', () => {
+    const mockUnapprovedScoreCertificate: PublicCertificateVerificationDto = {
+      ...mockValidCertificate,
+      finalScorePercentage: null,
+    };
+
+    mockQueryResult = {
+      data: mockUnapprovedScoreCertificate,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+
+    const html = renderToString(
+      React.createElement(
+        LocaleProvider,
+        { initialLocale: 'en' },
+        React.createElement(PublicCertificateVerificationResultPage)
+      )
+    );
+
+    // Assert that the final score container and any percentage are completely omitted
+    expect(html).not.toContain('data-testid="public-final-score"');
+    expect(html).not.toContain('Final Assessment Score');
+    expect(html).not.toContain('96%');
+    expect(html).toContain('Ayesha Siddiqua');
+    expect(html).toContain('TSP-2026-CA1B2C3D4');
+  });
 });
