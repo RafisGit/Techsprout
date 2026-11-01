@@ -1,6 +1,8 @@
 import {
   Controller,
   Get,
+  Post,
+  HttpCode,
   Param,
   Req,
   HttpStatus,
@@ -35,6 +37,26 @@ export class CertificatesController {
     private readonly certificateService: CertificateService
   ) {}
 
+  @Get('courses/:courseId/certificate/eligibility')
+  @ApiBearerAuth()
+  @ApiCookieAuth('techsprout_session')
+  @ApiOperation({ summary: 'Check certificate eligibility for enrolled student' })
+  @ApiResponse({ status: 200, description: 'Certificate eligibility evaluated successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid course ID format' })
+  @ApiResponse({ status: 404, description: 'Course not found' })
+  async getCertificateEligibility(
+    @Param('courseId') courseId: string,
+    @Req() req: AuthenticatedRequest
+  ) {
+    const studentId = req.user!.id;
+    const eligibility = await this.certificateService.getCertificateEligibility(courseId, studentId);
+    return {
+      success: true,
+      message: 'Certificate eligibility evaluated successfully',
+      data: eligibility,
+    };
+  }
+
   @Get('courses/:courseId/certificate')
   @ApiBearerAuth()
   @ApiCookieAuth('techsprout_session')
@@ -46,15 +68,24 @@ export class CertificatesController {
     @Param('courseId') courseId: string,
     @Req() req: AuthenticatedRequest
   ) {
-    const parseCourseId = uuidSchema.safeParse(courseId);
-    if (!parseCourseId.success) {
-      throw new ApiException('Invalid course ID format', HttpStatus.BAD_REQUEST, 'INVALID_ID');
-    }
-
     const studentId = req.user!.id;
 
+    // Resolve course (supports UUID or slug)
+    const course = await this.certificateService.resolveCourse(courseId);
+    if (!course) {
+      const isUuid = uuidSchema.safeParse(courseId).success;
+      if (!isUuid) {
+        throw new ApiException('Invalid course ID format', HttpStatus.BAD_REQUEST, 'INVALID_ID');
+      }
+      throw new ApiException(
+        'Enrollment not found for this course',
+        HttpStatus.NOT_FOUND,
+        'ENROLLMENT_NOT_FOUND'
+      );
+    }
+
     // 1. Query student enrollment
-    const enrollment = await this.certificateService.getEnrollment(courseId, studentId);
+    const enrollment = await this.certificateService.getEnrollment(course.id, studentId);
 
     // Case A — No enrollment
     if (!enrollment) {
@@ -81,57 +112,63 @@ export class CertificatesController {
       };
     }
 
-    // Case C — Enrollment exists + no certificate + enrollment COMPLETED
-    if (enrollment.status === 'COMPLETED') {
-      const issueResult = await this.certificateService.issueCertificateIfEligible(
-        enrollment.id,
-        {
-          actorId: studentId,
-          ipAddress: req.ip,
-          userAgent: req.headers['user-agent'],
-          requestId: req.id,
-        }
-      );
-
-      if (issueResult.status === 'ISSUED' || issueResult.status === 'ALREADY_EXISTS') {
-        return {
-          success: true,
-          message: 'Certificate retrieved successfully',
-          data: mapToStudentCertificateDto(issueResult.certificate),
-        };
+    // Case C — Enrollment exists + no certificate -> evaluate and issue
+    const issueResult = await this.certificateService.issueCertificateIfEligible(
+      enrollment.id,
+      {
+        actorId: studentId,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        requestId: req.id,
       }
+    );
 
-      if (issueResult.status === 'NOT_ELIGIBLE') {
-        throw new ApiException(
-          issueResult.reason ||
-            'You have not completed all requirements for this course. Complete all lessons and assessments to earn your certificate.',
-          HttpStatus.FORBIDDEN,
-          'COURSE_NOT_COMPLETED',
-          issueResult.details
-        );
-      }
+    if (issueResult.status === 'ISSUED' || issueResult.status === 'ALREADY_EXISTS') {
+      return {
+        success: true,
+        message: 'Certificate retrieved successfully',
+        data: mapToStudentCertificateDto(issueResult.certificate),
+      };
+    }
 
-      if (issueResult.status === 'ENROLLMENT_NOT_FOUND') {
-        throw new ApiException(
-          'Enrollment not found',
-          HttpStatus.NOT_FOUND,
-          'ENROLLMENT_NOT_FOUND'
-        );
-      }
-
+    if (issueResult.status === 'NOT_ELIGIBLE') {
       throw new ApiException(
-        issueResult.reason || 'Unable to issue certificate',
-        HttpStatus.BAD_REQUEST,
-        'INVALID_DOMAIN_STATE'
+        issueResult.reason ||
+          'You have not completed all requirements for this course. Complete all lessons and assessments to earn your certificate.',
+        HttpStatus.FORBIDDEN,
+        'COURSE_NOT_COMPLETED',
+        issueResult.details
       );
     }
 
-    // Case D — Enrollment exists + no certificate + enrollment not COMPLETED
+    if (issueResult.status === 'ENROLLMENT_NOT_FOUND') {
+      throw new ApiException(
+        'Enrollment not found',
+        HttpStatus.NOT_FOUND,
+        'ENROLLMENT_NOT_FOUND'
+      );
+    }
+
     throw new ApiException(
-      'You have not completed all requirements for this course. Complete all lessons and assessments to earn your certificate.',
-      HttpStatus.FORBIDDEN,
-      'COURSE_NOT_COMPLETED'
+      issueResult.reason || 'Unable to issue certificate',
+      HttpStatus.BAD_REQUEST,
+      'INVALID_DOMAIN_STATE'
     );
+  }
+
+  @Post('courses/:courseId/certificate/issue')
+  @ApiBearerAuth()
+  @ApiCookieAuth('techsprout_session')
+  @ApiOperation({ summary: 'Issue certificate for eligible enrolled student' })
+  @ApiResponse({ status: 200, description: 'Certificate issued or retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Course requirements not completed' })
+  @ApiResponse({ status: 404, description: 'Enrollment not found' })
+  @HttpCode(HttpStatus.OK)
+  async issueStudentCertificate(
+    @Param('courseId') courseId: string,
+    @Req() req: AuthenticatedRequest
+  ) {
+    return this.getStudentCertificate(courseId, req);
   }
 
   @Public()

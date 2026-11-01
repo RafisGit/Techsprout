@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { fetchPublicCourseBySlug } from '@/lib/api/catalog';
-import { fetchStudentCertificate } from '@/lib/api/certificates';
+import { fetchStudentCertificate, fetchCertificateEligibility, issueCertificate } from '@/lib/api/certificates';
 import { fetchCourseEnrollmentStatus } from '@/lib/api/learning';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { CertificateDocument } from '@/components/certificate/CertificateDocument';
@@ -77,6 +77,35 @@ export default function StudentCertificatePage() {
     !!certificate &&
     !!enrollmentData?.isEnrolled &&
     enrollmentData.enrollment?.status === 'ACTIVE';
+
+  // 4. Fetch Eligibility query when certificate query returns error
+  const {
+    data: eligibility,
+    isLoading: isEligibilityLoading,
+  } = useQuery({
+    queryKey: ['certificateEligibility', courseId],
+    queryFn: () => fetchCertificateEligibility(courseId!),
+    enabled: !!courseId && !!currentUser && !!isCertError,
+    staleTime: 30 * 1000,
+    retry: 1,
+  });
+
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
+
+  const handleClaim = async () => {
+    if (!courseId) return;
+    setIsClaiming(true);
+    setClaimError(null);
+    try {
+      await issueCertificate(courseId);
+      await refetchCertificate();
+    } catch (err: any) {
+      setClaimError(err?.response?.data?.message || t.certificate.unavailableDesc);
+    } finally {
+      setIsClaiming(false);
+    }
+  };
 
   const isLoading =
     isAuthLoading ||
@@ -181,6 +210,39 @@ export default function StudentCertificatePage() {
 
     // Course not completed (403)
     if (status === 403 || errorCode === 'COURSE_NOT_COMPLETED') {
+      if (eligibility?.status === 'ELIGIBLE') {
+        return (
+          <div className='min-h-[85vh] flex items-center justify-center px-4 bg-[#F8FAFC] py-12'>
+            <div className='max-w-md w-full bg-white rounded-3xl p-8 border border-green-200/80 shadow-xs text-center space-y-4'>
+              <div className='w-16 h-16 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center mx-auto'>
+                <GraduationCap className='w-8 h-8' />
+              </div>
+              <h2 className='text-xl font-bold text-gray-900'>{t.certificate.eligibleTitle}</h2>
+              <p className='text-xs sm:text-sm text-gray-600 leading-relaxed'>
+                {t.certificate.eligibleDesc}
+              </p>
+              {claimError && (
+                <p className='text-xs text-red-500 font-medium'>{claimError}</p>
+              )}
+              <div className='pt-2 flex justify-center gap-3'>
+                <Button
+                  onClick={handleClaim}
+                  disabled={isClaiming}
+                  className='rounded-xl text-xs font-semibold px-6 py-2.5 bg-primary text-white hover:bg-primary/90'
+                >
+                  {isClaiming ? t.certificate.claimingCertificate : t.certificate.claimCertificate}
+                </Button>
+                <Link href='/my-courses'>
+                  <Button variant='outline' className='rounded-xl text-xs font-semibold px-4 py-2.5'>
+                    {t.certificate.dashboard}
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className='min-h-[85vh] flex items-center justify-center px-4 bg-[#F8FAFC] py-12'>
           <div className='max-w-md w-full bg-white rounded-3xl p-8 border border-amber-200/80 shadow-xs text-center space-y-4'>
@@ -191,6 +253,35 @@ export default function StudentCertificatePage() {
             <p className='text-xs sm:text-sm text-gray-600 leading-relaxed'>
               {t.certificate.inProgressDesc.replace('{course}', course.title)}
             </p>
+            {eligibility && (
+              <div className='bg-amber-50/50 rounded-2xl p-4 text-left border border-amber-100/80 text-xs space-y-1.5 text-gray-700'>
+                <p className='font-semibold text-gray-900 mb-2'>{t.certificate.completionChecklist}</p>
+                <div className='flex items-center justify-between'>
+                  <span>{t.certificate.lessonsCompleted.replace('{completed}', formatNumber(eligibility.completedLessons)).replace('{total}', formatNumber(eligibility.totalLessons))}</span>
+                  {eligibility.completedLessons >= eligibility.totalLessons ? (
+                    <Check className='w-4 h-4 text-green-600' />
+                  ) : (
+                    <span className='text-amber-600 text-2xs font-semibold'>Incomplete</span>
+                  )}
+                </div>
+                {eligibility.publishedQuizzes > 0 && (
+                  <div className='flex items-center justify-between'>
+                    <span>{t.certificate.quizzesPassed.replace('{passed}', formatNumber(eligibility.passedQuizzes)).replace('{total}', formatNumber(eligibility.publishedQuizzes))}</span>
+                    {!eligibility.hasUnpassedQuizzes ? (
+                      <Check className='w-4 h-4 text-green-600' />
+                    ) : (
+                      <span className='text-amber-600 text-2xs font-semibold'>Pending</span>
+                    )}
+                  </div>
+                )}
+                {eligibility.hasUnpassedFinalExam && (
+                  <div className='flex items-center justify-between text-amber-700'>
+                    <span>{t.certificate.finalExamPending}</span>
+                    <AlertCircle className='w-3.5 h-3.5 text-amber-600' />
+                  </div>
+                )}
+              </div>
+            )}
             <div className='pt-2 flex justify-center gap-3'>
               <Link href={`/learn/${courseSlug}`}>
                 <Button className='rounded-xl text-xs font-semibold px-5 py-2.5 bg-primary text-white hover:bg-primary/90'>

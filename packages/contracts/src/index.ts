@@ -674,6 +674,32 @@ export interface StudentQuizReviewDto {
 
 export type CertificateStatus = 'ACTIVE' | 'REVOKED';
 
+export type CertificateEligibilityStatus =
+  | 'ELIGIBLE'
+  | 'ALREADY_ISSUED'
+  | 'COURSE_INCOMPLETE'
+  | 'ENROLLMENT_REQUIRED'
+  | 'ASSESSMENT_INCOMPLETE'
+  | 'ACCESS_DENIED';
+
+export interface CertificateEligibilityDto {
+  status: CertificateEligibilityStatus;
+  isEligible: boolean;
+  courseId: string;
+  courseTitle: string;
+  enrollmentId?: string;
+  certificateNumber?: string;
+  issuedAt?: string;
+  progressPercentage: number;
+  totalLessons: number;
+  completedLessons: number;
+  publishedQuizzes: number;
+  passedQuizzes: number;
+  hasUnpassedQuizzes: boolean;
+  hasUnpassedFinalExam: boolean;
+  reason?: string;
+}
+
 export interface CertificateDto {
   id: string;
   certificateNumber: string;
@@ -752,7 +778,9 @@ export type CertificateErrorCode =
   | 'ENROLLMENT_NOT_FOUND'
   | 'COURSE_NOT_COMPLETED'
   | 'CERTIFICATE_NOT_FOUND'
-  | 'CERTIFICATE_ALREADY_REVOKED';
+  | 'CERTIFICATE_ALREADY_REVOKED'
+  | 'INVALID_ID'
+  | 'INVALID_DOMAIN_STATE';
 
 // ==========================================
 // --- P5: PAYMENTS & ADMIN CONTRACTS ---

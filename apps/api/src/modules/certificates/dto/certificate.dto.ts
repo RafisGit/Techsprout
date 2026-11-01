@@ -2,6 +2,11 @@ import { z } from 'zod';
 
 export type CertificateStatus = 'ACTIVE' | 'REVOKED';
 
+export type {
+  CertificateEligibilityStatus,
+  CertificateEligibilityDto,
+} from '@techsprout/contracts';
+
 export const certificateNumberSchema = z
   .string({ required_error: 'Certificate number is required' })
   .trim()

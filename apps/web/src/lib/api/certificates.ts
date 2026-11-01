@@ -2,6 +2,7 @@ import { axiosInstance } from '@/lib/axiosInstance';
 import type {
   CertificateDto,
   PublicCertificateVerificationDto,
+  CertificateEligibilityDto,
 } from '@techsprout/contracts';
 
 /**
@@ -17,6 +18,30 @@ export async function fetchStudentCertificate(
 
 // Alias for convenience / contract compatibility
 export const getStudentCertificate = fetchStudentCertificate;
+
+/**
+ * Check certificate eligibility for the authenticated student.
+ * GET /api/v1/courses/:courseId/certificate/eligibility
+ */
+export async function fetchCertificateEligibility(
+  courseId: string
+): Promise<CertificateEligibilityDto> {
+  const response = await axiosInstance.get(`/api/v1/courses/${courseId}/certificate/eligibility`);
+  return response.data.data;
+}
+
+export const getCertificateEligibility = fetchCertificateEligibility;
+
+/**
+ * Explicitly issue certificate for an eligible course enrollment.
+ * POST /api/v1/courses/:courseId/certificate/issue
+ */
+export async function issueCertificate(
+  courseId: string
+): Promise<CertificateDto> {
+  const response = await axiosInstance.post(`/api/v1/courses/${courseId}/certificate/issue`);
+  return response.data.data;
+}
 
 /**
  * Publicly verify a certificate by its certificate number.

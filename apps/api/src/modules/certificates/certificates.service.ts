@@ -17,7 +17,11 @@ import { AuditService } from '../audit/audit.service';
 import { OutboxService } from '../events/outbox.service';
 import { ApiException } from '../../common/errors/api-error';
 import { AdminQueryCertificatesDto } from './dto/query-certificates.dto';
-import { mapToAdminCertificateDto } from './dto/certificate.dto';
+import {
+  mapToAdminCertificateDto,
+  CertificateEligibilityDto,
+  CertificateEligibilityStatus,
+} from './dto/certificate.dto';
 
 /**
  * Frozen unambiguous character set for certificate numbers
@@ -148,16 +152,12 @@ export class CertificateService {
       };
     }
 
-    // 4. Verify enrollment completion state
-    if (enrollment.status !== 'COMPLETED' || !enrollment.completedAt) {
+    // 4. Verify enrollment access
+    if (enrollment.status === 'CANCELLED') {
       return {
         status: 'NOT_ELIGIBLE',
         issued: false,
-        reason: 'Enrollment status is not COMPLETED or completedAt is missing',
-        details: {
-          enrollmentStatus: enrollment.status,
-          completedAt: enrollment.completedAt,
-        },
+        reason: 'Enrollment has been cancelled or revoked',
       };
     }
 
@@ -177,6 +177,36 @@ export class CertificateService {
           hasUnpassedFinalExam: eligibility.hasUnpassedFinalExam,
         },
       };
+    }
+
+    // Synchronize enrollment completion state if needed
+    let completedDate = enrollment.completedAt;
+    if (enrollment.status !== 'COMPLETED' || !completedDate) {
+      completedDate = new Date();
+      await this.db
+        .update(enrollments)
+        .set({
+          status: 'COMPLETED',
+          completedAt: completedDate,
+          updatedAt: new Date(),
+        })
+        .where(eq(enrollments.id, enrollmentId));
+
+      await this.auditService.record({
+        actorId: context?.actorId || enrollment.studentId,
+        action: 'ENROLLMENT_COMPLETED',
+        targetType: 'ENROLLMENT',
+        targetId: enrollmentId,
+        ipAddress: context?.ipAddress || null,
+        userAgent: context?.userAgent || null,
+        requestId: context?.requestId || null,
+        metadata: {
+          courseId: course.id,
+          studentId: enrollment.studentId,
+          completedAt: completedDate.toISOString(),
+          autoCompletedOnCertificateIssuance: true,
+        },
+      });
     }
 
     // 6. Calculate deterministic final score snapshot
@@ -232,7 +262,7 @@ export class CertificateService {
             studentName: student.name,
             courseTitle: course.title,
             instructorName: instructor.name,
-            completedAt: enrollment.completedAt,
+            completedAt: completedDate,
             issuedAt,
             finalScorePercentage,
             status: 'ACTIVE',
@@ -586,6 +616,200 @@ export class CertificateService {
       )
       .limit(1);
     return enrollment || null;
+  }
+
+  /**
+   * Helper: Retrieve course by ID
+   */
+  async getCourseById(courseId: string) {
+    const [course] = await this.db
+      .select()
+      .from(courses)
+      .where(eq(courses.id, courseId))
+      .limit(1);
+    return course || null;
+  }
+
+  /**
+   * Helper: Retrieve course by slug
+   */
+  async getCourseBySlug(slug: string) {
+    const [course] = await this.db
+      .select()
+      .from(courses)
+      .where(eq(courses.slug, slug))
+      .limit(1);
+    return course || null;
+  }
+
+  /**
+   * Helper: Resolve course by UUID or slug
+   */
+  async resolveCourse(courseIdentifier: string) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(courseIdentifier);
+    if (isUuid) {
+      const course = await this.getCourseById(courseIdentifier);
+      if (course) return course;
+    }
+    return await this.getCourseBySlug(courseIdentifier);
+  }
+
+  /**
+   * Authoritative certificate eligibility assessment for a student in a course.
+   * Evaluates lesson completion, published quizzes, and final exams.
+   * Returns strongly-typed diagnostic state without creating state mutations.
+   */
+  async getCertificateEligibility(
+    courseIdentifier: string,
+    studentId: string
+  ): Promise<CertificateEligibilityDto> {
+    const course = await this.resolveCourse(courseIdentifier);
+    if (!course) {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(courseIdentifier);
+      if (!isUuid) {
+        throw new ApiException('Invalid course ID format', HttpStatus.BAD_REQUEST, 'INVALID_ID');
+      }
+      throw new ApiException('Course not found', HttpStatus.NOT_FOUND, 'COURSE_NOT_FOUND');
+    }
+
+    const enrollment = await this.getEnrollment(course.id, studentId);
+    if (!enrollment) {
+      return {
+        status: 'ENROLLMENT_REQUIRED',
+        isEligible: false,
+        courseId: course.id,
+        courseTitle: course.title,
+        progressPercentage: 0,
+        totalLessons: 0,
+        completedLessons: 0,
+        publishedQuizzes: 0,
+        passedQuizzes: 0,
+        hasUnpassedQuizzes: false,
+        hasUnpassedFinalExam: false,
+        reason: 'Enrollment required: You are not enrolled in this course',
+      };
+    }
+
+    if (enrollment.status === 'CANCELLED') {
+      return {
+        status: 'ACCESS_DENIED',
+        isEligible: false,
+        courseId: course.id,
+        courseTitle: course.title,
+        enrollmentId: enrollment.id,
+        progressPercentage: 0,
+        totalLessons: 0,
+        completedLessons: 0,
+        publishedQuizzes: 0,
+        passedQuizzes: 0,
+        hasUnpassedQuizzes: false,
+        hasUnpassedFinalExam: false,
+        reason: 'Access denied: Enrollment has been cancelled',
+      };
+    }
+
+    // Check if certificate already exists
+    const existingCert = await this.getCertificateByEnrollment(enrollment.id);
+    const eligibility = await this.checkEligibility(enrollment.id, course.id);
+    const totalItems = eligibility.totalLessons + eligibility.publishedQuizzes;
+    const completedItems = eligibility.completedLessons + eligibility.passedQuizzes;
+    const progressPercentage =
+      totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100);
+
+    if (existingCert) {
+      return {
+        status: 'ALREADY_ISSUED',
+        isEligible: true,
+        courseId: course.id,
+        courseTitle: existingCert.courseTitle,
+        enrollmentId: enrollment.id,
+        certificateNumber: existingCert.certificateNumber,
+        issuedAt:
+          existingCert.issuedAt instanceof Date
+            ? existingCert.issuedAt.toISOString()
+            : String(existingCert.issuedAt),
+        progressPercentage: 100,
+        totalLessons: eligibility.totalLessons,
+        completedLessons: eligibility.completedLessons,
+        publishedQuizzes: eligibility.publishedQuizzes,
+        passedQuizzes: eligibility.passedQuizzes,
+        hasUnpassedQuizzes: false,
+        hasUnpassedFinalExam: false,
+        reason: 'Certificate already issued for this course enrollment',
+      };
+    }
+
+    if (!eligibility.isEligible) {
+      let status: CertificateEligibilityStatus;
+      if (eligibility.completedLessons < eligibility.totalLessons) {
+        status = 'COURSE_INCOMPLETE';
+      } else if (eligibility.hasUnpassedQuizzes || eligibility.hasUnpassedFinalExam) {
+        status = 'ASSESSMENT_INCOMPLETE';
+      } else {
+        status = 'COURSE_INCOMPLETE';
+      }
+
+      return {
+        status,
+        isEligible: false,
+        courseId: course.id,
+        courseTitle: course.title,
+        enrollmentId: enrollment.id,
+        progressPercentage,
+        totalLessons: eligibility.totalLessons,
+        completedLessons: eligibility.completedLessons,
+        publishedQuizzes: eligibility.publishedQuizzes,
+        passedQuizzes: eligibility.passedQuizzes,
+        hasUnpassedQuizzes: eligibility.hasUnpassedQuizzes,
+        hasUnpassedFinalExam: eligibility.hasUnpassedFinalExam,
+        reason: eligibility.reason || 'Curriculum completion criteria not satisfied',
+      };
+    }
+
+    return {
+      status: 'ELIGIBLE',
+      isEligible: true,
+      courseId: course.id,
+      courseTitle: course.title,
+      enrollmentId: enrollment.id,
+      progressPercentage: 100,
+      totalLessons: eligibility.totalLessons,
+      completedLessons: eligibility.completedLessons,
+      publishedQuizzes: eligibility.publishedQuizzes,
+      passedQuizzes: eligibility.passedQuizzes,
+      hasUnpassedQuizzes: false,
+      hasUnpassedFinalExam: false,
+      reason: 'Course requirements fully satisfied; certificate is ready for issuance',
+    };
+  }
+
+  /**
+   * Issue certificate by course identifier (slug or UUID) and student ID
+   */
+  async issueCertificateForCourse(
+    courseIdentifier: string,
+    studentId: string,
+    context?: CertificateIssuanceContext
+  ): Promise<IssueCertificateResult> {
+    const course = await this.resolveCourse(courseIdentifier);
+    if (!course) {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(courseIdentifier);
+      if (!isUuid) {
+        throw new ApiException('Invalid course ID format', HttpStatus.BAD_REQUEST, 'INVALID_ID');
+      }
+      throw new ApiException('Course not found', HttpStatus.NOT_FOUND, 'COURSE_NOT_FOUND');
+    }
+
+    const enrollment = await this.getEnrollment(course.id, studentId);
+    if (!enrollment) {
+      return {
+        status: 'ENROLLMENT_NOT_FOUND',
+        issued: false,
+        reason: `Enrollment not found for student ${studentId} in course ${course.id}`,
+      };
+    }
+
+    return this.issueCertificateIfEligible(enrollment.id, context);
   }
 
   /**
