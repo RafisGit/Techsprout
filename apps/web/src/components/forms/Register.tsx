@@ -2,6 +2,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -17,8 +18,10 @@ import { useOtpStore } from '@/store/Otpstore';
 import { axiosInstance } from '@/lib/axiosInstance';
 import { useState } from 'react';
 import { Input } from '../ui/input';
+import { useTranslation } from '@/i18n';
 
 export default function RegisterForm() {
+  const { t } = useTranslation();
   const { setModalStatus, setPhoneNumber } = useOtpStore();
   const [serverError, setServerError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -76,7 +79,7 @@ export default function RegisterForm() {
         };
       };
       const errData = errorObj.response?.data;
-      let message = errData?.message || 'Registration failed. Please check your information.';
+      let message = errData?.message || t('auth.registerFailed');
 
       if (errData?.details && typeof errData.details === 'object') {
         const fieldMessages: string[] = [];
@@ -105,7 +108,7 @@ export default function RegisterForm() {
   return (
     <section className='common-container flex min-h-screen items-center justify-center py-20'>
       <div className='bg-accent/5 w-full max-w-lg rounded-lg p-6 shadow-md'>
-        <h2 className='text-2xl font-bold text-center mb-6'>Create an Account</h2>
+        <h2 className='text-2xl font-bold text-center mb-6'>{t('auth.createAccountTitle')}</h2>
         {serverError && (
           <div className='mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 text-sm'>
             {serverError}
@@ -118,11 +121,11 @@ export default function RegisterForm() {
               name='name'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className='text-md'>Full Name</FormLabel>
+                  <FormLabel className='text-md'>{t('auth.fullName')}</FormLabel>
                   <FormControl>
                     <Input
                       type='text'
-                      placeholder='Enter your full name'
+                      placeholder={t('auth.fullNamePlaceholder')}
                       {...field}
                       className='h-12 rounded-xl bg-white'
                     />
@@ -136,11 +139,11 @@ export default function RegisterForm() {
               name='userName'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className='text-md'>Username</FormLabel>
+                  <FormLabel className='text-md'>{t('auth.username')}</FormLabel>
                   <FormControl>
                     <Input
                       type='text'
-                      placeholder='Enter your username'
+                      placeholder={t('auth.usernamePlaceholder')}
                       {...field}
                       className='h-12 rounded-xl bg-white'
                     />
@@ -154,11 +157,11 @@ export default function RegisterForm() {
               name='email'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className='text-md'>Email</FormLabel>
+                  <FormLabel className='text-md'>{t('auth.email')}</FormLabel>
                   <FormControl>
                     <Input
                       type='email'
-                      placeholder='Enter your email address'
+                      placeholder={t('auth.emailPlaceholder')}
                       {...field}
                       className='h-12 rounded-xl bg-white'
                     />
@@ -172,11 +175,11 @@ export default function RegisterForm() {
               name='phoneNumber'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className='text-md'>Phone Number</FormLabel>
+                  <FormLabel className='text-md'>{t('auth.phone')}</FormLabel>
                   <FormControl>
                     <Input
                       type='text'
-                      placeholder='017XXXXXXXX'
+                      placeholder={t('auth.phonePlaceholder')}
                       {...field}
                       className='h-12 rounded-xl bg-white'
                     />
@@ -190,17 +193,17 @@ export default function RegisterForm() {
               name='password'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className='text-md'>Password</FormLabel>
+                  <FormLabel className='text-md'>{t('auth.password')}</FormLabel>
                   <FormControl>
                     <Input
                       type='password'
-                      placeholder='Enter your password (min. 8 characters)'
+                      placeholder={t('auth.passwordPlaceholder')}
                       {...field}
                       className='h-12 rounded-xl bg-white'
                     />
                   </FormControl>
                   <p className='text-xs text-muted-foreground mt-1'>
-                    Must be at least 8 characters with uppercase, lowercase, and numbers.
+                    {t('auth.passwordRequirements')}
                   </p>
                   <FormMessage />
                 </FormItem>
@@ -211,11 +214,11 @@ export default function RegisterForm() {
               name='passwordConfirmation'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className='text-md'>Confirm Password</FormLabel>
+                  <FormLabel className='text-md'>{t('auth.confirmPassword')}</FormLabel>
                   <FormControl>
                     <Input
                       type='password'
-                      placeholder='Confirm your password'
+                      placeholder={t('auth.confirmPasswordPlaceholder')}
                       {...field}
                       className='h-12 rounded-xl bg-white'
                     />
@@ -229,8 +232,14 @@ export default function RegisterForm() {
               disabled={isSubmitting}
               className='bg-primary hover:bg-accent w-full h-12 text-base font-semibold'
             >
-              {isSubmitting ? 'Registering...' : 'REGISTER'}
+              {isSubmitting ? t('auth.registering') : t('auth.registerButton')}
             </Button>
+            <div className='text-center text-sm text-gray-600 pt-2'>
+              {t('auth.alreadyHaveAccount')}{' '}
+              <Link href='/login' className='text-primary font-semibold hover:underline'>
+                {t('auth.loginHere')}
+              </Link>
+            </div>
           </form>
         </Form>
       </div>

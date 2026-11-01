@@ -2,6 +2,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -16,8 +17,10 @@ import { useState } from 'react';
 import { Input } from '../ui/input';
 import { loginSchema } from '@/schemas/loginSchema';
 import { getPostLoginRedirect } from '@/lib/session';
+import { useTranslation } from '@/i18n';
 
 export default function Login() {
+  const { t } = useTranslation();
   const [serverError, setServerError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -45,7 +48,7 @@ export default function Login() {
         const targetUrl = getPostLoginRedirect(response.data.user?.role);
         window.location.href = targetUrl;
       } else {
-        setServerError(response.data.message || 'Login failed. Please verify your credentials.');
+        setServerError(response.data.message || t('auth.loginFailed'));
       }
     } catch (err: unknown) {
       const errorObj = err as {
@@ -56,9 +59,9 @@ export default function Login() {
       if (errorObj.response?.data?.message) {
         setServerError(errorObj.response.data.message);
       } else if (!errorObj.response) {
-        setServerError('Unable to connect to the server. Please check your connection and try again.');
+        setServerError(t('auth.connectionError'));
       } else {
-        setServerError('Invalid email or password');
+        setServerError(t('auth.invalidCredentials'));
       }
     } finally {
       setIsSubmitting(false);
@@ -68,7 +71,7 @@ export default function Login() {
   return (
     <section className='common-container flex items-center justify-center py-20'>
       <div className='bg-accent/5 w-full max-w-lg rounded-lg p-6 shadow-md'>
-        <h2 className='text-2xl font-bold text-center mb-6'>Sign In to Your Account</h2>
+        <h2 className='text-2xl font-bold text-center mb-6'>{t('auth.signInTitle')}</h2>
         {serverError && (
           <div className='mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 text-sm'>
             {serverError}
@@ -81,11 +84,11 @@ export default function Login() {
               name='email'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className='text-md'>Email</FormLabel>
+                  <FormLabel className='text-md'>{t('auth.email')}</FormLabel>
                   <FormControl>
                     <Input
                       type='email'
-                      placeholder='Enter your email address'
+                      placeholder={t('auth.emailPlaceholder')}
                       {...field}
                       className='h-12 rounded-xl bg-white'
                     />
@@ -99,11 +102,11 @@ export default function Login() {
               name='password'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className='text-md'>Password</FormLabel>
+                  <FormLabel className='text-md'>{t('auth.password')}</FormLabel>
                   <FormControl>
                     <Input
                       type='password'
-                      placeholder='Enter your password'
+                      placeholder={t('auth.passwordPlaceholder')}
                       {...field}
                       className='h-12 rounded-xl bg-white'
                     />
@@ -117,8 +120,14 @@ export default function Login() {
               disabled={isSubmitting}
               className='bg-primary hover:bg-accent w-full h-12 text-base font-semibold'
             >
-              {isSubmitting ? 'Signing in...' : 'Login'}
+              {isSubmitting ? t('auth.signingIn') : t('auth.loginButton')}
             </Button>
+            <div className='text-center text-sm text-gray-600 pt-2'>
+              {t('auth.dontHaveAccount')}{' '}
+              <Link href='/register' className='text-primary font-semibold hover:underline'>
+                {t('auth.registerHere')}
+              </Link>
+            </div>
           </form>
         </Form>
       </div>

@@ -1,3 +1,5 @@
+'use client';
+
 import Hero from '@/components/Hero';
 import Title from '@/components/Title';
 import {
@@ -7,11 +9,14 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { faqs } from '@/lib/mockData/mockData';
+import { useTranslation } from '@/i18n';
 
-export default function page() {
+export default function FAQPage() {
+  const { t } = useTranslation();
+
   return (
     <>
-      <Hero pageName='FAQ' />
+      <Hero pageName={t('nav.faq')} />
       <section className='mx-auto my-8 px-4 lg:my-16 xl:max-w-2/3'>
         <Accordion type='single' collapsible className='w-full'>
           {faqs.map(({ question, answer }, idx) => (

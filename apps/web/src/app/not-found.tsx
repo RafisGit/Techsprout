@@ -1,25 +1,29 @@
+'use client';
+
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { useTranslation } from '@/i18n';
 
 export default function NotFound() {
+  const { t } = useTranslation();
+
   return (
     <section className='bg-white dark:bg-gray-900'>
       <div className='container mx-auto flex min-h-screen items-center justify-center px-6 py-12'>
         <div className='w-full'>
           <div className='mx-auto flex max-w-lg flex-col items-center text-center'>
-            <p className='text-primary text-2xl font-medium'>404 error</p>
+            <p className='text-primary text-2xl font-medium'>{t('notFound.errorCode')}</p>
             <h1 className='mt-3 text-2xl font-semibold text-gray-800 md:text-3xl dark:text-white'>
-              We lost this page
+              {t('notFound.title')}
             </h1>
             <p className='mt-4 text-gray-500 dark:text-gray-400'>
-              We searched high and low, but couldn’t find what you’re looking for.Let’s find a
-              better place for you to go.
+              {t('notFound.description')}
             </p>
 
             <div className='mt-6 flex w-full shrink-0 items-center gap-x-3 sm:w-auto'>
               <Link href={'/'}>
                 <Button size={'lg'} className='capitalize'>
-                  Take Me Home
+                  {t('notFound.takeMeHome')}
                 </Button>
               </Link>
             </div>
@@ -44,17 +48,19 @@ export default function NotFound() {
                 </svg>
               </span>
 
-              <h3 className='mt-6 font-medium text-gray-700 dark:text-gray-200'>Courses</h3>
+              <h3 className='mt-6 font-medium text-gray-700 dark:text-gray-200'>
+                {t('notFound.coursesCardTitle')}
+              </h3>
 
               <p className='mt-2 text-gray-500 dark:text-gray-400'>
-                Dive in to learn all about our product.
+                {t('notFound.coursesCardDesc')}
               </p>
 
               <Link
                 href='/courses'
                 className='mt-4 inline-flex items-center gap-x-2 text-sm text-blue-500 hover:underline dark:text-blue-400'
               >
-                <span>Start learning</span>
+                <span>{t('notFound.startLearning')}</span>
 
                 <svg
                   xmlns='http://www.w3.org/2000/svg'
@@ -91,17 +97,19 @@ export default function NotFound() {
                 </svg>
               </span>
 
-              <h3 className='mt-6 font-medium text-gray-700 dark:text-gray-200'>Our blog</h3>
+              <h3 className='mt-6 font-medium text-gray-700 dark:text-gray-200'>
+                {t('notFound.blogCardTitle')}
+              </h3>
 
               <p className='mt-2 text-gray-500 dark:text-gray-400'>
-                Read the latest posts on our blog.
+                {t('notFound.blogCardDesc')}
               </p>
 
               <Link
                 href='/blogs'
                 className='mt-4 inline-flex items-center gap-x-2 text-sm text-blue-500 hover:underline dark:text-blue-400'
               >
-                <span>View lastest posts</span>
+                <span>{t('notFound.viewLatestPosts')}</span>
 
                 <svg
                   xmlns='http://www.w3.org/2000/svg'
@@ -138,17 +146,19 @@ export default function NotFound() {
                 </svg>
               </span>
 
-              <h3 className='mt-6 font-medium text-gray-700 dark:text-gray-200'>Chat to us</h3>
+              <h3 className='mt-6 font-medium text-gray-700 dark:text-gray-200'>
+                {t('notFound.chatCardTitle')}
+              </h3>
 
               <p className='mt-2 text-gray-500 dark:text-gray-400'>
-                Can’t find what you’re looking for?
+                {t('notFound.chatCardDesc')}
               </p>
 
               <Link
                 href='/contact'
                 className='mt-4 inline-flex items-center gap-x-2 text-sm text-blue-500 hover:underline dark:text-blue-400'
               >
-                <span>Contact Us</span>
+                <span>{t('notFound.contactUs')}</span>
 
                 <svg
                   xmlns='http://www.w3.org/2000/svg'

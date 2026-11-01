@@ -1,10 +1,15 @@
+'use client';
+
 import Login from '@/components/forms/Login';
 import Hero from '@/components/Hero';
+import { useTranslation } from '@/i18n';
 
-export default function page() {
+export default function LoginPage() {
+  const { t } = useTranslation();
+
   return (
     <>
-      <Hero pageName='Login' />
+      <Hero pageName={t('actions.login')} />
       <Login />
     </>
   );

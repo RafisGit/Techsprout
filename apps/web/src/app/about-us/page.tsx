@@ -1,3 +1,5 @@
+'use client';
+
 import AnimatedText from '@/components/AnimatedText';
 import Hero from '@/components/Hero';
 import Title from '@/components/Title';
@@ -14,30 +16,28 @@ import aboutShape3 from '@/assets/img/shapes/about_dots.svg';
 import TopInstructors from '@/components/sections/home/TopInstructors';
 import Offer from '@/components/Offer';
 import Skills from '@/components/sections/aboutUs/Skills';
+import { useTranslation } from '@/i18n';
 
-export default function page() {
+export default function AboutUsPage() {
+  const { t } = useTranslation();
+
   return (
     <>
-      <Hero pageName='About Us' />
+      <Hero pageName={t('nav.aboutUs')} />
       {/* Who we are */}
       <section className='container mx-auto grid grid-cols-1 items-center gap-4 px-4 py-16 md:grid-cols-2 lg:py-28 xl:grid-cols-3'>
         <div className='col-span-1 space-y-4'>
-          <TextBadge>Who we are</TextBadge>
+          <TextBadge>{t('about.badge')}</TextBadge>
           <Title h={2}>
-            The Leading <AnimatedText text='Place' /> For Learning
-            <span className='text-primary'>&</span>
-            Instruction
+            {t('about.headingPrefix')} <AnimatedText text={t('about.headingWord')} /> {t('about.headingSuffix')}
           </Title>
           <p>
-            Our mission is to inspire curiosity, creativity, and innovation — shaping tomorrow’s
-            tech leaders today.Discover top instructors from across the globe, bringing world-class
-            knowledge straight to your screen. At TechSprout School, learning goes beyond boundaries
-            with expert guidance in coding, AI, and digital skills.
+            {t('about.description')}
           </p>
           <div>
             <Link href={'/courses'}>
               <Button size={'lg'} isArrow={true}>
-                Explore Courses
+                {t('about.exploreCourses')}
               </Button>
             </Link>
           </div>
