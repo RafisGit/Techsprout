@@ -226,7 +226,8 @@ No schema changes were required. The existing Drizzle schema for `certificates` 
 
 ### 8. Work Package Status
 
-**WP-P11-01 Result:** **COMPLETE**
+**WP-P11-01 Result:** **COMPLETE**  
+**Implementation Commit SHA:** `26f7c5d`  
 
 - Authoritative existing course-completion rules enforced.
 - Incomplete students strictly prevented from issuing certificates.
