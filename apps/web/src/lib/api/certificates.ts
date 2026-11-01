@@ -57,3 +57,34 @@ export async function verifyCertificate(
 }
 
 export const getPublicCertificateVerification = verifyCertificate;
+
+/**
+ * Download certificate PDF for an enrolled course.
+ * GET /api/v1/courses/:courseId/certificate/download?lang=en|bn
+ */
+export async function downloadCertificatePdf(
+  courseId: string,
+  lang: 'en' | 'bn' = 'en'
+): Promise<Blob> {
+  const response = await axiosInstance.get(`/api/v1/courses/${courseId}/certificate/download`, {
+    params: { lang },
+    responseType: 'blob',
+  });
+  return response.data;
+}
+
+/**
+ * Download certificate PDF by certificate number.
+ * GET /api/v1/certificates/:certificateNumber/download?lang=en|bn
+ */
+export async function downloadCertificateByNumberPdf(
+  certificateNumber: string,
+  lang: 'en' | 'bn' = 'en'
+): Promise<Blob> {
+  const encoded = encodeURIComponent(certificateNumber.trim());
+  const response = await axiosInstance.get(`/api/v1/certificates/${encoded}/download`, {
+    params: { lang },
+    responseType: 'blob',
+  });
+  return response.data;
+}

@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { fetchPublicCourseBySlug } from '@/lib/api/catalog';
-import { fetchStudentCertificate, fetchCertificateEligibility, issueCertificate } from '@/lib/api/certificates';
+import { fetchStudentCertificate, fetchCertificateEligibility, issueCertificate, downloadCertificatePdf } from '@/lib/api/certificates';
 import { fetchCourseEnrollmentStatus } from '@/lib/api/learning';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { CertificateDocument } from '@/components/certificate/CertificateDocument';
@@ -26,11 +26,14 @@ import {
 } from 'lucide-react';
 
 export default function StudentCertificatePage() {
-  const { t, formatNumber } = useTranslation();
+  const { t, locale, formatNumber } = useTranslation();
   const params = useParams();
   const courseSlug = params?.courseSlug as string;
 
   const [isCopied, setIsCopied] = useState(false);
+  const [pdfLang, setPdfLang] = useState<'en' | 'bn'>(locale === 'bn' ? 'bn' : 'en');
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadFeedback, setDownloadFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const { data: currentUser, isLoading: isAuthLoading } = useCurrentUser();
 
   // 1. Resolve Course to obtain course.id
@@ -111,6 +114,34 @@ export default function StudentCertificatePage() {
     isAuthLoading ||
     isCourseLoading ||
     (!!currentUser && !!courseId && isCertLoading);
+
+  const handleDownloadPdf = async () => {
+    if (!courseId || !certificate) return;
+    setIsDownloading(true);
+    setDownloadFeedback(null);
+    try {
+      const blob = await downloadCertificatePdf(courseId, pdfLang);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `TechSprout-Certificate-${certificate.certificateNumber}-${pdfLang}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setDownloadFeedback({ type: 'success', message: t.certificate.downloadSuccess });
+      setTimeout(() => setDownloadFeedback(null), 4000);
+    } catch (err: any) {
+      console.error('Download certificate error:', err);
+      setDownloadFeedback({
+        type: 'error',
+        message: err?.response?.data?.message || t.certificate.downloadFailed,
+      });
+      setTimeout(() => setDownloadFeedback(null), 5000);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const handlePrint = () => {
     if (typeof window !== 'undefined') {
@@ -437,6 +468,26 @@ export default function StudentCertificatePage() {
 
       {/* Main Certificate Content Area */}
       <main className='container mx-auto px-4 max-w-5xl pt-8 sm:pt-12'>
+        {/* Download Feedback Notification */}
+        {downloadFeedback && (
+          <div
+            role='status'
+            aria-live='polite'
+            className={`no-print mb-4 p-3.5 rounded-xl border text-xs sm:text-sm font-medium flex items-center gap-2 shadow-2xs ${
+              downloadFeedback.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : 'bg-rose-50 border-rose-200 text-rose-900'
+            }`}
+            data-testid='download-feedback-banner'
+          >
+            {downloadFeedback.type === 'success' ? (
+              <Check className='w-4 h-4 text-emerald-600 shrink-0' />
+            ) : (
+              <AlertCircle className='w-4 h-4 text-rose-600 shrink-0' />
+            )}
+            <span>{downloadFeedback.message}</span>
+          </div>
+        )}
         {/* Historical Certificate Notice (when course curriculum has expanded and enrollment is ACTIVE) */}
         {isHistoricalActive && (
           <div

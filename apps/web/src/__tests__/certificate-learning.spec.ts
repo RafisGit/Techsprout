@@ -6,6 +6,8 @@ import {
   getStudentCertificate,
   verifyCertificate,
   getPublicCertificateVerification,
+  downloadCertificatePdf,
+  downloadCertificateByNumberPdf,
 } from '@/lib/api/certificates';
 import {
   CertificateDocument,
@@ -988,6 +990,54 @@ describe('P4.5.4 — Certificate Frontend & Public Verification Test Suite', () 
 
       expect(certificateApiCalls.length).toBe(0);
       expect(axiosInstance.get).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Phase 11.2 / WP-P11-02 — Certificate PDF Download Client Tests', () => {
+    it('calls GET /api/v1/courses/:courseId/certificate/download with blob responseType and lang parameter', async () => {
+      const mockBlob = new Blob(['%PDF-1.3 fake pdf content'], { type: 'application/pdf' });
+      vi.mocked(axiosInstance.get).mockResolvedValueOnce({ data: mockBlob });
+
+      const result = await downloadCertificatePdf('course-uuid-1', 'en');
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/v1/courses/course-uuid-1/certificate/download', {
+        params: { lang: 'en' },
+        responseType: 'blob',
+      });
+      expect(result).toBe(mockBlob);
+    });
+
+    it('defaults language to en if not specified', async () => {
+      const mockBlob = new Blob(['%PDF-1.3 fake pdf content'], { type: 'application/pdf' });
+      vi.mocked(axiosInstance.get).mockResolvedValueOnce({ data: mockBlob });
+
+      await downloadCertificatePdf('course-uuid-1');
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/v1/courses/course-uuid-1/certificate/download', {
+        params: { lang: 'en' },
+        responseType: 'blob',
+      });
+    });
+
+    it('supports bn language parameter for Bangla PDF downloads', async () => {
+      const mockBlob = new Blob(['%PDF-1.3 fake bn pdf content'], { type: 'application/pdf' });
+      vi.mocked(axiosInstance.get).mockResolvedValueOnce({ data: mockBlob });
+
+      await downloadCertificatePdf('course-uuid-1', 'bn');
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/v1/courses/course-uuid-1/certificate/download', {
+        params: { lang: 'bn' },
+        responseType: 'blob',
+      });
+    });
+
+    it('supports downloading certificate PDF by certificate number', async () => {
+      const mockBlob = new Blob(['%PDF-1.3 fake pdf content'], { type: 'application/pdf' });
+      vi.mocked(axiosInstance.get).mockResolvedValueOnce({ data: mockBlob });
+
+      const result = await downloadCertificateByNumberPdf('TSP-2026-CA1B2C3D4', 'bn');
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/v1/certificates/TSP-2026-CA1B2C3D4/download', {
+        params: { lang: 'bn' },
+        responseType: 'blob',
+      });
+      expect(result).toBe(mockBlob);
     });
   });
 });
