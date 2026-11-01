@@ -5,13 +5,15 @@ export type CertificateStatus = 'ACTIVE' | 'REVOKED';
 export type {
   CertificateEligibilityStatus,
   CertificateEligibilityDto,
+  VerificationResultStatus,
 } from '@techsprout/contracts';
 
 export const certificateNumberSchema = z
   .string({ required_error: 'Certificate number is required' })
   .trim()
   .min(1, 'Certificate number is required')
-  .max(50, 'Certificate number cannot exceed 50 characters');
+  .max(50, 'Certificate number cannot exceed 50 characters')
+  .regex(/^[a-zA-Z0-9_\-]+$/, 'Certificate number contains invalid characters');
 
 export interface CertificateDto {
   id: string;
@@ -30,6 +32,7 @@ export interface CertificateDto {
 
 export interface PublicCertificateVerificationDto {
   isValid: boolean;
+  verificationStatus?: 'VALID' | 'REVOKED' | 'NOT_FOUND';
   certificateNumber: string;
   status: CertificateStatus;
   studentName: string;
@@ -37,6 +40,7 @@ export interface PublicCertificateVerificationDto {
   instructorName?: string;
   completedAt?: string;
   issuedAt?: string;
+  verificationUrl?: string;
   finalScorePercentage?: number | null;
   revokedAt?: string | null;
   revocationReason?: string | null;
@@ -101,18 +105,24 @@ export function mapToStudentCertificateDto(cert: {
   };
 }
 
-export function mapToPublicVerificationDto(cert: {
-  certificateNumber: string;
-  studentName: string;
-  courseTitle: string;
-  instructorName?: string;
-  completedAt?: Date | string | null;
-  issuedAt?: Date | string | null;
-  finalScorePercentage?: number | null;
-  status: CertificateStatus;
-  revokedAt?: Date | string | null;
-  revocationReason?: string | null;
-}): PublicCertificateVerificationDto {
+export function mapToPublicVerificationDto(
+  cert: {
+    certificateNumber: string;
+    studentName: string;
+    courseTitle: string;
+    instructorName?: string;
+    completedAt?: Date | string | null;
+    issuedAt?: Date | string | null;
+    finalScorePercentage?: number | null;
+    status: CertificateStatus;
+    revokedAt?: Date | string | null;
+    revocationReason?: string | null;
+  },
+  baseUrl: string = 'https://techsprout.edu'
+): PublicCertificateVerificationDto {
+  const cleanBase = baseUrl.replace(/\/+$/, '');
+  const verificationUrl = `${cleanBase}/verify/${encodeURIComponent(cert.certificateNumber)}`;
+
   if (cert.status === 'REVOKED') {
     const revokedAt = cert.revokedAt
       ? cert.revokedAt instanceof Date
@@ -122,6 +132,7 @@ export function mapToPublicVerificationDto(cert: {
 
     return {
       isValid: false,
+      verificationStatus: 'REVOKED',
       certificateNumber: cert.certificateNumber,
       status: 'REVOKED',
       studentName: cert.studentName,
@@ -129,6 +140,7 @@ export function mapToPublicVerificationDto(cert: {
       instructorName: cert.instructorName,
       revokedAt,
       revocationReason: cert.revocationReason || undefined,
+      verificationUrl,
     };
   }
 
@@ -146,6 +158,7 @@ export function mapToPublicVerificationDto(cert: {
 
   return {
     isValid: true,
+    verificationStatus: 'VALID',
     certificateNumber: cert.certificateNumber,
     status: 'ACTIVE',
     studentName: cert.studentName,
@@ -154,6 +167,7 @@ export function mapToPublicVerificationDto(cert: {
     completedAt,
     issuedAt,
     finalScorePercentage: cert.finalScorePercentage,
+    verificationUrl,
   };
 }
 

@@ -715,8 +715,11 @@ export interface CertificateDto {
   revocationReason?: string | null;
 }
 
+export type VerificationResultStatus = 'VALID' | 'REVOKED' | 'NOT_FOUND';
+
 export interface PublicCertificateVerificationDto {
   isValid: boolean;
+  verificationStatus?: VerificationResultStatus;
   certificateNumber: string;
   status: CertificateStatus;
   studentName: string;
@@ -724,6 +727,7 @@ export interface PublicCertificateVerificationDto {
   instructorName?: string;
   completedAt?: string;
   issuedAt?: string;
+  verificationUrl?: string;
   finalScorePercentage?: number | null;
   revokedAt?: string | null;
   revocationReason?: string | null;

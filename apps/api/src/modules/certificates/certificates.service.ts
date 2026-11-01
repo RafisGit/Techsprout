@@ -564,10 +564,17 @@ export class CertificateService {
    * Helper: Retrieve certificate by public verification certificate number
    */
   async getCertificateByNumber(certificateNumber: string) {
+    const trimmed = (certificateNumber || '').trim();
     const [cert] = await this.db
       .select()
       .from(certificates)
-      .where(eq(certificates.certificateNumber, certificateNumber))
+      .where(
+        or(
+          eq(certificates.certificateNumber, trimmed),
+          eq(certificates.certificateNumber, trimmed.toUpperCase()),
+          ilike(certificates.certificateNumber, trimmed)
+        )
+      )
       .limit(1);
     return cert || null;
   }

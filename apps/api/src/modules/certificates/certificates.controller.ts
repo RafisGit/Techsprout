@@ -25,6 +25,7 @@ import { CertificatePdfService } from './certificate-pdf.service';
 import { AuthenticatedRequest } from '../../common/http/correlation-id.middleware';
 import { ApiException } from '../../common/errors/api-error';
 import { Public } from '../../common/auth/decorators/public.decorator';
+import { env } from '../../config/env.config';
 import {
   certificateNumberSchema,
   mapToStudentCertificateDto,
@@ -378,12 +379,16 @@ export class CertificatesController {
   @Get('certificates/verify/:certificateNumber')
   @ApiOperation({ summary: 'Public rate-limited certificate verification route' })
   @ApiResponse({ status: 200, description: 'Certificate verification result' })
+  @ApiResponse({ status: 400, description: 'Invalid certificate number format' })
   @ApiResponse({ status: 404, description: 'Certificate not found' })
   async verifyCertificate(
-    @Param('certificateNumber') certificateNumber: string
+    @Param('certificateNumber') certificateNumber: string,
+    @Res({ passthrough: true }) res: Response
   ) {
-    const parseNumber = certificateNumberSchema.safeParse(certificateNumber);
+    const trimmed = (certificateNumber || '').trim();
+    const parseNumber = certificateNumberSchema.safeParse(trimmed);
     if (!parseNumber.success) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       throw new ApiException(
         'Invalid certificate number format',
         HttpStatus.BAD_REQUEST,
@@ -394,6 +399,7 @@ export class CertificatesController {
 
     const cert = await this.certificateService.getCertificateByNumber(parseNumber.data);
     if (!cert) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       throw new ApiException(
         'Certificate not found',
         HttpStatus.NOT_FOUND,
@@ -401,13 +407,22 @@ export class CertificatesController {
       );
     }
 
+    const canonicalBaseUrl =
+      env.WEB_PUBLIC_ORIGIN && !env.WEB_PUBLIC_ORIGIN.includes('localhost')
+        ? env.WEB_PUBLIC_ORIGIN
+        : 'https://techsprout.edu';
+
+    // Safe public caching for immutable credential records
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+
     return {
       success: true,
       message:
         cert.status === 'REVOKED'
           ? 'Certificate has been administratively revoked'
           : 'Certificate verification successful',
-      data: mapToPublicVerificationDto(cert),
+      data: mapToPublicVerificationDto(cert, canonicalBaseUrl),
     };
   }
 }

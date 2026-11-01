@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -20,6 +20,8 @@ import {
   BookOpen,
   GraduationCap,
   RotateCcw,
+  Copy,
+  ExternalLink,
 } from 'lucide-react';
 
 export default function PublicCertificateVerificationResultPage() {
@@ -27,6 +29,8 @@ export default function PublicCertificateVerificationResultPage() {
   const params = useParams();
   const rawCertNumber = params?.certificateNumber as string;
   const certificateNumber = decodeURIComponent(rawCertNumber || '').trim();
+
+  const [isCopied, setIsCopied] = useState(false);
 
   // Call GET /api/v1/certificates/verify/:certificateNumber
   const {
@@ -42,6 +46,20 @@ export default function PublicCertificateVerificationResultPage() {
     retry: false,
     staleTime: 60 * 1000,
   });
+
+  const handleCopyVerificationUrl = () => {
+    const url =
+      verification?.verificationUrl ||
+      (typeof window !== 'undefined'
+        ? `${window.location.origin}/verify/${certificateNumber}`
+        : `https://techsprout.edu/verify/${certificateNumber}`);
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => {
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2500);
+      });
+    }
+  };
 
   // 1. Loading State
   if (isLoading) {
@@ -76,12 +94,13 @@ export default function PublicCertificateVerificationResultPage() {
               {t.certificate.verificationFailed}
             </span>
             <h1 className='text-2xl font-black text-gray-900 tracking-tight'>
-              {isNotFound ? t.certificate.certificateNotFound : t.certificate.verificationUnavailable}
+              {isNotFound ? t.certificate.certificateNotFound : t.certificate.temporaryFailure}
             </h1>
             <p className='text-xs sm:text-sm text-gray-500 leading-relaxed'>
               {isNotFound
-                ? t.certificate.notFoundDesc.replace('{id}', certificateNumber)
-                : t.certificate.networkErrorDesc}
+                ? t.certificate.notFoundExplanation ||
+                  t.certificate.notFoundDesc.replace('{id}', certificateNumber)
+                : t.certificate.temporaryFailureDesc}
             </p>
           </div>
 
@@ -207,10 +226,26 @@ export default function PublicCertificateVerificationResultPage() {
             </div>
           </div>
 
+          {/* Verification Meaning & Official Explanation */}
+          <div
+            className={`mt-6 p-4 rounded-2xl border text-xs sm:text-sm leading-relaxed ${
+              isRevoked
+                ? 'bg-rose-100/70 border-rose-200 text-rose-900'
+                : 'bg-emerald-100/70 border-emerald-200 text-emerald-950 font-medium'
+            }`}
+            data-testid='public-verification-explanation'
+          >
+            <div className='font-bold flex items-center gap-1.5 mb-1'>
+              <ShieldCheck className='w-4 h-4' />
+              <span>{t.certificate.verificationExplanation}</span>
+            </div>
+            <p>{isRevoked ? t.certificate.revokedExplanation : t.certificate.validExplanation}</p>
+          </div>
+
           {/* Revocation Details Warning (if REVOKED) */}
           {isRevoked && (
             <div
-              className='mt-6 p-4 rounded-2xl bg-rose-100/70 border border-rose-200 space-y-2'
+              className='mt-4 p-4 rounded-2xl bg-rose-100/70 border border-rose-200 space-y-2'
               data-testid='public-revocation-details'
             >
               <div className='text-xs font-bold text-rose-900 flex items-center gap-1.5'>
@@ -234,6 +269,44 @@ export default function PublicCertificateVerificationResultPage() {
               )}
             </div>
           )}
+
+          {/* Canonical Verification Link Box */}
+          <div className='mt-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-white/80 border border-gray-200/80'>
+            <div className='space-y-0.5 truncate max-w-lg'>
+              <span className='text-[10px] font-bold text-gray-400 uppercase tracking-wider block'>
+                {t.certificate.verifyOnline}
+              </span>
+              <span
+                className='font-mono text-xs text-gray-700 truncate block'
+                data-testid='canonical-verification-url'
+              >
+                {verification.verificationUrl ||
+                  (typeof window !== 'undefined'
+                    ? `${window.location.origin}/verify/${verification.certificateNumber}`
+                    : `https://techsprout.edu/verify/${verification.certificateNumber}`)}
+              </span>
+            </div>
+            <Button
+              type='button'
+              variant='outline'
+              size='sm'
+              onClick={handleCopyVerificationUrl}
+              className='shrink-0 rounded-lg text-xs font-semibold px-3 py-1.5 border-gray-200 hover:bg-gray-50 flex items-center gap-1'
+              data-testid='btn-copy-public-verification-url'
+            >
+              {isCopied ? (
+                <>
+                  <CheckCircle2 className='w-3.5 h-3.5 text-emerald-600' />
+                  <span className='text-emerald-700 font-bold'>{t.certificate.copied}</span>
+                </>
+              ) : (
+                <>
+                  <Copy className='w-3.5 h-3.5 text-gray-500' />
+                  <span>{t.certificate.copyLink}</span>
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* Credential Snapshot Data Grid */}
