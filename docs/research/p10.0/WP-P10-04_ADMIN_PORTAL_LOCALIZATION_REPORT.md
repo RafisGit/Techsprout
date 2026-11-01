@@ -164,5 +164,5 @@ next build
   - `8d70a13` (WP-P10-01 Report)
   - `cfdf1dc` (WP-P10-02 Student Portal Localization)
   - `e72baac` (WP-P10-03 Instructor Portal Localization)
-- **Work Package Commit:** `86dc1d8` (WP-P10-04 Admin Portal Localization)
+- **Implementation Commit:** `7e0e425` (`feat(p10): localize admin portal in Bangla and English`)
 - **Safe Working Tree:** Untracked legacy docs and scratch directories preserved untouched. No remote push or branch merge performed.
