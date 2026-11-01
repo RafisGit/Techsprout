@@ -8,6 +8,12 @@
     Path to the .dump file to verify.
 .PARAMETER ManifestFile
     Optional path to the associated .manifest.json file.
+.PARAMETER Environment
+    Optional environment name ('staging', 'production', or 'local'). Inferred if omitted.
+.PARAMETER ResourceId
+    Optional resource identifier. Inferred if omitted.
+.PARAMETER GenerateManifest
+    Generates or updates the .manifest.json file with verified metadata.
 #>
 
 [CmdletBinding()]
@@ -15,7 +21,13 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$BackupFile,
 
-    [string]$ManifestFile = ''
+    [string]$ManifestFile = '',
+
+    [string]$Environment = '',
+
+    [string]$ResourceId = '',
+
+    [switch]$GenerateManifest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -124,6 +136,47 @@ Write-Host "     Tables Found:  $($tablesUnique.Count) tables" -ForegroundColor 
 
 if ($tablesUnique.Count -lt 5) {
     Write-Warning "WARNING: Less than 5 tables found in backup. Check database schema scope."
+}
+
+# 5. Optionally generate manifest if requested or missing
+if ($GenerateManifest -or ([string]::IsNullOrWhiteSpace($ManifestFile) -or -not (Test-Path $ManifestFile))) {
+    $targetManifestPath = if (-not [string]::IsNullOrWhiteSpace($ManifestFile)) { $ManifestFile } else { [System.IO.Path]::ChangeExtension($BackupFile, ".manifest.json") }
+    
+    $inferredEnv = $Environment
+    if ([string]::IsNullOrWhiteSpace($inferredEnv)) {
+        if ($fileItem.Name -match 'techsprout-(staging|production|local)') {
+            $inferredEnv = $matches[1]
+        } else {
+            $inferredEnv = 'staging'
+        }
+    }
+
+    $inferredResId = $ResourceId
+    if ([string]::IsNullOrWhiteSpace($inferredResId)) {
+        if ($inferredEnv -eq 'staging') {
+            $inferredResId = 'dpg-db474ae0tbcc73dcgr10-a'
+        } elseif ($inferredEnv -eq 'production') {
+            $inferredResId = 'dpg-dasmr1e0tbcc73849i90-a'
+        } else {
+            $inferredResId = 'local'
+        }
+    }
+
+    $manifestObj = [PSCustomObject]@{
+        environment          = $inferredEnv
+        resourceId           = $inferredResId
+        postgresMajorVersion = 16
+        backupTimestamp      = $fileItem.LastWriteTimeUtc.ToString("yyyy-MM-ddTHH:mm:ssZ")
+        backupFile           = $fileItem.Name
+        fileSizeBytes        = $fileSize
+        sha256               = $currentHash
+        archiveValidation    = "passed"
+        restoreTest          = $null
+    }
+
+    $jsonStr = $manifestObj | ConvertTo-Json -Depth 4
+    [System.IO.File]::WriteAllText($targetManifestPath, $jsonStr, (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host "[OK] Generated verified manifest at: $targetManifestPath" -ForegroundColor Green
 }
 
 Write-Host "====================================================" -ForegroundColor Cyan

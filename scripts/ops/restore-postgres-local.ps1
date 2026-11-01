@@ -111,6 +111,31 @@ try {
     Write-Host "`n--- Primary Table Row Counts ---" -ForegroundColor Cyan
     & "$binDir\psql.exe" -h $SafetyHost -p $Port -U postgres -d $testDb -c $sqlCounts
 
+    # 8. Update manifest with verified restore test outcome
+    $manifestPath = [System.IO.Path]::ChangeExtension($BackupFile, ".manifest.json")
+    if (Test-Path $manifestPath) {
+        try {
+            $manifestObj = Get-Content $manifestPath -Raw | ConvertFrom-Json
+            $backupHash = (Get-FileHash -Algorithm SHA256 -Path $BackupFile).Hash
+            $pgVerOutput = & "$binDir\psql.exe" --version
+            $detectedMajor = 16
+            if ($pgVerOutput -match '(\d+)\.') {
+                $detectedMajor = [int]$matches[1]
+            }
+            $manifestObj.restoreTest = [PSCustomObject]@{
+                status               = "passed"
+                postgresMajorVersion = $detectedMajor
+                testedBackupSha256   = $backupHash
+                testedAt             = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            }
+            $jsonStr = $manifestObj | ConvertTo-Json -Depth 4
+            [System.IO.File]::WriteAllText($manifestPath, $jsonStr, (New-Object System.Text.UTF8Encoding($false)))
+            Write-Host "[OK] Recorded successful restore test in manifest: $manifestPath (PostgreSQL v$detectedMajor)" -ForegroundColor Green
+        } catch {
+            Write-Warning "Could not update manifest with restore outcome: $_"
+        }
+    }
+
     Write-Host "====================================================" -ForegroundColor Cyan
     Write-Host "SUCCESS: Isolated restore test completed successfully." -ForegroundColor Green
     Write-Host "====================================================" -ForegroundColor Cyan

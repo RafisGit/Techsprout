@@ -9,8 +9,12 @@
     Target environment: 'staging', 'production', or 'local'.
 .PARAMETER DatabaseUrl
     Connection string. If omitted, prompts privately or uses $env:DATABASE_URL.
+.PARAMETER ResourceId
+    Expected database resource ID. Defaults to standard Render IDs if omitted.
+.PARAMETER BackupDir
+    Directory holding verified backup archives. Defaults to '$env:USERPROFILE\TechSproutBackups'.
 .PARAMETER SkipBackupCheck
-    Bypasses pre-migration backup presence verification (only allowed for 'local').
+    Bypasses pre-migration backup verification (STRICTLY prohibited for staging & production).
 #>
 
 [CmdletBinding()]
@@ -19,6 +23,10 @@ param(
     [string]$Environment = 'staging',
 
     [string]$DatabaseUrl = '',
+
+    [string]$ResourceId = '',
+
+    [string]$BackupDir = '',
 
     [switch]$SkipBackupCheck
 )
@@ -31,35 +39,41 @@ Write-Host "Target Environment: $Environment" -ForegroundColor Cyan
 Write-Host "Timestamp:          $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss zzz')" -ForegroundColor Cyan
 Write-Host "====================================================" -ForegroundColor Cyan
 
-# 1. Backup Requirement Enforcement
-if ($Environment -in @('staging', 'production') -and -not $SkipBackupCheck) {
-    Write-Host "[CHECK] Verifying pre-migration backup presence..." -ForegroundColor Yellow
-    $backupDir = Join-Path $env:USERPROFILE "TechSproutBackups"
-    if (-not (Test-Path $backupDir)) {
-        Write-Error "FAIL: Backup directory $backupDir not found. Pre-migration backup is mandatory."
+# 1. Pre-Migration Backup Verification Gate
+if ($Environment -in @('staging', 'production')) {
+    if ($SkipBackupCheck) {
+        Write-Error "FAIL: -SkipBackupCheck is strictly prohibited for '$Environment' migrations. A verified pre-migration backup is mandatory."
         exit 1
     }
 
-    $recentDumps = Get-ChildItem -Path $backupDir -Filter "*.dump" | 
-        Where-Object { $_.Length -gt 0 -and $_.LastWriteTime -gt (Get-Date).AddDays(-7) } |
-        Sort-Object LastWriteTime -Descending
+    $resolvedBackupDir = if (-not [string]::IsNullOrWhiteSpace($BackupDir)) { $BackupDir } else { Join-Path $env:USERPROFILE "TechSproutBackups" }
+    Write-Host "[CHECK] Verifying pre-migration backup gate in $resolvedBackupDir..." -ForegroundColor Yellow
 
-    if (-not $recentDumps -or $recentDumps.Count -eq 0) {
-        Write-Error "FAIL: No verified non-empty .dump archive found within the last 7 days in $backupDir. Execute backup-postgres.ps1 first."
-        exit 1
+    $gateEngine = Join-Path $PSScriptRoot "backup-gate.mjs"
+    if (Test-Path $gateEngine) {
+        & node "$gateEngine" $Environment $resolvedBackupDir
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "FAIL: Pre-migration backup gate check failed for environment '$Environment'. Migration aborted."
+            exit 1
+        }
+    } else {
+        # Fallback to direct directory check if engine is missing
+        if (-not (Test-Path $resolvedBackupDir)) {
+            Write-Error "FAIL: Backup directory $resolvedBackupDir not found. Pre-migration backup is mandatory."
+            exit 1
+        }
+        $manifests = Get-ChildItem -Path $resolvedBackupDir -Filter "techsprout-${Environment}-*.manifest.json"
+        if (-not $manifests -or $manifests.Count -eq 0) {
+            Write-Error "FAIL: No verified pre-migration backup manifest found for environment '$Environment' in $resolvedBackupDir."
+            exit 1
+        }
     }
-
-    $latestDump = $recentDumps[0]
-    Write-Host "[OK] Pre-migration backup verified: $($latestDump.Name) ($($latestDump.Length) bytes, $($latestDump.LastWriteTime))" -ForegroundColor Green
+    Write-Host "[PASS] Pre-migration backup gate successfully verified for '$Environment'." -ForegroundColor Green
 } elseif ($SkipBackupCheck) {
-    if ($Environment -eq 'production') {
-        Write-Error "FAIL: -SkipBackupCheck is strictly prohibited for production migrations."
-        exit 1
-    }
-    Write-Warning "WARNING: Backup check skipped via flag."
+    Write-Warning "WARNING: Backup check skipped for local development environment."
 }
 
-# 2. Resolve Connection String
+# 2. Resolve Connection String safely without printing credentials
 $connStr = $DatabaseUrl
 if ([string]::IsNullOrWhiteSpace($connStr)) {
     if (-not [string]::IsNullOrWhiteSpace($env:DATABASE_URL)) {

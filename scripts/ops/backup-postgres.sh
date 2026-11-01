@@ -86,15 +86,38 @@ else
 fi
 echo "[OK] SHA-256 Checksum: ${SHA256}"
 
-# 7. Metadata Manifest
+# 7. Validate Archive via pg_restore --list
+ARCHIVE_VALIDATION="failed"
+if command -v pg_restore >/dev/null 2>&1; then
+    if pg_restore --list "${BACKUP_PATH}" >/dev/null 2>&1; then
+        ARCHIVE_VALIDATION="passed"
+        echo "[PASS] Archive passed pg_restore --list check."
+    fi
+fi
+
+EFFECTIVE_RESOURCE_ID="${RESOURCE_ID}"
+if [[ -z "${EFFECTIVE_RESOURCE_ID}" ]]; then
+    if [[ "${ENVIRONMENT}" == "staging" ]]; then
+        EFFECTIVE_RESOURCE_ID="dpg-db474ae0tbcc73dcgr10-a"
+    elif [[ "${ENVIRONMENT}" == "production" ]]; then
+        EFFECTIVE_RESOURCE_ID="dpg-dasmr1e0tbcc73849i90-a"
+    else
+        EFFECTIVE_RESOURCE_ID="local"
+    fi
+fi
+
+# 8. Metadata Manifest
 cat <<EOF > "${MANIFEST_PATH}"
 {
-  "backupFile": "${BACKUP_FILENAME}",
   "environment": "${ENVIRONMENT}",
-  "sourceResourceId": "${RESOURCE_ID}",
-  "createdAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "resourceId": "${EFFECTIVE_RESOURCE_ID}",
+  "postgresMajorVersion": 16,
+  "backupTimestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "backupFile": "${BACKUP_FILENAME}",
   "fileSizeBytes": ${FILE_SIZE},
   "sha256": "${SHA256}",
+  "archiveValidation": "${ARCHIVE_VALIDATION}",
+  "restoreTest": null,
   "pgDumpVersion": "${PG_DUMP_VERSION}",
   "format": "custom",
   "flags": "--no-owner --no-acl"

@@ -149,20 +149,60 @@ $hashObj = Get-FileHash -Algorithm SHA256 -Path $backupPath
 $sha256 = $hashObj.Hash
 Write-Host "[OK] SHA-256 Checksum: $sha256" -ForegroundColor Green
 
-# 7. Write Non-Sensitive Metadata Manifest
-$manifest = [PSCustomObject]@{
-    backupFile       = $backupFileName
-    environment      = $Environment
-    sourceResourceId = $ResourceId
-    createdAt        = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-    fileSizeBytes    = $fileSize
-    sha256           = $sha256
-    pgDumpVersion    = $pgDumpVersion
-    format           = "custom"
-    flags            = "--no-owner --no-acl"
+# 7. Validate Archive via pg_restore --list
+Write-Host "[RUN] Validating archive integrity via pg_restore --list..." -ForegroundColor Yellow
+$pgRestorePath = $null
+$potentialRestorePaths = @(
+    "C:\Program Files\PostgreSQL\18\bin\pg_restore.exe",
+    "C:\Program Files\PostgreSQL\16\bin\pg_restore.exe",
+    "C:\Program Files\PostgreSQL\14\bin\pg_restore.exe"
+)
+foreach ($p in $potentialRestorePaths) {
+    if (Test-Path $p) { $pgRestorePath = $p; break }
+}
+if (-not $pgRestorePath) {
+    $cmd = Get-Command pg_restore -ErrorAction SilentlyContinue
+    if ($cmd) { $pgRestorePath = $cmd.Source }
 }
 
-$manifest | ConvertTo-Json -Depth 4 | Set-Content -Path $manifestPath -Encoding UTF8
+$archiveValidation = "failed"
+if ($pgRestorePath) {
+    & $pgRestorePath --list "$backupPath" 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        $archiveValidation = "passed"
+        Write-Host "[PASS] Archive passed pg_restore --list integrity check." -ForegroundColor Green
+    }
+}
+
+$effectiveResourceId = $ResourceId
+if ([string]::IsNullOrWhiteSpace($effectiveResourceId)) {
+    if ($Environment -eq 'staging') {
+        $effectiveResourceId = 'dpg-db474ae0tbcc73dcgr10-a'
+    } elseif ($Environment -eq 'production') {
+        $effectiveResourceId = 'dpg-dasmr1e0tbcc73849i90-a'
+    } else {
+        $effectiveResourceId = 'local'
+    }
+}
+
+# 8. Write Machine-Readable Safe Metadata Manifest
+$manifest = [PSCustomObject]@{
+    environment          = $Environment
+    resourceId           = $effectiveResourceId
+    postgresMajorVersion = 16
+    backupTimestamp      = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+    backupFile           = $backupFileName
+    fileSizeBytes        = $fileSize
+    sha256               = $sha256
+    archiveValidation    = $archiveValidation
+    restoreTest          = $null
+    pgDumpVersion        = $pgDumpVersion
+    format               = "custom"
+    flags                = "--no-owner --no-acl"
+}
+
+$jsonStr = $manifest | ConvertTo-Json -Depth 4
+[System.IO.File]::WriteAllText($manifestPath, $jsonStr, (New-Object System.Text.UTF8Encoding($false)))
 Write-Host "[OK] Backup manifest written to $manifestPath" -ForegroundColor Green
 
 Write-Host "====================================================" -ForegroundColor Cyan

@@ -147,13 +147,15 @@ for (const s of stagingConfig.services) {
 }
 
 // -----------------------------------------------------------------------------
-// CHECK 4: Dedicated Migration Runner Path
+// CHECK 4: Dedicated Migration Runner Path & Backup Gate Engine
 // -----------------------------------------------------------------------------
-console.log('\n--- 4. Controlled Migration Runner ---');
+console.log('\n--- 4. Controlled Migration Runner & Backup Gate ---');
 const apiPkg = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'apps/api/package.json'), 'utf8'));
 assert(apiPkg.scripts && apiPkg.scripts['db:migrate:prod'], 'apps/api/package.json has db:migrate:prod script');
 assert(fs.existsSync(path.join(ROOT_DIR, 'scripts/ops/run-migrations.ps1')), 'scripts/ops/run-migrations.ps1 exists');
 assert(fs.existsSync(path.join(ROOT_DIR, 'scripts/ops/run-migrations.sh')), 'scripts/ops/run-migrations.sh exists');
+assert(fs.existsSync(path.join(ROOT_DIR, 'scripts/ops/backup-gate.mjs')), 'scripts/ops/backup-gate.mjs exists');
+assert(fs.existsSync(path.join(ROOT_DIR, 'apps/api/src/test/migration-backup-gate.spec.ts')), 'migration-backup-gate.spec.ts exists');
 
 // -----------------------------------------------------------------------------
 // CHECK 5: Secret Exposure Prevention

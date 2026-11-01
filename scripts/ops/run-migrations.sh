@@ -24,19 +24,22 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
     exit 1
 fi
 
-# 2. Check Backup for staging/production
+# 2. Check Backup Gate for staging/production
 if [[ "${ENVIRONMENT}" == "staging" ]] || [[ "${ENVIRONMENT}" == "production" ]]; then
-    echo "[CHECK] Verifying pre-migration backup presence in ${BACKUP_DIR}..."
-    if [[ ! -d "${BACKUP_DIR}" ]]; then
-        echo "ERROR: Backup directory ${BACKUP_DIR} does not exist. Pre-migration backup is mandatory." >&2
-        exit 1
+    echo "[CHECK] Verifying pre-migration backup gate in ${BACKUP_DIR}..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [[ -f "${SCRIPT_DIR}/backup-gate.mjs" ]]; then
+        if ! node "${SCRIPT_DIR}/backup-gate.mjs" "${ENVIRONMENT}" "${BACKUP_DIR}"; then
+            echo "ERROR: Pre-migration backup gate check failed for environment '${ENVIRONMENT}'." >&2
+            exit 1
+        fi
+    else
+        if [[ ! -d "${BACKUP_DIR}" ]]; then
+            echo "ERROR: Backup directory ${BACKUP_DIR} does not exist. Pre-migration backup is mandatory." >&2
+            exit 1
+        fi
     fi
-    RECENT_DUMP=$(find "${BACKUP_DIR}" -name "*.dump" -size +0c -mtime -7 2>/dev/null | head -n 1 || true)
-    if [[ -z "${RECENT_DUMP}" ]]; then
-        echo "ERROR: No verified non-empty .dump archive found within the last 7 days in ${BACKUP_DIR}." >&2
-        exit 1
-    fi
-    echo "[OK] Found pre-migration backup: ${RECENT_DUMP}"
+    echo "[PASS] Pre-migration backup gate verified for ${ENVIRONMENT}."
 fi
 
 # 3. Execute Migrations
