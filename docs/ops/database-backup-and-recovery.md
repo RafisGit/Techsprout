@@ -138,6 +138,27 @@ If Render has purged the suspended resource or billing cannot be resolved on the
 - Drizzle matches the `created_at` timestamp in milliseconds against `when` in `apps/api/src/database/migrations/meta/_journal.json`.
 - Migrations are strictly versioned, incremental, and idempotent.
 
+### Executing Migrations in a Controlled Release Phase:
+Use the dedicated migration runners to apply pending migrations separately from container startup:
+
+```powershell
+# Windows Operator:
+& powershell.exe -ExecutionPolicy Bypass -File "scripts/ops/run-migrations.ps1" `
+    -Environment staging `
+    -DatabaseUrl "$env:DATABASE_URL"
+```
+
+```bash
+# POSIX / CI:
+DATABASE_URL="postgresql://..." ./scripts/ops/run-migrations.sh staging
+```
+
+The runner:
+1. Enforces verified pre-migration backup presence within the last 7 days.
+2. Executes Drizzle ORM migrations via `apps/api/dist/database/migrate.js`.
+3. Verifies zero errors and clean exit status.
+4. Strictly omits any seed script execution.
+
 ### Pre-Migration Checklist:
 1. Run `verify-postgres-backup.ps1` on the latest backup.
 2. Inspect pending migration SQL for destructive statements (`DROP TABLE`, `DROP COLUMN`, `ALTER COLUMN TYPE`).
@@ -151,3 +172,4 @@ If Render has purged the suspended resource or billing cannot be resolved on the
 ### Rollback Strategy:
 - **Additive Migrations (Indexes/Tables):** Execute safe manual `DROP INDEX IF EXISTS` or `DROP TABLE IF EXISTS` and remove the tracking row from `drizzle.__drizzle_migrations`.
 - **Destructive/Complex Migrations:** Restore the pre-migration `.dump` archive using Procedure C into a staging test database before executing against production.
+

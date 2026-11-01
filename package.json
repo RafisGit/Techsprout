@@ -17,7 +17,8 @@
     "test:benchmark": "pnpm --filter @techsprout/api test:benchmark",
     "lint": "pnpm --recursive lint",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\"",
-    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
+    "validate:deploy": "node scripts/ops/validate-deployment-config.mjs"
   },
   "devDependencies": {
     "prettier": "^3.6.2",
