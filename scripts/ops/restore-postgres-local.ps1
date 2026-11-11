@@ -47,23 +47,10 @@ if ($fileItem.Length -eq 0) {
     exit 1
 }
 
-# 2. Locate PostgreSQL tools
-$binDir = $null
-$potentialBinDirs = @(
-    "C:\Program Files\PostgreSQL\18\bin",
-    "C:\Program Files\PostgreSQL\16\bin",
-    "C:\Program Files\PostgreSQL\14\bin"
-)
-
-foreach ($dir in $potentialBinDirs) {
-    if ((Test-Path "$dir\initdb.exe") -and (Test-Path "$dir\pg_ctl.exe") -and (Test-Path "$dir\pg_restore.exe")) {
-        $binDir = $dir
-        break
-    }
-}
-
-if (-not $binDir) {
-    Write-Error "CRITICAL: PostgreSQL binaries not found."
+# 2. Locate PostgreSQL 16 client tools strictly
+$binDir = "C:\Program Files\PostgreSQL\16\bin"
+if (-not (Test-Path "$binDir\initdb.exe") -or -not (Test-Path "$binDir\pg_ctl.exe") -or -not (Test-Path "$binDir\pg_restore.exe")) {
+    Write-Error "CRITICAL: PostgreSQL 16 binaries not found in $binDir. Fallback to non-16 versions is prohibited."
     exit 1
 }
 
@@ -97,19 +84,27 @@ try {
     & "$binDir\pg_restore.exe" -h $SafetyHost -p $Port -U postgres -d $testDb --no-owner --no-acl "$BackupFile"
     $restoreCode = $LASTEXITCODE
     if ($restoreCode -ne 0) {
-        Write-Warning "pg_restore exited with code $restoreCode"
-    } else {
-        Write-Host "[PASS] pg_restore completed with exit code 0." -ForegroundColor Green
+        Write-Error "FAIL: pg_restore exited with error code $restoreCode. Restore verification failed. Manifest will not be marked as passed."
+        exit 1
     }
+    Write-Host "[PASS] pg_restore completed with exit code 0." -ForegroundColor Green
 
     # 7. Verification Queries
     $sqlTables = 'SELECT schemaname, count(*) as tables_count FROM pg_tables WHERE schemaname IN (''public'', ''drizzle'') GROUP BY schemaname;'
     Write-Host "`n--- Table Inventory ---" -ForegroundColor Cyan
     & "$binDir\psql.exe" -h $SafetyHost -p $Port -U postgres -d $testDb -c $sqlTables
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "FAIL: Table inventory verification query failed. Manifest will not be marked as passed."
+        exit 1
+    }
 
     $sqlCounts = 'SELECT (SELECT count(*) FROM users) as users_count, (SELECT count(*) FROM courses) as courses_count, (SELECT count(*) FROM categories) as categories_count, (SELECT count(*) FROM modules) as modules_count, (SELECT count(*) FROM lessons) as lessons_count, (SELECT count(*) FROM enrollments) as enrollments_count, (SELECT count(*) FROM certificates) as certificates_count, (SELECT count(*) FROM drizzle.__drizzle_migrations) as migrations_count;'
     Write-Host "`n--- Primary Table Row Counts ---" -ForegroundColor Cyan
     & "$binDir\psql.exe" -h $SafetyHost -p $Port -U postgres -d $testDb -c $sqlCounts
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "FAIL: Primary table row count query failed. Manifest will not be marked as passed."
+        exit 1
+    }
 
     # 8. Update manifest with verified restore test outcome
     $manifestPath = [System.IO.Path]::ChangeExtension($BackupFile, ".manifest.json")

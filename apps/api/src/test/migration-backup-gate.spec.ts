@@ -98,8 +98,8 @@ describe('Phase 12.3: Pre-Migration Backup Verification Gate', () => {
       ).toThrow(/Database resource ID mismatch/);
     });
 
-    it('fails closed when backup timestamp is older than 7 days', () => {
-      const expiredDate = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+    it('fails closed when backup timestamp is older than 24 hours', () => {
+      const expiredDate = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
       const manifest = createValidManifest('staging', {
         backupTimestamp: expiredDate,
       });
@@ -108,7 +108,7 @@ describe('Phase 12.3: Pre-Migration Backup Verification Gate', () => {
         validateBackupManifest(manifest, {
           targetEnvironment: 'staging',
         })
-      ).toThrow(/Backup is expired/);
+      ).toThrow(/Backup is expired.*maximum allowed age is 24\.0 hours/);
     });
 
     it('fails closed when backup timestamp is in the future', () => {

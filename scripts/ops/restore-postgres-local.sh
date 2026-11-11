@@ -35,10 +35,18 @@ echo "Target File: ${BACKUP_FILE}"
 echo "Target DB:   ${TARGET_DB} (localhost:${TARGET_PORT})"
 echo "===================================================="
 
-# Check binaries
+# Check binaries and require PostgreSQL 16
 command -v createdb >/dev/null 2>&1 || { echo "createdb required"; exit 1; }
 command -v pg_restore >/dev/null 2>&1 || { echo "pg_restore required"; exit 1; }
 command -v dropdb >/dev/null 2>&1 || { echo "dropdb required"; exit 1; }
+command -v psql >/dev/null 2>&1 || { echo "psql required"; exit 1; }
+
+PG_RESTORE_VER=$(pg_restore --version | head -n 1)
+PG_RESTORE_MAJOR=$(echo "${PG_RESTORE_VER}" | grep -oE '[0-9]+' | head -n 1)
+if [[ "${PG_RESTORE_MAJOR}" != "16" ]]; then
+    echo "ERROR: 'pg_restore' major version is ${PG_RESTORE_MAJOR} (expected 16). Version: ${PG_RESTORE_VER}. Fallback prohibited." >&2
+    exit 1
+fi
 
 # Recreate target database
 echo "[RUN] Preparing disposable database '${TARGET_DB}'..."
@@ -47,20 +55,24 @@ createdb -h 127.0.0.1 -p "${TARGET_PORT}" "${TARGET_DB}"
 
 # Restore
 echo "[RUN] Restoring archive..."
-RESTORE_STATUS="passed"
 if ! pg_restore -h 127.0.0.1 -p "${TARGET_PORT}" -d "${TARGET_DB}" --no-owner --no-acl "${BACKUP_FILE}"; then
-    echo "WARNING: pg_restore reported warnings/errors."
-    RESTORE_STATUS="passed"
+    echo "ERROR: pg_restore failed with non-zero exit code. Restore verification failed. Manifest will not be marked as passed." >&2
+    exit 1
 fi
+echo "[PASS] pg_restore completed with exit code 0."
+RESTORE_STATUS="passed"
 
 # Verify
 echo "[RUN] Verifying tables..."
-psql -h 127.0.0.1 -p "${TARGET_PORT}" -d "${TARGET_DB}" -c "
+if ! psql -h 127.0.0.1 -p "${TARGET_PORT}" -d "${TARGET_DB}" -c "
     SELECT schemaname, count(*) as tables_count 
     FROM pg_tables 
     WHERE schemaname IN ('public', 'drizzle') 
     GROUP BY schemaname;
-"
+"; then
+    echo "ERROR: Table verification query failed. Manifest will not be marked as passed." >&2
+    exit 1
+fi
 
 # Update manifest if present
 MANIFEST_PATH="${BACKUP_FILE%.dump}.manifest.json"
@@ -68,7 +80,9 @@ if [[ -f "${MANIFEST_PATH}" ]]; then
     PG_VER_RAW=$(psql -V | awk '{print $3}' | cut -d'.' -f1)
     BACKUP_HASH="unavailable"
     if command -v sha256sum >/dev/null 2>&1; then
-        BACKUP_HASH=$(sha256sum "${BACKUP_FILE}" | awk '{print $1}')
+        BACKUP_HASH=$(sha256sum "${BACKUP_FILE}" | grep -oE '[0-9a-fA-F]{64}' | tr '[:lower:]' '[:upper:]' || true)
+    elif command -v shasum >/dev/null 2>&1; then
+        BACKUP_HASH=$(shasum -a 256 "${BACKUP_FILE}" | grep -oE '[0-9a-fA-F]{64}' | tr '[:lower:]' '[:upper:]' || true)
     fi
     echo "[OK] Updating manifest ${MANIFEST_PATH} with restore test outcome..."
     # If jq or python is available, patch JSON

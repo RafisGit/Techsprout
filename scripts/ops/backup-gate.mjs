@@ -7,7 +7,7 @@
  * Rules:
  * 1. Target environment must match manifest environment (cross-environment prohibited).
  * 2. Database resource ID must match target expected resource ID.
- * 3. Backup timestamp must be within the configured 7-day safety window.
+ * 3. Backup timestamp must be within the configured 24-hour safety window.
  * 4. Dump file must exist on disk and have non-zero size.
  * 5. SHA-256 cryptographic checksum must match manifest.
  * 6. Archive validation must be 'passed' (verified via pg_restore --list).
@@ -27,7 +27,7 @@ export const DEFAULT_RESOURCE_IDS = {
   production: 'dpg-dasmr1e0tbcc73849i90-a',
 };
 
-export const MAX_BACKUP_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+export const MAX_BACKUP_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 /**
  * Calculates SHA-256 hash of a file synchronously.
@@ -111,9 +111,9 @@ export function validateBackupManifest(manifest, options = {}) {
 
   const ageMs = currentTime - backupTime;
   if (ageMs > maxAgeMs) {
-    const ageDays = (ageMs / (24 * 60 * 60 * 1000)).toFixed(1);
+    const ageHours = (ageMs / (60 * 60 * 1000)).toFixed(1);
     throw new Error(
-      `FAIL: Backup is expired. Timestamp "${timestampStr}" is ${ageDays} days old (maximum allowed age is 7.0 days). A fresh pre-migration backup is mandatory.`
+      `FAIL: Backup is expired. Timestamp "${timestampStr}" is ${ageHours} hours old (maximum allowed age is 24.0 hours). A fresh pre-migration backup is mandatory.`
     );
   }
 

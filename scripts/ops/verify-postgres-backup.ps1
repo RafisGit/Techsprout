@@ -66,40 +66,22 @@ if ([string]::IsNullOrWhiteSpace($ManifestFile)) {
 if (-not [string]::IsNullOrWhiteSpace($ManifestFile) -and (Test-Path $ManifestFile)) {
     Write-Host "[INFO] Validating against manifest: $ManifestFile"
     $manifestData = Get-Content $ManifestFile -Raw | ConvertFrom-Json
-    if ($manifestData.sha256) {
-        if ($manifestData.sha256.ToUpper() -eq $currentHash.ToUpper()) {
-            Write-Host "[PASS] Cryptographic integrity match: SHA-256 matches manifest." -ForegroundColor Green
-        } else {
-            Write-Error "FAIL: Checksum mismatch! Manifest: $($manifestData.sha256), Actual: $currentHash"
-            exit 1
-        }
+    if (-not $manifestData.sha256) {
+        Write-Error "FAIL: Manifest at '$ManifestFile' is missing required 'sha256' field."
+        exit 1
+    }
+    if ($manifestData.sha256.ToString().ToUpper() -eq $currentHash.ToUpper()) {
+        Write-Host "[PASS] Cryptographic integrity match: SHA-256 matches manifest." -ForegroundColor Green
+    } else {
+        Write-Error "FAIL: Checksum mismatch! Manifest: $($manifestData.sha256), Actual: $currentHash"
+        exit 1
     }
 }
 
-# 3. Locate pg_restore
-$pgRestorePath = $null
-$potentialPaths = @(
-    "C:\Program Files\PostgreSQL\18\bin\pg_restore.exe",
-    "C:\Program Files\PostgreSQL\16\bin\pg_restore.exe",
-    "C:\Program Files\PostgreSQL\14\bin\pg_restore.exe"
-)
-
-foreach ($path in $potentialPaths) {
-    if (Test-Path $path) {
-        $pgRestorePath = $path
-        break
-    }
-}
-
-if (-not $pgRestorePath) {
-    $cmd = Get-Command pg_restore -ErrorAction SilentlyContinue
-    if ($cmd) {
-        $pgRestorePath = $cmd.Source
-    }
-}
-
-if (-not $pgRestorePath) {
-    Write-Error "CRITICAL: 'pg_restore' executable not found."
+# 3. Locate PostgreSQL 16 pg_restore strictly
+$pgRestorePath = "C:\Program Files\PostgreSQL\16\bin\pg_restore.exe"
+if (-not (Test-Path $pgRestorePath)) {
+    Write-Error "CRITICAL: PostgreSQL 16 'pg_restore' executable not found at '$pgRestorePath'. Fallback prohibited."
     exit 1
 }
 

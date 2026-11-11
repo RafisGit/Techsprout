@@ -3,6 +3,9 @@ export interface BackupManifest {
   resourceId: string;
   sourceResourceId?: string;
   postgresMajorVersion: number;
+  postgresServerVersion?: string;
+  pgDumpVersion?: string;
+  pgRestoreVersion?: string;
   backupTimestamp?: string;
   createdAt?: string;
   backupFile: string;
@@ -15,7 +18,6 @@ export interface BackupManifest {
     testedBackupSha256: string;
     testedAt?: string;
   } | null;
-  pgDumpVersion?: string;
   format?: string;
   flags?: string;
 }
