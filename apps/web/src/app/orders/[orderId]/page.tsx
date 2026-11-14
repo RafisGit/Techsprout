@@ -384,7 +384,7 @@ export default function StudentOrderDetailPage() {
                 )}
 
                 <div className='border-t border-gray-100 pt-3 flex justify-between items-center text-sm font-extrabold text-gray-900'>
-                  <span>{t.orders.totalPaid}</span>
+                  <span>{order.status === 'PAID' ? t.orders.totalPaid : t.orders.total}</span>
                   <span className='text-base text-primary'>
                     {formatCurrency(order.payableCents / 100, order.currency)}
                   </span>
@@ -627,7 +627,7 @@ export default function StudentOrderDetailPage() {
                   disabled={isSubmittingRefund}
                   className='rounded-xl text-xs font-semibold'
                 >
-                  {t.common.cancel}
+                  {t.actions.cancel}
                 </Button>
                 <Button
                   type='submit'

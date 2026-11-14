@@ -317,7 +317,7 @@ export default function StudentOrdersPage() {
                     <div className='flex items-center justify-between md:justify-end gap-6 pt-3 md:pt-0 border-t md:border-t-0 border-gray-100'>
                       <div className='text-left md:text-right'>
                         <span className='text-[10px] uppercase font-bold text-gray-400 tracking-wider block'>
-                          {t.orders.amountPaid}
+                          {order.status === 'PAID' ? t.orders.amountPaid : t.orders.total}
                         </span>
                         <span className='text-base sm:text-lg font-extrabold text-gray-900'>
                           {formatCurrency(order.payableCents / 100, order.currency)}

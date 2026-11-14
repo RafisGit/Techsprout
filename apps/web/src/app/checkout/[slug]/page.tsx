@@ -68,6 +68,7 @@ export default function CheckoutPage() {
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
   const [submitStep, setSubmitStep] = useState<
     'idle' | 'creating_order' | 'initiating_payment' | 'redirecting'
   >('idle');
@@ -101,6 +102,7 @@ export default function CheckoutPage() {
         setAppliedCoupon(preview);
         setCouponCodeInput(cleanCode);
         setCouponError(null);
+        setCreatedOrderId(null);
       } else {
         setAppliedCoupon(null);
         setCouponError('Coupon is not applicable to this course.');
@@ -138,6 +140,7 @@ export default function CheckoutPage() {
     setAppliedCoupon(null);
     setCouponCodeInput('');
     setCouponError(null);
+    setCreatedOrderId(null);
   };
 
   // Authoritative Order & Payment checkout handler
@@ -148,25 +151,31 @@ export default function CheckoutPage() {
     setCheckoutError(null);
 
     try {
-      // Step 1: Create Order with server-side pricing and reservation locking
-      setSubmitStep('creating_order');
-      const order = await createOrder({
-        courseId: course.id,
-        couponCode: appliedCoupon?.code || undefined,
-      });
+      let orderId = createdOrderId;
+
+      if (!orderId) {
+        // Step 1: Create Order with server-side pricing and reservation locking
+        setSubmitStep('creating_order');
+        const order = await createOrder({
+          courseId: course.id,
+          couponCode: appliedCoupon?.code || undefined,
+        });
+        orderId = order.id;
+        setCreatedOrderId(order.id);
+      }
 
       // Step 2: Initiate Payment Session
       setSubmitStep('initiating_payment');
       const paymentSession = await initiatePayment({
-        orderId: order.id,
+        orderId,
       });
 
       // Step 3: Hosted Gateway Redirection or Internal Zero-Payable Success
       setSubmitStep('redirecting');
 
-      if (order.payableCents === 0 || paymentSession.gatewayUrl.includes('/orders/')) {
+      if (paymentSession.gatewayUrl.includes('/orders/') || isZeroPayable) {
         // Zero-payable or internal return URL
-        router.push(`/orders/${order.id}/success`);
+        router.push(`/orders/${orderId}/success`);
       } else {
         // SSLCommerz hosted payment gateway URL
         window.location.href = paymentSession.gatewayUrl;
@@ -501,6 +510,8 @@ export default function CheckoutPage() {
                     </span>
                   ) : isZeroPayable ? (
                     'Complete Free Enrollment'
+                  ) : createdOrderId && checkoutError ? (
+                    'Retry Payment'
                   ) : (
                     'Proceed to Payment'
                   )}
