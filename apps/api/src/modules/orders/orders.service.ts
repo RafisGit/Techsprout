@@ -1,5 +1,5 @@
 import { Injectable, Inject, HttpStatus, Optional } from '@nestjs/common';
-import { eq, and, desc, sql, count, inArray, gte, lte, or, ilike } from 'drizzle-orm';
+import { eq, and, desc, sql, count, inArray, gte, lte, gt, or, ilike } from 'drizzle-orm';
 import { DRIZZLE_DB, DrizzleDB } from '../../database/drizzle.provider';
 import {
   orders,
@@ -134,6 +134,45 @@ export class OrdersService {
         HttpStatus.CONFLICT,
         'ALREADY_ENROLLED'
       );
+    }
+
+    // 2b. Check if an active, unexpired PENDING order already exists for this student and course
+    const now = new Date();
+    const normalizedInputCoupon = input.couponCode ? input.couponCode.trim().toUpperCase() : null;
+
+    const [existingPending] = await this.db
+      .select({
+        order: orders,
+        item: orderItems,
+      })
+      .from(orders)
+      .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+      .where(
+        and(
+          eq(orders.studentId, studentId),
+          eq(orderItems.courseId, input.courseId),
+          inArray(orders.status, ['PENDING', 'PAYMENT_PROCESSING']),
+          gt(orders.expiresAt, now)
+        )
+      )
+      .orderBy(desc(orders.createdAt))
+      .limit(1);
+
+    if (existingPending) {
+      const existingCouponCode = existingPending.order.couponCode;
+      // If the same coupon (or both without coupon), reuse the existing pending order
+      if (existingCouponCode === normalizedInputCoupon) {
+        const [student] = await this.db
+          .select({ name: users.name, email: users.email })
+          .from(users)
+          .where(eq(users.id, studentId))
+          .limit(1);
+
+        return this.formatOrderDto(existingPending.order, [existingPending.item], student);
+      }
+
+      // If the student changed/removed the coupon, cancel the previous pending order to release its coupon reservation
+      await this.expireOrderIfDue(existingPending.order.id);
     }
 
     // 3. Authoritative price calculation
