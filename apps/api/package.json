@@ -6,7 +6,7 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "start": "node dist/main",
-    "dev": "tsx watch src/main.ts",
+    "dev": "tsc -p tsconfig.build.json && node dist/main",
     "test": "vitest run",
     "test:security": "vitest run src/test/security.spec.ts",
     "test:e2e": "vitest run src/test/http-e2e.spec.ts",
