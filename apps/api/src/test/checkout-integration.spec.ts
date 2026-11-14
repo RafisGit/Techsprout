@@ -664,5 +664,145 @@ describe('P5.4.4 — Student Checkout & Order Completion Flow Integration Tests'
 
       expect(enr).toBeUndefined();
     });
+
+    it('34. reuses existing active unexpired pending order for same student and course without coupon', async () => {
+      // Create fresh course
+      const [freshCourse] = await testDb
+        .insert(schema.courses)
+        .values({
+          title: 'Idempotent Pending Course',
+          slug: 'idempotent-course-' + Date.now(),
+          description: 'Testing idempotent pending order reuse',
+          price: '2000.00',
+          currency: 'BDT',
+          status: 'PUBLISHED',
+          visibility: 'PUBLIC',
+          categoryId: activeCategory.id,
+          instructorId: adminId,
+        })
+        .returning();
+
+      // First order creation
+      const res1 = await request(app.getHttpServer())
+        .post('/api/v1/orders')
+        .set('Cookie', studentCookies)
+        .send({
+          courseId: freshCourse.id,
+        });
+
+      expect(res1.status).toBe(201);
+      const order1Id = res1.body.data.id;
+
+      // Second order creation without coupon
+      const res2 = await request(app.getHttpServer())
+        .post('/api/v1/orders')
+        .set('Cookie', studentCookies)
+        .send({
+          courseId: freshCourse.id,
+        });
+
+      expect(res2.status).toBe(201);
+      const order2Id = res2.body.data.id;
+
+      // Must be idempotent - reuses the exact same active pending order ID
+      expect(order2Id).toBe(order1Id);
+    });
+
+    it('35. cancels previous pending order and creates new one when coupon is changed', async () => {
+      // Create fresh course
+      const [freshCourse] = await testDb
+        .insert(schema.courses)
+        .values({
+          title: 'Coupon Replacement Course',
+          slug: 'coupon-replace-course-' + Date.now(),
+          description: 'Testing coupon replacement cancels old pending order',
+          price: '2000.00',
+          currency: 'BDT',
+          status: 'PUBLISHED',
+          visibility: 'PUBLIC',
+          categoryId: activeCategory.id,
+          instructorId: adminId,
+        })
+        .returning();
+
+      // First order with percent coupon
+      const res1 = await request(app.getHttpServer())
+        .post('/api/v1/orders')
+        .set('Cookie', studentCookies)
+        .send({
+          courseId: freshCourse.id,
+          couponCode: percentCoupon.code,
+        });
+
+      expect(res1.status).toBe(201);
+      const order1Id = res1.body.data.id;
+      expect(res1.body.data.couponCode).toBe(percentCoupon.code);
+
+      // Second order without coupon (coupon changed/removed)
+      const res2 = await request(app.getHttpServer())
+        .post('/api/v1/orders')
+        .set('Cookie', studentCookies)
+        .send({
+          courseId: freshCourse.id,
+        });
+
+      expect(res2.status).toBe(201);
+      const order2Id = res2.body.data.id;
+      expect(order2Id).not.toBe(order1Id);
+
+      // Verify the previous order was cancelled/expired
+      const [oldOrder] = await testDb
+        .select()
+        .from(schema.orders)
+        .where(eq(schema.orders.id, order1Id));
+
+      expect(oldOrder.status).toBe('CANCELLED');
+    });
+
+    it('36. returns clean client-safe gateway error without leaking raw provider internals', async () => {
+      // Create fresh course
+      const [freshCourse] = await testDb
+        .insert(schema.courses)
+        .values({
+          title: 'Gateway Failure Course',
+          slug: 'gateway-fail-course-' + Date.now(),
+          description: 'Testing sanitized gateway initiation error propagation',
+          price: '2000.00',
+          currency: 'BDT',
+          status: 'PUBLISHED',
+          visibility: 'PUBLIC',
+          categoryId: activeCategory.id,
+          instructorId: adminId,
+        })
+        .returning();
+
+      // Create fresh order
+      const orderRes = await request(app.getHttpServer())
+        .post('/api/v1/orders')
+        .set('Cookie', studentCookies)
+        .send({
+          courseId: freshCourse.id,
+        });
+      expect(orderRes.status).toBe(201);
+      const orderId = orderRes.body.data.id;
+
+      // Configure mock SSLCommerz client to throw a network error with sensitive host
+      mockSslCommerz.sessionInitiationHandler = async () => {
+        throw new Error('Connection reset by peer: internal-gateway-host:8443');
+      };
+
+      const initRes = await request(app.getHttpServer())
+        .post('/api/v1/payments/initiate')
+        .set('Cookie', studentCookies)
+        .send({ orderId });
+
+      expect(initRes.status).toBe(502);
+      expect(initRes.body.message).toBe('Failed to establish session with payment gateway');
+      expect(initRes.body.message).not.toContain('Connection reset by peer');
+      expect(initRes.body.message).not.toContain('internal-gateway-host');
+
+      // Reset mock client failure scenario
+      mockSslCommerz.sessionInitiationHandler = undefined;
+    });
   });
 });

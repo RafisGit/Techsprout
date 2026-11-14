@@ -2319,6 +2319,686 @@ describe('P5.3 — Core Payment Engine & SSLCommerz Test Suite', () => {
         expect(s.dbOrder.status).toBe('PAYMENT_PROCESSING');
         expect(s.dbPayments[0].status).toBe('INITIATED');
       });
+
+      it('10.2.4 idempotent session reuse on duplicate initiation returns existing active session without spawning duplicate payments', async () => {
+        const orderRes = await request(app.getHttpServer())
+          .post('/api/v1/orders')
+          .set('Cookie', studentCookies)
+          .send({ courseId: paidCourse.id });
+        const order = orderRes.body.data;
+
+        // First initiation
+        const init1 = await request(app.getHttpServer())
+          .post('/api/v1/payments/initiate')
+          .set('Cookie', studentCookies)
+          .send({ orderId: order.id });
+        expect(init1.status).toBe(201);
+        const { paymentId: p1Id, merchantTranId: t1, gatewayUrl: g1 } = init1.body.data;
+
+        // Second initiation for the same order (e.g. multi-tab or duplicate click)
+        const init2 = await request(app.getHttpServer())
+          .post('/api/v1/payments/initiate')
+          .set('Cookie', studentCookies)
+          .send({ orderId: order.id });
+        expect(init2.status).toBe(201);
+        const { paymentId: p2Id, merchantTranId: t2, gatewayUrl: g2 } = init2.body.data;
+
+        // Must reuse the exact same payment attempt and gateway session
+        expect(p2Id).toBe(p1Id);
+        expect(t2).toBe(t1);
+        expect(g2).toBe(g1);
+
+        // Database must have exactly ONE payment attempt for this order
+        const s = await snapshot(order.id);
+        expect(s.dbPayments).toHaveLength(1);
+        expect(s.dbPayments[0].status).toBe('INITIATED');
+      });
+
+      it('10.2.5 excess settlement handling verifies and tags second transaction for refund without duplicate fulfillment', async () => {
+        const orderRes = await request(app.getHttpServer())
+          .post('/api/v1/orders')
+          .set('Cookie', studentCookies)
+          .send({ courseId: paidCourse.id });
+        const order = orderRes.body.data;
+
+        // 1. First initiation
+        const init1 = await request(app.getHttpServer())
+          .post('/api/v1/payments/initiate')
+          .set('Cookie', studentCookies)
+          .send({ orderId: order.id });
+        const tran1 = init1.body.data.merchantTranId;
+
+        // Complete payment on tran1
+        const valId1 = `VAL-PRIMARY-${Date.now()}`;
+        mockSslCommerz.setMockValidationSuccess(valId1, {
+          tran_id: tran1,
+          amount: '2500.00',
+          currency: 'BDT',
+          bank_tran_id: 'BANK-TRN-1111',
+        });
+
+        const pay1Res = await request(app.getHttpServer())
+          .post('/api/v1/payments/sslcommerz/success')
+          .set('Accept', 'application/json')
+          .send({
+            tran_id: tran1,
+            val_id: valId1,
+            amount: '2500.00',
+            currency: 'BDT',
+            status: 'VALID',
+          });
+        expect(pay1Res.status).toBe(200);
+
+        // Snapshot after primary payment: 1 enrollment, 1 invoice, order PAID
+        const snap1 = await snapshot(order.id);
+        expect(snap1.dbOrder.status).toBe('PAID');
+        expect(snap1.enrollmentRows).toHaveLength(1);
+        expect(snap1.invoicesRows).toHaveLength(1);
+
+        // 2. Simulate a distinct second payment attempt that was previously created on this order
+        const tran2 = `TSP-TXN-EXCESS-${Date.now()}`;
+        const [payment2] = await testDb
+          .insert(schema.payments)
+          .values({
+            orderId: order.id,
+            merchantTranId: tran2,
+            provider: 'SSLCOMMERZ',
+            amountCents: order.payableCents,
+            currency: 'BDT',
+            status: 'INITIATED',
+            initiatedAt: new Date(),
+          })
+          .returning();
+
+        // Gateway verifies that tran2 was also charged
+        const valId2 = `VAL-EXCESS-${Date.now()}`;
+        mockSslCommerz.setMockValidationSuccess(valId2, {
+          tran_id: tran2,
+          amount: '2500.00',
+          currency: 'BDT',
+          bank_tran_id: 'BANK-TRN-2222',
+        });
+
+        // Callback arrives for the second transaction
+        const pay2Res = await request(app.getHttpServer())
+          .post('/api/v1/payments/sslcommerz/success')
+          .set('Accept', 'application/json')
+          .send({
+            tran_id: tran2,
+            val_id: valId2,
+            amount: '2500.00',
+            currency: 'BDT',
+            status: 'VALID',
+          });
+        expect(pay2Res.status).toBe(200);
+
+        // Snapshot after excess payment callback:
+        const snap2 = await snapshot(order.id);
+        // Guaranteed zero duplicate enrollments and zero duplicate invoices!
+        expect(snap2.enrollmentRows).toHaveLength(1);
+        expect(snap2.invoicesRows).toHaveLength(1);
+
+        // Inspect payment2 record in database:
+        const [dbP2] = await testDb
+          .select()
+          .from(schema.payments)
+          .where(eq(schema.payments.id, payment2.id));
+
+        expect(dbP2.status).toBe('FAILED');
+        expect(dbP2.valId).toBe(valId2);
+        expect(dbP2.bankTranId).toBe('BANK-TRN-2222');
+        const parsedRaw = JSON.parse(dbP2.rawResponse || '{}');
+        expect(parsedRaw.excessSettlement).toBe(true);
+        expect(parsedRaw.requiresRefund).toBe(true);
+
+        // Verify audit log captured EXCESS_PAYMENT_SETTLEMENT_DETECTED
+        const [excessAudit] = await testDb
+          .select()
+          .from(schema.auditLogs)
+          .where(
+            and(
+              eq(schema.auditLogs.action, 'EXCESS_PAYMENT_SETTLEMENT_DETECTED'),
+              eq(schema.auditLogs.targetId, payment2.id)
+            )
+          );
+        expect(excessAudit).toBeDefined();
+        const meta = typeof excessAudit.metadata === 'string' ? JSON.parse(excessAudit.metadata) : excessAudit.metadata;
+        expect(meta.valId).toBe(valId2);
+        expect(meta.requiresRefund).toBe(true);
+      });
+    });
+
+    describe('11. Phase 1 Payment Concurrency Remediation', () => {
+      async function snapshot(orderId: string) {
+        const [dbOrder] = await testDb
+          .select()
+          .from(schema.orders)
+          .where(eq(schema.orders.id, orderId));
+        const dbPayments = await testDb
+          .select()
+          .from(schema.payments)
+          .where(eq(schema.payments.orderId, orderId));
+        const invoicesRows = await testDb.select().from(schema.invoices);
+        const enrollmentRows = await testDb.select().from(schema.enrollments);
+        const redemptions = await testDb
+          .select()
+          .from(schema.couponRedemptions)
+          .where(eq(schema.couponRedemptions.orderId, orderId));
+        return { dbOrder, dbPayments, invoicesRows, enrollmentRows, redemptions };
+      }
+
+      // 1. Two simultaneous initiation requests
+      it('11.1 two simultaneous initiation requests do not create competing gateway sessions', async () => {
+        const orderRes = await request(app.getHttpServer())
+          .post('/api/v1/orders')
+          .set('Cookie', studentCookies)
+          .send({ courseId: paidCourse.id });
+        const order = orderRes.body.data;
+
+        let gatewayCalls = 0;
+        mockSslCommerz.sessionInitiationHandler = async (params) => {
+          gatewayCalls++;
+          await new Promise((r) => setTimeout(r, 60));
+          const sessionKey = `simultaneous_session_${params.tran_id}`;
+          return {
+            status: 'SUCCESS',
+            sessionkey: sessionKey,
+            GatewayPageURL: `https://sandbox.sslcommerz.com/EasyCheckout/testpage?sessionkey=${sessionKey}`,
+          };
+        };
+
+        try {
+          const [res1, res2] = await Promise.all([
+            request(app.getHttpServer())
+              .post('/api/v1/payments/initiate')
+              .set('Cookie', studentCookies)
+              .send({ orderId: order.id }),
+            request(app.getHttpServer())
+              .post('/api/v1/payments/initiate')
+              .set('Cookie', studentCookies)
+              .send({ orderId: order.id }),
+          ]);
+
+          // Exactly one request must initiate, second must either get 201 with reused session or 409
+          const statuses = [res1.status, res2.status].sort();
+          if (statuses[0] === 201 && statuses[1] === 201) {
+            // Both returned 201 via session reuse
+            expect(res1.body.data.gatewayUrl).toBe(res2.body.data.gatewayUrl);
+            expect(res1.body.data.merchantTranId).toBe(res2.body.data.merchantTranId);
+            expect(gatewayCalls).toBe(1);
+          } else {
+            // One got 201, one got 409
+            expect(statuses).toEqual([201, 409]);
+            expect(gatewayCalls).toBe(1);
+          }
+
+          const s = await snapshot(order.id);
+          expect(s.dbOrder.status).toBe('PAYMENT_PROCESSING');
+          const initiatedPayments = s.dbPayments.filter((p: any) => p.status === 'INITIATED');
+          expect(initiatedPayments).toHaveLength(1);
+          expect(s.enrollmentRows).toHaveLength(0);
+          expect(s.invoicesRows).toHaveLength(0);
+        } finally {
+          mockSslCommerz.sessionInitiationHandler = undefined;
+        }
+      });
+
+      // 2. One 12-second gateway response
+      it('11.2 gateway initiation taking 12 seconds succeeds within the 30-second lease', async () => {
+        const orderRes = await request(app.getHttpServer())
+          .post('/api/v1/orders')
+          .set('Cookie', studentCookies)
+          .send({ courseId: paidCourse.id });
+        const order = orderRes.body.data;
+
+        let gatewayCalls = 0;
+        mockSslCommerz.sessionInitiationHandler = async (params) => {
+          gatewayCalls++;
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          const sessionKey = `delayed_12s_session_${params.tran_id}`;
+          return {
+            status: 'SUCCESS',
+            sessionkey: sessionKey,
+            GatewayPageURL: `https://sandbox.sslcommerz.com/EasyCheckout/testpage?sessionkey=${sessionKey}`,
+          };
+        };
+
+        try {
+          const res = await request(app.getHttpServer())
+            .post('/api/v1/payments/initiate')
+            .set('Cookie', studentCookies)
+            .send({ orderId: order.id });
+
+          expect(res.status).toBe(201);
+          expect(gatewayCalls).toBe(1);
+
+          const s = await snapshot(order.id);
+          expect(s.dbOrder.status).toBe('PAYMENT_PROCESSING');
+          expect(s.dbPayments).toHaveLength(1);
+          expect(s.dbPayments[0].status).toBe('INITIATED');
+
+          const raw = JSON.parse(s.dbPayments[0].rawResponse || '{}');
+          expect(raw.gatewayUrl).toBeDefined();
+          expect(raw.sessionkey).toBeDefined();
+          expect(s.enrollmentRows).toHaveLength(0);
+          expect(s.invoicesRows).toHaveLength(0);
+        } finally {
+          mockSslCommerz.sessionInitiationHandler = undefined;
+        }
+      });
+
+      // 3. Gateway request timing out after 15 seconds
+      it('11.3 gateway request timing out after 15 seconds transitions payment to FAILED and reverts order to PENDING', async () => {
+        const orderRes = await request(app.getHttpServer())
+          .post('/api/v1/orders')
+          .set('Cookie', studentCookies)
+          .send({ courseId: paidCourse.id });
+        const order = orderRes.body.data;
+
+        mockSslCommerz.sessionInitiationHandler = async () => {
+          throw new Error('SSLCommerz gateway timeout after 15000ms');
+        };
+
+        try {
+          const res = await request(app.getHttpServer())
+            .post('/api/v1/payments/initiate')
+            .set('Cookie', studentCookies)
+            .send({ orderId: order.id });
+
+          expect(res.status).toBe(502);
+          expect(res.body.errorCode).toBe('GATEWAY_ERROR');
+
+          const s = await snapshot(order.id);
+          expect(s.dbOrder.status).toBe('PENDING');
+          expect(s.dbPayments).toHaveLength(1);
+          expect(s.dbPayments[0].status).toBe('FAILED');
+          expect(s.enrollmentRows).toHaveLength(0);
+          expect(s.invoicesRows).toHaveLength(0);
+        } finally {
+          mockSslCommerz.sessionInitiationHandler = undefined;
+        }
+      });
+
+      // 4. Retry while original gateway request is still executing
+      it('11.4 retry while original gateway request is still executing within active lease returns 409 Conflict', async () => {
+        const orderRes = await request(app.getHttpServer())
+          .post('/api/v1/orders')
+          .set('Cookie', studentCookies)
+          .send({ courseId: paidCourse.id });
+        const order = orderRes.body.data;
+
+        // Seed an in-flight payment attempt with active lease (leaseExpiresAt in future, no gatewayUrl)
+        const inFlightTranId = `TSP-IN-FLIGHT-${Date.now()}`;
+        const leaseExpiresAt = new Date(Date.now() + 25000); // 25s remaining
+
+        await testDb.insert(schema.payments).values({
+          orderId: order.id,
+          merchantTranId: inFlightTranId,
+          provider: 'SSLCOMMERZ',
+          amountCents: order.payableCents,
+          currency: 'BDT',
+          status: 'INITIATED',
+          initiatedAt: new Date(),
+          rawResponse: JSON.stringify({
+            leaseExpiresAt: leaseExpiresAt.toISOString(),
+            leaseDurationSeconds: 30,
+          }),
+        });
+
+        // Set order to PAYMENT_PROCESSING
+        await testDb
+          .update(schema.orders)
+          .set({ status: 'PAYMENT_PROCESSING' })
+          .where(eq(schema.orders.id, order.id));
+
+        let gatewayCalls = 0;
+        mockSslCommerz.sessionInitiationHandler = async () => {
+          gatewayCalls++;
+          return { status: 'SUCCESS' };
+        };
+
+        try {
+          const res = await request(app.getHttpServer())
+            .post('/api/v1/payments/initiate')
+            .set('Cookie', studentCookies)
+            .send({ orderId: order.id });
+
+          expect(res.status).toBe(409);
+          expect(res.body.errorCode).toBe('PAYMENT_INITIATION_IN_PROGRESS');
+          expect(gatewayCalls).toBe(0); // Never called gateway!
+
+          const s = await snapshot(order.id);
+          expect(s.dbPayments).toHaveLength(1); // No second attempt created
+          expect(s.dbPayments[0].merchantTranId).toBe(inFlightTranId);
+          expect(s.dbPayments[0].status).toBe('INITIATED');
+        } finally {
+          mockSslCommerz.sessionInitiationHandler = undefined;
+        }
+      });
+
+      // 5. Stale gateway response arriving after supersession
+      it('11.5 stale gateway response arriving after attempt was superseded is fenced out', async () => {
+        const orderRes = await request(app.getHttpServer())
+          .post('/api/v1/orders')
+          .set('Cookie', studentCookies)
+          .send({ courseId: paidCourse.id });
+        const order = orderRes.body.data;
+
+        let sessionCalledResolve: () => void;
+        const sessionCalledPromise = new Promise<void>((resolve) => {
+          sessionCalledResolve = resolve;
+        });
+
+        let initiateResolve: (val: any) => void;
+        const initiatePromise = new Promise((resolve) => {
+          initiateResolve = resolve;
+        });
+
+        // Gateway hangs on first request until explicitly released
+        mockSslCommerz.sessionInitiationHandler = async (params) => {
+          sessionCalledResolve();
+          return initiatePromise as any;
+        };
+
+        try {
+          // Launch first initiation in background eagerly
+          const req1Promise = (async () => {
+            return request(app.getHttpServer())
+              .post('/api/v1/payments/initiate')
+              .set('Cookie', studentCookies)
+              .send({ orderId: order.id });
+          })();
+
+          // Wait until handler is invoked (guarantees coordination tx committed p1)
+          await sessionCalledPromise;
+
+          // Fetch the attempt created by req1
+          const [p1] = await testDb
+            .select()
+            .from(schema.payments)
+            .where(eq(schema.payments.orderId, order.id));
+          expect(p1).toBeDefined();
+
+          // Manually supersede p1 (simulating supersession by retry or admin)
+          await testDb
+            .update(schema.payments)
+            .set({ status: 'CANCELLED', updatedAt: new Date() })
+            .where(eq(schema.payments.id, p1.id));
+
+          // Now release the gateway call for req1
+          initiateResolve!({
+            status: 'SUCCESS',
+            sessionkey: 'stale_session_123',
+            GatewayPageURL: 'https://sandbox.sslcommerz.com/EasyCheckout/stale',
+          });
+
+          // req1 must fail with 409 PAYMENT_SESSION_SUPERSEDED
+          const res1 = await req1Promise;
+          expect(res1.status).toBe(409);
+          expect(res1.body.errorCode).toBe('PAYMENT_SESSION_SUPERSEDED');
+
+          // p1 in database must remain CANCELLED (never resurrected)
+          const [afterP1] = await testDb
+            .select()
+            .from(schema.payments)
+            .where(eq(schema.payments.id, p1.id));
+          expect(afterP1.status).toBe('CANCELLED');
+          expect(afterP1.providerSessionKey).toBeNull();
+
+          // Audit log must capture PAYMENT_INITIATION_STALE_SESSION_FENCED
+          const [fenceAudit] = await testDb
+            .select()
+            .from(schema.auditLogs)
+            .where(
+              and(
+                eq(schema.auditLogs.action, 'PAYMENT_INITIATION_STALE_SESSION_FENCED'),
+                eq(schema.auditLogs.targetId, p1.id)
+              )
+            );
+          expect(fenceAudit).toBeDefined();
+        } finally {
+          mockSslCommerz.sessionInitiationHandler = undefined;
+        }
+      });
+
+      // 6. Abandoned initiation after lease expiry
+      it('11.6 abandoned initiation after lease expiry is cleanly superseded on next initiation', async () => {
+        const orderRes = await request(app.getHttpServer())
+          .post('/api/v1/orders')
+          .set('Cookie', studentCookies)
+          .send({ courseId: paidCourse.id });
+        const order = orderRes.body.data;
+
+        // Seed an abandoned attempt created 45 seconds ago with expired lease (lease was 30s)
+        const abandonedTranId = `TSP-ABANDONED-${Date.now()}`;
+        const abandonedInitiatedAt = new Date(Date.now() - 45000);
+        const expiredLeaseAt = new Date(Date.now() - 15000);
+
+        const [p1] = await testDb
+          .insert(schema.payments)
+          .values({
+            orderId: order.id,
+            merchantTranId: abandonedTranId,
+            provider: 'SSLCOMMERZ',
+            amountCents: order.payableCents,
+            currency: 'BDT',
+            status: 'INITIATED',
+            initiatedAt: abandonedInitiatedAt,
+            rawResponse: JSON.stringify({
+              leaseExpiresAt: expiredLeaseAt.toISOString(),
+              leaseDurationSeconds: 30,
+            }),
+          })
+          .returning();
+
+        await testDb
+          .update(schema.orders)
+          .set({ status: 'PAYMENT_PROCESSING' })
+          .where(eq(schema.orders.id, order.id));
+
+        // Next initiation arrives
+        const res2 = await request(app.getHttpServer())
+          .post('/api/v1/payments/initiate')
+          .set('Cookie', studentCookies)
+          .send({ orderId: order.id });
+
+        expect(res2.status).toBe(201);
+        expect(res2.body.data.merchantTranId).not.toBe(abandonedTranId);
+
+        const s = await snapshot(order.id);
+        expect(s.dbOrder.status).toBe('PAYMENT_PROCESSING');
+        expect(s.dbPayments).toHaveLength(2);
+
+        const [oldAttempt] = s.dbPayments.filter((p: any) => p.id === p1.id);
+        const [newAttempt] = s.dbPayments.filter((p: any) => p.id !== p1.id);
+
+        expect(oldAttempt.status).toBe('CANCELLED');
+        expect(newAttempt.status).toBe('INITIATED');
+      });
+
+      // 7. Late callback for superseded attempt
+      it('11.7 late valid callback for a superseded attempt fulfills unpaid order with audit event', async () => {
+        const orderRes = await request(app.getHttpServer())
+          .post('/api/v1/orders')
+          .set('Cookie', studentCookies)
+          .send({ courseId: paidCourse.id });
+        const order = orderRes.body.data;
+
+        const supersededTranId = `TSP-SUPERSEDED-${Date.now()}`;
+        const [p1] = await testDb
+          .insert(schema.payments)
+          .values({
+            orderId: order.id,
+            merchantTranId: supersededTranId,
+            provider: 'SSLCOMMERZ',
+            amountCents: order.payableCents,
+            currency: 'BDT',
+            status: 'CANCELLED', // Superseded
+            initiatedAt: new Date(Date.now() - 60000),
+          })
+          .returning();
+
+        await testDb
+          .update(schema.orders)
+          .set({ status: 'PAYMENT_PROCESSING' })
+          .where(eq(schema.orders.id, order.id));
+
+        const valId = `VAL-SUPERSEDED-${Date.now()}`;
+        mockSslCommerz.setMockValidationSuccess(valId, {
+          tran_id: supersededTranId,
+          amount: '2500.00',
+          currency: 'BDT',
+          bank_tran_id: 'BANK-SUPERSEDED-999',
+        });
+
+        // Late callback arrives for superseded attempt
+        const res = await request(app.getHttpServer())
+          .post('/api/v1/payments/sslcommerz/success')
+          .set('Accept', 'application/json')
+          .send({
+            tran_id: supersededTranId,
+            val_id: valId,
+            amount: '2500.00',
+            currency: 'BDT',
+            status: 'VALID',
+          });
+
+        expect(res.status).toBe(200);
+
+        const s = await snapshot(order.id);
+        expect(s.dbOrder.status).toBe('PAID');
+        expect(s.enrollmentRows).toHaveLength(1);
+        expect(s.invoicesRows).toHaveLength(1);
+
+        const [p1After] = await testDb
+          .select()
+          .from(schema.payments)
+          .where(eq(schema.payments.id, p1.id));
+        expect(p1After.status).toBe('VALIDATED');
+        expect(p1After.valId).toBe(valId);
+        expect(p1After.bankTranId).toBe('BANK-SUPERSEDED-999');
+
+        // Audit log must capture PAYMENT_SUPERSEDED_ATTEMPT_HONORED
+        const [honorAudit] = await testDb
+          .select()
+          .from(schema.auditLogs)
+          .where(
+            and(
+              eq(schema.auditLogs.action, 'PAYMENT_SUPERSEDED_ATTEMPT_HONORED'),
+              eq(schema.auditLogs.targetId, p1.id)
+            )
+          );
+        expect(honorAudit).toBeDefined();
+      });
+
+      // 8. Two independently validated transactions for one order
+      it('11.8 two independently validated transactions for one order yield exactly one fulfillment and one excess settlement', async () => {
+        const orderRes = await request(app.getHttpServer())
+          .post('/api/v1/orders')
+          .set('Cookie', studentCookies)
+          .send({ courseId: paidCourse.id });
+        const order = orderRes.body.data;
+
+        const tran1 = `TSP-DUAL-1-${Date.now()}`;
+        const tran2 = `TSP-DUAL-2-${Date.now()}`;
+
+        const [p1] = await testDb.insert(schema.payments).values({
+          orderId: order.id,
+          merchantTranId: tran1,
+          provider: 'SSLCOMMERZ',
+          amountCents: order.payableCents,
+          currency: 'BDT',
+          status: 'INITIATED',
+          initiatedAt: new Date(Date.now() - 10000),
+        }).returning();
+
+        const [p2] = await testDb.insert(schema.payments).values({
+          orderId: order.id,
+          merchantTranId: tran2,
+          provider: 'SSLCOMMERZ',
+          amountCents: order.payableCents,
+          currency: 'BDT',
+          status: 'CANCELLED',
+          initiatedAt: new Date(Date.now() - 5000),
+        }).returning();
+
+        await testDb.update(schema.orders).set({ status: 'PAYMENT_PROCESSING' }).where(eq(schema.orders.id, order.id));
+
+        const valId1 = `VAL-DUAL-1-${Date.now()}`;
+        const valId2 = `VAL-DUAL-2-${Date.now()}`;
+
+        mockSslCommerz.setMockValidationSuccess(valId1, {
+          tran_id: tran1,
+          amount: '2500.00',
+          currency: 'BDT',
+          bank_tran_id: 'BANK-D1-111',
+        });
+
+        mockSslCommerz.setMockValidationSuccess(valId2, {
+          tran_id: tran2,
+          amount: '2500.00',
+          currency: 'BDT',
+          bank_tran_id: 'BANK-D2-222',
+        });
+
+        // Execute callback 1
+        const res1 = await request(app.getHttpServer())
+          .post('/api/v1/payments/sslcommerz/success')
+          .set('Accept', 'application/json')
+          .send({
+            tran_id: tran1,
+            val_id: valId1,
+            amount: '2500.00',
+            currency: 'BDT',
+            status: 'VALID',
+          });
+        expect(res1.status).toBe(200);
+
+        // Execute callback 2
+        const res2 = await request(app.getHttpServer())
+          .post('/api/v1/payments/sslcommerz/success')
+          .set('Accept', 'application/json')
+          .send({
+            tran_id: tran2,
+            val_id: valId2,
+            amount: '2500.00',
+            currency: 'BDT',
+            status: 'VALID',
+          });
+        expect(res2.status).toBe(200);
+
+        // Verification:
+        const s = await snapshot(order.id);
+        expect(s.dbOrder.status).toBe('PAID');
+        expect(s.enrollmentRows).toHaveLength(1); // EXACTLY 1 enrollment
+        expect(s.invoicesRows).toHaveLength(1);   // EXACTLY 1 invoice
+
+        const [dbP1] = await testDb.select().from(schema.payments).where(eq(schema.payments.id, p1.id));
+        const [dbP2] = await testDb.select().from(schema.payments).where(eq(schema.payments.id, p2.id));
+
+        expect(dbP1.status).toBe('VALIDATED');
+        expect(dbP1.valId).toBe(valId1);
+
+        expect(dbP2.status).toBe('FAILED');
+        expect(dbP2.valId).toBe(valId2);
+        expect(dbP2.bankTranId).toBe('BANK-D2-222');
+
+        const parsedRaw = JSON.parse(dbP2.rawResponse || '{}');
+        expect(parsedRaw.excessSettlement).toBe(true);
+        expect(parsedRaw.requiresRefund).toBe(true);
+
+        // Audit log for excess settlement
+        const [excessAudit] = await testDb
+          .select()
+          .from(schema.auditLogs)
+          .where(
+            and(
+              eq(schema.auditLogs.action, 'EXCESS_PAYMENT_SETTLEMENT_DETECTED'),
+              eq(schema.auditLogs.targetId, p2.id)
+            )
+          );
+        expect(excessAudit).toBeDefined();
+      });
     });
   });
 });

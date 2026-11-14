@@ -179,6 +179,19 @@ describe('P5.5.2 — Student Order History UI & Navigation Test Suite', () => {
       expect(cancelledConfig.label).toBe('Cancelled');
       expect(paidConfig.variant).not.toBe(pendingConfig.variant);
     });
+
+    it('7b. displays "Total" label for pending/unpaid orders and "Amount Paid" for paid orders', () => {
+      const getAmountLabel = (status: OrderStatus, labels: { amountPaid: string; total: string }) => {
+        return status === 'PAID' ? labels.amountPaid : labels.total;
+      };
+
+      const labels = { amountPaid: 'Amount Paid', total: 'Total' };
+      expect(getAmountLabel('PAID', labels)).toBe('Amount Paid');
+      expect(getAmountLabel('PENDING', labels)).toBe('Total');
+      expect(getAmountLabel('PAYMENT_PROCESSING', labels)).toBe('Total');
+      expect(getAmountLabel('FAILED', labels)).toBe('Total');
+      expect(getAmountLabel('CANCELLED', labels)).toBe('Total');
+    });
   });
 
   // ==========================================

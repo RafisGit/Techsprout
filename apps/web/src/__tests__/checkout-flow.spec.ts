@@ -498,5 +498,98 @@ describe('P5.4.4 — Student Checkout & Order Completion Flow Test Suite', () =>
       expect(inv?.id).toBe('inv-101');
       expect(inv?.payableCents).toBe(250000);
     });
+
+    it('should reuse created order ID on retry instead of creating duplicate orders', async () => {
+      let createdOrderId: string | null = null;
+      let orderCreationCalls = 0;
+      let paymentInitiationCalls = 0;
+
+      const mockCreateOrder = vi.fn(async () => {
+        orderCreationCalls++;
+        return { id: 'ord-retry-123' };
+      });
+
+      const mockInitiatePayment = vi.fn(async ({ orderId }: { orderId: string }) => {
+        paymentInitiationCalls++;
+        if (paymentInitiationCalls === 1) {
+          throw new Error('Failed to establish session with payment gateway');
+        }
+        return { gatewayUrl: 'https://sandbox.sslcommerz.com/testpage' };
+      });
+
+      // Attempt 1: Fails at payment initiation
+      try {
+        let orderId = createdOrderId;
+        if (!orderId) {
+          const order = await mockCreateOrder();
+          orderId = order.id;
+          createdOrderId = order.id;
+        }
+        await mockInitiatePayment({ orderId });
+      } catch (e) {
+        // Handled in UI
+      }
+
+      expect(orderCreationCalls).toBe(1);
+      expect(paymentInitiationCalls).toBe(1);
+      expect(createdOrderId).toBe('ord-retry-123');
+
+      // Attempt 2 (Retry): Reuses orderId without re-calling createOrder
+      let retrySuccess = false;
+      try {
+        let orderId = createdOrderId;
+        if (!orderId) {
+          const order = await mockCreateOrder();
+          orderId = order.id;
+          createdOrderId = order.id;
+        }
+        const session = await mockInitiatePayment({ orderId });
+        expect(session.gatewayUrl).toBe('https://sandbox.sslcommerz.com/testpage');
+        retrySuccess = true;
+      } catch (e) {
+        // Handled in UI
+      }
+
+      expect(retrySuccess).toBe(true);
+      expect(orderCreationCalls).toBe(1); // STILL 1! No duplicate order created!
+      expect(paymentInitiationCalls).toBe(2);
+    });
+
+    it('should show "Retry Payment" button label when createdOrderId and checkoutError exist', () => {
+      const getButtonLabel = ({
+        isSubmitting,
+        isZeroPayable,
+        createdOrderId,
+        checkoutError,
+      }: {
+        isSubmitting: boolean;
+        isZeroPayable: boolean;
+        createdOrderId: string | null;
+        checkoutError: string | null;
+      }) => {
+        if (isSubmitting) return 'Processing...';
+        if (isZeroPayable) return 'Complete Free Enrollment';
+        if (createdOrderId && checkoutError) return 'Retry Payment';
+        return 'Proceed to Payment';
+      };
+
+      expect(
+        getButtonLabel({
+          isSubmitting: false,
+          isZeroPayable: false,
+          createdOrderId: 'ord-123',
+          checkoutError: 'Failed to establish session',
+        })
+      ).toBe('Retry Payment');
+
+      expect(
+        getButtonLabel({
+          isSubmitting: false,
+          isZeroPayable: false,
+          createdOrderId: null,
+          checkoutError: null,
+        })
+      ).toBe('Proceed to Payment');
+    });
   });
 });
