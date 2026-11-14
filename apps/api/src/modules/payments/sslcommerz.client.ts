@@ -109,11 +109,19 @@ export class SSLCommerzClient implements ISSLCommerzClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
 
+  private sanitizeErrorMessage(err: unknown): string {
+    if (!err) return 'Unknown gateway error';
+    const msg = typeof err === 'string' ? err : (err as any).message || String(err);
+    return msg
+      .replace(/store_passwd=[^&\s]+/gi, 'store_passwd=[REDACTED]')
+      .replace(/store_id=[^&\s]+/gi, 'store_id=[REDACTED]');
+  }
+
   constructor(config: SSLCommerzConfig) {
     this.storeId = config.storeId || '';
     this.storePassword = config.storePassword || '';
     this.baseUrl = config.baseUrl.replace(/\/+$/, '');
-    this.timeoutMs = config.timeoutMs ?? 10000;
+    this.timeoutMs = config.timeoutMs ?? 15000;
   }
 
   /**
@@ -122,6 +130,7 @@ export class SSLCommerzClient implements ISSLCommerzClient {
    */
   async initiateSession(params: SSLCommerzInitiateSessionParams): Promise<SSLCommerzSessionResponse> {
     if (!this.storeId || !this.storePassword) {
+      this.logger.error('SSLCommerz gateway credentials not configured (SSLCOMMERZ_STORE_ID / SSLCOMMERZ_STORE_PASSWORD required)');
       throw new Error(
         'SSLCommerz gateway credentials not configured (SSLCOMMERZ_STORE_ID / SSLCOMMERZ_STORE_PASSWORD required)'
       );
@@ -169,7 +178,7 @@ export class SSLCommerzClient implements ISSLCommerzClient {
       const data = (await response.json()) as SSLCommerzSessionResponse;
       return data;
     } catch (error) {
-      this.logger.error(`SSLCommerz session initiation error for tran_id=${params.tran_id}:`, error);
+      this.logger.error(`SSLCommerz session initiation error for tran_id=${params.tran_id}: ${this.sanitizeErrorMessage(error)}`);
       throw error;
     }
   }
@@ -180,6 +189,7 @@ export class SSLCommerzClient implements ISSLCommerzClient {
    */
   async validateOrder(valId: string): Promise<SSLCommerzOrderValidationResponse> {
     if (!this.storeId || !this.storePassword) {
+      this.logger.error('SSLCommerz gateway credentials not configured (SSLCOMMERZ_STORE_ID / SSLCOMMERZ_STORE_PASSWORD required)');
       throw new Error(
         'SSLCommerz gateway credentials not configured (SSLCOMMERZ_STORE_ID / SSLCOMMERZ_STORE_PASSWORD required)'
       );
@@ -210,7 +220,7 @@ export class SSLCommerzClient implements ISSLCommerzClient {
       const data = (await response.json()) as SSLCommerzOrderValidationResponse;
       return data;
     } catch (error) {
-      this.logger.error(`SSLCommerz validation API error for val_id=${valId}:`, error);
+      this.logger.error(`SSLCommerz validation API error for val_id=${valId}: ${this.sanitizeErrorMessage(error)}`);
       throw error;
     }
   }
@@ -221,6 +231,7 @@ export class SSLCommerzClient implements ISSLCommerzClient {
    */
   async queryTransaction(tranId: string): Promise<SSLCommerzTransactionQueryResponse> {
     if (!this.storeId || !this.storePassword) {
+      this.logger.error('SSLCommerz gateway credentials not configured (SSLCOMMERZ_STORE_ID / SSLCOMMERZ_STORE_PASSWORD required)');
       throw new Error(
         'SSLCommerz gateway credentials not configured (SSLCOMMERZ_STORE_ID / SSLCOMMERZ_STORE_PASSWORD required)'
       );
@@ -250,7 +261,7 @@ export class SSLCommerzClient implements ISSLCommerzClient {
       const data = (await response.json()) as SSLCommerzTransactionQueryResponse;
       return data;
     } catch (error) {
-      this.logger.error(`SSLCommerz transaction query error for tran_id=${tranId}:`, error);
+      this.logger.error(`SSLCommerz transaction query error for tran_id=${tranId}: ${this.sanitizeErrorMessage(error)}`);
       throw error;
     }
   }
@@ -261,6 +272,7 @@ export class SSLCommerzClient implements ISSLCommerzClient {
    */
   async initiateRefund(params: SSLCommerzInitiateRefundParams): Promise<SSLCommerzRefundResponse> {
     if (!this.storeId || !this.storePassword) {
+      this.logger.error('SSLCommerz gateway credentials not configured (SSLCOMMERZ_STORE_ID / SSLCOMMERZ_STORE_PASSWORD required)');
       throw new Error(
         'SSLCommerz gateway credentials not configured (SSLCOMMERZ_STORE_ID / SSLCOMMERZ_STORE_PASSWORD required)'
       );
@@ -297,7 +309,7 @@ export class SSLCommerzClient implements ISSLCommerzClient {
       const data = (await response.json()) as SSLCommerzRefundResponse;
       return data;
     } catch (error) {
-      this.logger.error(`SSLCommerz refund initiation error for refund_trans_id=${params.refund_trans_id}:`, error);
+      this.logger.error(`SSLCommerz refund initiation error for refund_trans_id=${params.refund_trans_id}: ${this.sanitizeErrorMessage(error)}`);
       throw error;
     }
   }
@@ -308,6 +320,7 @@ export class SSLCommerzClient implements ISSLCommerzClient {
    */
   async queryRefund(refundRefId: string): Promise<SSLCommerzRefundQueryResponse> {
     if (!this.storeId || !this.storePassword) {
+      this.logger.error('SSLCommerz gateway credentials not configured (SSLCOMMERZ_STORE_ID / SSLCOMMERZ_STORE_PASSWORD required)');
       throw new Error(
         'SSLCommerz gateway credentials not configured (SSLCOMMERZ_STORE_ID / SSLCOMMERZ_STORE_PASSWORD required)'
       );
@@ -337,7 +350,7 @@ export class SSLCommerzClient implements ISSLCommerzClient {
       const data = (await response.json()) as SSLCommerzRefundQueryResponse;
       return data;
     } catch (error) {
-      this.logger.error(`SSLCommerz refund query error for refund_ref_id=${refundRefId}:`, error);
+      this.logger.error(`SSLCommerz refund query error for refund_ref_id=${refundRefId}: ${this.sanitizeErrorMessage(error)}`);
       throw error;
     }
   }

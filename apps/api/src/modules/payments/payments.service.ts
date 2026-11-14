@@ -105,6 +105,27 @@ export class PaymentsService {
     return sanitized;
   }
 
+  private readonly coordinationLocks = new Map<string, Promise<void>>();
+
+  private async acquireCoordinationLock(orderId: string): Promise<() => void> {
+    while (this.coordinationLocks.has(orderId)) {
+      try {
+        await this.coordinationLocks.get(orderId);
+      } catch {
+        // ignore errors from previous holder
+      }
+    }
+    let release!: () => void;
+    const promise = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.coordinationLocks.set(orderId, promise);
+    return () => {
+      this.coordinationLocks.delete(orderId);
+      release();
+    };
+  }
+
   /**
    * Initiate Gateway Payment Session
    * POST /api/v1/payments/initiate
@@ -114,115 +135,161 @@ export class PaymentsService {
     input: InitiatePaymentRequest,
     reqMeta?: { ip?: string; userAgent?: string; requestId?: string }
   ): Promise<InitiatePaymentResponse> {
-    // 1. Fetch order
-    const [order] = await this.db
-      .select()
-      .from(orders)
-      .where(eq(orders.id, input.orderId))
-      .limit(1);
+    const releaseCoordinationLock = await this.acquireCoordinationLock(input.orderId);
 
-    if (!order) {
-      throw new ApiException('Order not found', HttpStatus.NOT_FOUND, 'ORDER_NOT_FOUND');
-    }
+    // 1. Atomic payment coordination via PostgreSQL SELECT FOR UPDATE order lock
+    let coord: any;
+    try {
+      coord = await this.db.transaction(async (tx) => {
+      // 1.1 Lock order using SELECT FOR UPDATE
+      const [order] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.id, input.orderId))
+        .for('update');
 
-    // 2. Ownership verification
-    if (order.studentId !== studentId) {
-      throw new ApiException(
-        'Access denied: cannot initiate payment for another student order',
-        HttpStatus.FORBIDDEN,
-        'ORDER_ACCESS_DENIED'
-      );
-    }
+      if (!order) {
+        throw new ApiException('Order not found', HttpStatus.NOT_FOUND, 'ORDER_NOT_FOUND');
+      }
 
-    // 3. Expiration verification
-    if (order.expiresAt < new Date()) {
-      await this.ordersService.expireOrderIfDue(order.id);
-      throw new ApiException('Order has expired', HttpStatus.BAD_REQUEST, 'INVALID_ORDER_STATE_TRANSITION');
-    }
+      // 1.2 Ownership verification under lock
+      if (order.studentId !== studentId) {
+        throw new ApiException(
+          'Access denied: cannot initiate payment for another student order',
+          HttpStatus.FORBIDDEN,
+          'ORDER_ACCESS_DENIED'
+        );
+      }
 
-    // 4. Order state verification
-    if (order.status === 'PAID') {
-      throw new ApiException(
-        'Order is already paid',
-        HttpStatus.BAD_REQUEST,
-        'INVALID_ORDER_STATE_TRANSITION'
-      );
-    }
+      // 1.3 Expiration verification under lock
+      const now = new Date();
+      if (order.expiresAt < now) {
+        throw new ApiException('Order has expired', HttpStatus.BAD_REQUEST, 'INVALID_ORDER_STATE_TRANSITION');
+      }
 
-    if (order.status === 'CANCELLED') {
-      throw new ApiException(
-        'Order is cancelled',
-        HttpStatus.BAD_REQUEST,
-        'INVALID_ORDER_STATE_TRANSITION'
-      );
-    }
+      // 1.4 Order state verification under lock
+      if (order.status === 'PAID') {
+        throw new ApiException(
+          'Order is already paid',
+          HttpStatus.BAD_REQUEST,
+          'INVALID_ORDER_STATE_TRANSITION'
+        );
+      }
 
-    if (order.status === 'REFUNDED') {
-      throw new ApiException(
-        'Order is refunded',
-        HttpStatus.BAD_REQUEST,
-        'INVALID_ORDER_STATE_TRANSITION'
-      );
-    }
+      if (order.status === 'CANCELLED') {
+        throw new ApiException(
+          'Order is cancelled',
+          HttpStatus.BAD_REQUEST,
+          'INVALID_ORDER_STATE_TRANSITION'
+        );
+      }
 
-    // 5. Amount & Minimum/Maximum Gateway Boundary Check
-    if (order.payableCents === 0) {
-      // Rule: payableCents === 0 -> bypass SSLCommerz completely
-      const zeroBypass = await this.fulfillZeroPayableOrder(order, reqMeta);
-      return {
-        paymentId: zeroBypass.paymentId,
-        merchantTranId: zeroBypass.merchantTranId,
-        gatewayUrl: `${env.WEB_PUBLIC_ORIGIN}/orders/${order.id}/success`,
-        provider: 'SSLCOMMERZ',
-      };
-    }
+      if (order.status === 'REFUNDED') {
+        throw new ApiException(
+          'Order is refunded',
+          HttpStatus.BAD_REQUEST,
+          'INVALID_ORDER_STATE_TRANSITION'
+        );
+      }
 
-    if (order.payableCents < GATEWAY_MIN_AMOUNT_CENTS) {
-      // Rule: 1 <= payableCents < 1000 -> reject payment initiation
-      // SSLCommerz V4 requires minimum total_amount = 10.00 BDT (1000 cents/poisha)
-      throw new ApiException(
-        'Payment amount is below gateway minimum of 10.00 BDT',
-        HttpStatus.BAD_REQUEST,
-        'PAYMENT_AMOUNT_BELOW_GATEWAY_MINIMUM'
-      );
-    }
+      // 1.5 Amount boundary checks under lock
+      if (order.payableCents === 0) {
+        return { kind: 'ZERO_PAYABLE' as const, order };
+      }
 
-    if (order.payableCents > GATEWAY_MAX_AMOUNT_CENTS) {
-      // Rule: payableCents > 50_000_000 -> reject BEFORE contacting SSLCommerz
-      // SSLCommerz V4 specifies maximum total_amount = 500,000.00 BDT (50,000,000 cents/poisha)
-      throw new ApiException(
-        'Payment amount exceeds gateway maximum limit of 500,000.00 BDT',
-        HttpStatus.BAD_REQUEST,
-        'PAYMENT_AMOUNT_ABOVE_GATEWAY_MAXIMUM'
-      );
-    }
+      if (order.payableCents < GATEWAY_MIN_AMOUNT_CENTS) {
+        throw new ApiException(
+          'Payment amount is below gateway minimum of 10.00 BDT',
+          HttpStatus.BAD_REQUEST,
+          'PAYMENT_AMOUNT_BELOW_GATEWAY_MINIMUM'
+        );
+      }
 
-    // 6. Fetch course title & student profile
-    const [item] = await this.db
-      .select()
-      .from(orderItems)
-      .where(eq(orderItems.orderId, order.id))
-      .limit(1);
+      if (order.payableCents > GATEWAY_MAX_AMOUNT_CENTS) {
+        throw new ApiException(
+          'Payment amount exceeds gateway maximum limit of 500,000.00 BDT',
+          HttpStatus.BAD_REQUEST,
+          'PAYMENT_AMOUNT_ABOVE_GATEWAY_MAXIMUM'
+        );
+      }
 
-    const [student] = await this.db
-      .select()
-      .from(users)
-      .where(eq(users.id, studentId))
-      .limit(1);
+      // 1.6 Inspect existing payment attempts while holding order lock
+      const existingAttempts = await tx
+        .select()
+        .from(payments)
+        .where(
+          and(
+            eq(payments.orderId, order.id),
+            eq(payments.status, 'INITIATED')
+          )
+        )
+        .orderBy(desc(payments.initiatedAt));
 
-    const courseTitle = item?.courseTitle || 'TechSprout Course';
-    const merchantTranId = `TSP-TXN-${Date.now().toString().slice(-8)}-${Math.floor(1000 + Math.random() * 9000)}`;
+      if (existingAttempts.length > 0) {
+        const latestAttempt = existingAttempts[0];
+        const ageMs = now.getTime() - latestAttempt.initiatedAt.getTime();
 
-    // 7. Atomic creation of payment attempt & order transition
-    const payment = await this.db.transaction(async (tx) => {
-      // Transition order to PAYMENT_PROCESSING
+        let parsedRaw: Record<string, unknown> | null = null;
+        try {
+          parsedRaw = latestAttempt.rawResponse ? JSON.parse(latestAttempt.rawResponse) : null;
+        } catch {
+          parsedRaw = null;
+        }
+
+        const gatewayUrl = typeof parsedRaw?.gatewayUrl === 'string' ? parsedRaw.gatewayUrl : null;
+
+        // Reuse active session within 15-minute window if gateway URL already exists
+        if (gatewayUrl && ageMs < 15 * 60 * 1000) {
+          return {
+            kind: 'REUSE_SESSION' as const,
+            order,
+            payment: latestAttempt,
+            gatewayUrl,
+            merchantTranId: latestAttempt.merchantTranId,
+          };
+        }
+
+        // Explicit initiation lease (default 30 seconds)
+        const leaseDurationMs = 30 * 1000;
+        const leaseExpiresAt = parsedRaw?.leaseExpiresAt
+          ? new Date(parsedRaw.leaseExpiresAt as string)
+          : new Date(latestAttempt.initiatedAt.getTime() + leaseDurationMs);
+
+        // Return PAYMENT_INITIATION_IN_PROGRESS when live initiation lease exists without established session
+        if (!gatewayUrl && now < leaseExpiresAt) {
+          throw new ApiException(
+            'Payment initiation already in progress for this order. Please complete the existing session or wait a moment.',
+            HttpStatus.CONFLICT,
+            'PAYMENT_INITIATION_IN_PROGRESS'
+          );
+        }
+
+        // Supersede only genuinely stale attempts (lease expired or session timed out)
+        await tx
+          .update(payments)
+          .set({
+            status: 'CANCELLED',
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(payments.orderId, order.id),
+              eq(payments.status, 'INITIATED')
+            )
+          );
+      }
+
+      // 1.7 Transition order to PAYMENT_PROCESSING & create exactly one new reservation attempt
       await tx
         .update(orders)
         .set({
           status: 'PAYMENT_PROCESSING',
-          updatedAt: new Date(),
+          updatedAt: now,
         })
         .where(eq(orders.id, order.id));
+
+      const merchantTranId = `TSP-TXN-${now.getTime().toString().slice(-8)}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const leaseExpiresAt = new Date(now.getTime() + 30 * 1000);
 
       const [newPayment] = await tx
         .insert(payments)
@@ -233,36 +300,91 @@ export class PaymentsService {
           amountCents: order.payableCents,
           currency: order.currency,
           status: 'INITIATED',
-          initiatedAt: new Date(),
+          initiatedAt: now,
+          rawResponse: JSON.stringify({
+            leaseExpiresAt: leaseExpiresAt.toISOString(),
+            leaseDurationSeconds: 30,
+          }),
         })
         .returning();
 
-      return newPayment;
-    });
+      // Fetch course title and student profile for gateway payload while holding lock
+      const [item] = await tx
+        .select()
+        .from(orderItems)
+        .where(eq(orderItems.orderId, order.id))
+        .limit(1);
 
-    // 8. Gateway session initiation with authoritative server parameters
-    const totalAmountStr = centsToDecimalString(order.payableCents);
+      const [student] = await tx
+        .select()
+        .from(users)
+        .where(eq(users.id, studentId))
+        .limit(1);
+
+      return {
+        kind: 'NEW_ATTEMPT' as const,
+        order,
+        payment: newPayment,
+        merchantTranId,
+        courseTitle: item?.courseTitle || 'TechSprout Course',
+        studentName: student?.name || 'TechSprout Student',
+        studentEmail: student?.email || 'student@techsprout.edu',
+        studentPhone: student?.phone || '01700000000',
+      };
+    });
+    } finally {
+      releaseCoordinationLock();
+    }
+
+    // 2. Coordination committed: database order lock released BEFORE contacting gateway
+    if (coord.kind === 'ZERO_PAYABLE') {
+      const zeroBypass = await this.fulfillZeroPayableOrder(coord.order, reqMeta);
+      return {
+        paymentId: zeroBypass.paymentId,
+        merchantTranId: zeroBypass.merchantTranId,
+        gatewayUrl: `${env.WEB_PUBLIC_ORIGIN}/orders/${coord.order.id}/success`,
+        provider: 'SSLCOMMERZ',
+      };
+    }
+
+    if (coord.kind === 'REUSE_SESSION') {
+      this.logger.log(
+        `[IDEMPOTENT_INITIATE] Reusing active gateway session for order ${coord.order.id} (paymentId: ${coord.payment.id}, tranId: ${coord.merchantTranId})`
+      );
+      return {
+        paymentId: coord.payment.id,
+        merchantTranId: coord.merchantTranId,
+        gatewayUrl: coord.gatewayUrl,
+        provider: 'SSLCOMMERZ',
+      };
+    }
+
+    // 3. Gateway session initiation with authoritative server parameters
+    const totalAmountStr = centsToDecimalString(coord.order.payableCents);
     const apiPublicBase = env.API_PUBLIC_BASE_URL.replace(/\/+$/, '');
 
     let gatewaySession;
     try {
       gatewaySession = await this.sslcommerzClient.initiateSession({
         total_amount: totalAmountStr,
-        currency: order.currency,
-        tran_id: merchantTranId,
+        currency: coord.order.currency,
+        tran_id: coord.merchantTranId,
         success_url: `${apiPublicBase}/api/v1/payments/sslcommerz/success`,
         fail_url: `${apiPublicBase}/api/v1/payments/sslcommerz/fail`,
         cancel_url: `${apiPublicBase}/api/v1/payments/sslcommerz/cancel`,
         ipn_url: `${apiPublicBase}/api/v1/payments/sslcommerz/ipn`,
-        cus_name: student?.name || 'TechSprout Student',
-        cus_email: student?.email || 'student@techsprout.edu',
-        cus_phone: student?.phone || '01700000000',
-        product_name: courseTitle,
+        cus_name: coord.studentName,
+        cus_email: coord.studentEmail,
+        cus_phone: coord.studentPhone,
+        product_name: coord.courseTitle,
         product_category: 'Education',
       });
-    } catch (err) {
+    } catch (err: any) {
       // Network/transport/credential error: no usable gateway session exists.
-      await this.recoverFromFailedInitiation(payment.id, order.id);
+      this.logger.error(
+        `[PAYMENT_INITIATE_FAILED] orderId=${coord.order.id} paymentId=${coord.payment.id} error=${err?.message || err}`
+      );
+      await this.recoverFromFailedInitiation(coord.payment.id, coord.order.id);
 
       throw new ApiException(
         'Failed to establish session with payment gateway',
@@ -273,8 +395,8 @@ export class PaymentsService {
 
     if (gatewaySession.status !== 'SUCCESS' || !gatewaySession.GatewayPageURL) {
       await this.recoverFromFailedInitiation(
-        payment.id,
-        order.id,
+        coord.payment.id,
+        coord.order.id,
         JSON.stringify(this.sanitizeGatewayData(gatewaySession))
       );
 
@@ -285,36 +407,76 @@ export class PaymentsService {
       );
     }
 
-    // Save provider session key
-    await this.db
+    // 4. Optimistic Fencing: Conditionally persist metadata only if attempt is still INITIATED
+    const fencedUpdate = await this.db
       .update(payments)
       .set({
         providerSessionKey: gatewaySession.sessionkey || null,
+        rawResponse: JSON.stringify(
+          this.sanitizeGatewayData({
+            gatewayUrl: gatewaySession.GatewayPageURL,
+            sessionkey: gatewaySession.sessionkey,
+            status: gatewaySession.status,
+          })
+        ),
         updatedAt: new Date(),
       })
-      .where(eq(payments.id, payment.id));
+      .where(
+        and(
+          eq(payments.id, coord.payment.id),
+          eq(payments.status, 'INITIATED')
+        )
+      )
+      .returning();
 
-    // Audit event
+    if (fencedUpdate.length === 0) {
+      // Fencing check failed! Attempt was superseded while gateway request was in flight.
+      this.logger.warn(
+        `[PAYMENT_INITIATION_FENCED_OUT] Stale gateway session received for superseded attempt: paymentId=${coord.payment.id} tranId=${coord.merchantTranId}`
+      );
+      await this.auditService.record({
+        actorId: studentId,
+        action: 'PAYMENT_INITIATION_STALE_SESSION_FENCED',
+        targetType: 'PAYMENT',
+        targetId: coord.payment.id,
+        ipAddress: reqMeta?.ip,
+        userAgent: reqMeta?.userAgent,
+        requestId: reqMeta?.requestId,
+        metadata: {
+          orderId: coord.order.id,
+          merchantTranId: coord.merchantTranId,
+          reason: 'Payment attempt was superseded while gateway request was in flight',
+        },
+      });
+
+      throw new ApiException(
+        'Payment initiation superseded by newer attempt. Please proceed with the active session.',
+        HttpStatus.CONFLICT,
+        'PAYMENT_SESSION_SUPERSEDED'
+      );
+    }
+
+    // 5. Audit event
     await this.auditService.record({
       actorId: studentId,
       action: 'PAYMENT_INITIATED',
       targetType: 'PAYMENT',
-      targetId: payment.id,
+      targetId: coord.payment.id,
       ipAddress: reqMeta?.ip,
       userAgent: reqMeta?.userAgent,
       requestId: reqMeta?.requestId,
       metadata: {
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-        merchantTranId,
-        amountCents: order.payableCents,
-        currency: order.currency,
+        orderId: coord.order.id,
+        orderNumber: coord.order.orderNumber,
+        merchantTranId: coord.merchantTranId,
+        amountCents: coord.order.payableCents,
+        currency: coord.order.currency,
       },
     });
 
     return {
-      paymentId: payment.id,
-      merchantTranId,
+      paymentId: coord.payment.id,
+      merchantTranId: coord.merchantTranId,
       gatewayUrl: gatewaySession.GatewayPageURL,
       provider: 'SSLCOMMERZ',
     };
@@ -335,6 +497,14 @@ export class PaymentsService {
   ): Promise<void> {
     try {
       await this.db.transaction(async (tx) => {
+        // Consistent lock acquisition sequence: order first
+        const [lockedOrder] = await tx
+          .select()
+          .from(orders)
+          .where(eq(orders.id, orderId))
+          .for('update');
+
+        // Only transition from INITIATED to FAILED (do not overwrite if already CANCELLED or VALIDATED)
         await tx
           .update(payments)
           .set({
@@ -342,7 +512,12 @@ export class PaymentsService {
             ...(rawResponse ? { rawResponse } : {}),
             updatedAt: new Date(),
           })
-          .where(eq(payments.id, paymentId));
+          .where(
+            and(
+              eq(payments.id, paymentId),
+              eq(payments.status, 'INITIATED')
+            )
+          );
 
         const [liveAttempt] = await tx
           .select({ id: payments.id })
@@ -355,11 +530,11 @@ export class PaymentsService {
           )
           .limit(1);
 
-        if (!liveAttempt) {
+        if (!liveAttempt && lockedOrder && lockedOrder.status === 'PAYMENT_PROCESSING') {
           await tx
             .update(orders)
             .set({ status: 'PENDING', updatedAt: new Date() })
-            .where(and(eq(orders.id, orderId), eq(orders.status, 'PAYMENT_PROCESSING')));
+            .where(eq(orders.id, orderId));
         }
       });
     } catch (recoveryErr) {
@@ -725,10 +900,10 @@ export class PaymentsService {
       throw new ApiException('Order record not found', HttpStatus.NOT_FOUND, 'ORDER_NOT_FOUND');
     }
 
-    // Fast-path idempotent check: if order is already PAID, skip external HTTP call
-    if (order.status === 'PAID') {
+    // Fast-path idempotent check: if this specific payment attempt is already VALIDATED, skip external HTTP call
+    if (payment.status === 'VALIDATED') {
       this.logger.log(
-        `[IDEMPOTENT_FULFILLMENT] Order ${order.id} is already PAID. Skipping external validation call.`
+        `[IDEMPOTENT_FULFILLMENT] Payment ${payment.id} for order ${order.id} is already VALIDATED. Skipping external validation call.`
       );
       await this.auditService.record({
         actorId: order.studentId,
@@ -754,17 +929,17 @@ export class PaymentsService {
 
     // 4. BEGIN short-lived DB Transaction to apply verified result with row-level locks
     const fulfillment = await this.db.transaction(async (tx) => {
-      // 5. Lock payment and order rows using SELECT FOR UPDATE
-      const [lockedPayment] = await tx
-        .select()
-        .from(payments)
-        .where(eq(payments.id, payment.id))
-        .for('update');
-
+      // 5. Lock order and payment in consistent sequence: orders -> payments
       const [lockedOrder] = await tx
         .select()
         .from(orders)
         .where(eq(orders.id, order.id))
+        .for('update');
+
+      const [lockedPayment] = await tx
+        .select()
+        .from(payments)
+        .where(eq(payments.id, payment.id))
         .for('update');
 
       if (!lockedOrder || !lockedPayment) {
@@ -784,15 +959,69 @@ export class PaymentsService {
         );
       }
 
-      // 7. If order became PAID while waiting for the lock: idempotent no-op!
-      if (lockedOrder.status === 'PAID') {
+      // 7. If this payment attempt became VALIDATED concurrently while waiting for the lock
+      if (lockedPayment.status === 'VALIDATED') {
         this.logger.log(
-          `[IDEMPOTENT_FULFILLMENT] Order ${lockedOrder.id} was fulfilled concurrently. Idempotent no-op.`
+          `[IDEMPOTENT_FULFILLMENT] Payment ${lockedPayment.id} for order ${lockedOrder.id} was fulfilled concurrently. Idempotent no-op.`
         );
         return { order: lockedOrder, payment: lockedPayment, isDuplicate: true };
       }
 
-      // 8. Update payment to VALIDATED
+      const wasSuperseded = lockedPayment.status === 'CANCELLED';
+
+      // 8. If order became PAID by another transaction attempt: EXCESS SETTLEMENT!
+      if (lockedOrder.status === 'PAID') {
+        this.logger.warn(
+          `[EXCESS_SETTLEMENT_DETECTED] Order ${lockedOrder.id} is already PAID. Transaction ${lockedPayment.merchantTranId} (val_id: ${validated.valId}, bank_tran_id: ${validated.bankTranId}) verified at gateway as excess settlement. Tagged for refund.`
+        );
+
+        const [excessPayment] = await tx
+          .update(payments)
+          .set({
+            status: 'FAILED',
+            valId: validated.valId,
+            bankTranId: validated.bankTranId || null,
+            cardType: validated.cardType || null,
+            cardBrand: validated.cardBrand || null,
+            gatewayFeeCents: validated.gatewayFeeCents || null,
+            validatedAt: new Date(),
+            rawResponse: JSON.stringify({
+              ...validated.rawResponse,
+              excessSettlement: true,
+              settledAfterOrderPaid: true,
+              requiresRefund: true,
+              wasSuperseded,
+            }),
+            updatedAt: new Date(),
+          })
+          .where(eq(payments.id, lockedPayment.id))
+          .returning();
+
+        await this.auditService.record({
+          actorId: lockedOrder.studentId,
+          action: 'EXCESS_PAYMENT_SETTLEMENT_DETECTED',
+          targetType: 'PAYMENT',
+          targetId: lockedPayment.id,
+          ipAddress: reqMeta?.ip,
+          userAgent: reqMeta?.userAgent,
+          requestId: reqMeta?.requestId,
+          metadata: {
+            orderId: lockedOrder.id,
+            orderNumber: lockedOrder.orderNumber,
+            merchantTranId: lockedPayment.merchantTranId,
+            valId: validated.valId,
+            bankTranId: validated.bankTranId,
+            amountCents: lockedPayment.amountCents,
+            excessSettlement: true,
+            requiresRefund: true,
+            wasSuperseded,
+          },
+        });
+
+        return { order: lockedOrder, payment: excessPayment, isDuplicate: true, excessSettlement: true };
+      }
+
+      // 9. Update payment to VALIDATED
       const [updatedPayment] = await tx
         .update(payments)
         .set({
@@ -809,7 +1038,30 @@ export class PaymentsService {
         .where(eq(payments.id, lockedPayment.id))
         .returning();
 
-      // 9. Update order to PAID
+      // If attempt was previously CANCELLED, record explicit audit event
+      if (wasSuperseded) {
+        this.logger.log(
+          `[SUPERSEDED_ATTEMPT_HONORED] Order ${lockedOrder.id} fulfilled by previously superseded payment attempt ${lockedPayment.id} (tran_id: ${lockedPayment.merchantTranId})`
+        );
+        await this.auditService.record({
+          actorId: lockedOrder.studentId,
+          action: 'PAYMENT_SUPERSEDED_ATTEMPT_HONORED',
+          targetType: 'PAYMENT',
+          targetId: lockedPayment.id,
+          ipAddress: reqMeta?.ip,
+          userAgent: reqMeta?.userAgent,
+          requestId: reqMeta?.requestId,
+          metadata: {
+            orderId: lockedOrder.id,
+            orderNumber: lockedOrder.orderNumber,
+            merchantTranId: lockedPayment.merchantTranId,
+            valId: validated.valId,
+            bankTranId: validated.bankTranId,
+          },
+        });
+      }
+
+      // 10. Update order to PAID
       const [updatedOrder] = await tx
         .update(orders)
         .set({
@@ -959,21 +1211,23 @@ export class PaymentsService {
 
     // 14. Audit logging
     if (fulfillment.isDuplicate) {
-      await this.auditService.record({
-        actorId: fulfillment.order.studentId,
-        action: 'PAYMENT_REPLAY_DETECTED',
-        targetType: 'PAYMENT',
-        targetId: fulfillment.payment.id,
-        ipAddress: reqMeta?.ip,
-        userAgent: reqMeta?.userAgent,
-        requestId: reqMeta?.requestId,
-        metadata: {
-          merchantTranId,
-          valId,
-          orderId: fulfillment.order.id,
-          orderNumber: fulfillment.order.orderNumber,
-        },
-      });
+      if (!(fulfillment as any).excessSettlement) {
+        await this.auditService.record({
+          actorId: fulfillment.order.studentId,
+          action: 'PAYMENT_REPLAY_DETECTED',
+          targetType: 'PAYMENT',
+          targetId: fulfillment.payment.id,
+          ipAddress: reqMeta?.ip,
+          userAgent: reqMeta?.userAgent,
+          requestId: reqMeta?.requestId,
+          metadata: {
+            merchantTranId,
+            valId,
+            orderId: fulfillment.order.id,
+            orderNumber: fulfillment.order.orderNumber,
+          },
+        });
+      }
     } else {
       await this.auditService.record({
         actorId: fulfillment.order.studentId,
